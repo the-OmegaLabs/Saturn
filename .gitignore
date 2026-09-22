@@ -6,6 +6,8 @@ __pycache__/
 .venv/
 .flet/
 .zcode/
+/dist/
+/.build-probe/
 
 # scratch artifacts (test screenshots, temp scripts)
 /*.png

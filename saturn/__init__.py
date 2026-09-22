@@ -108,7 +108,7 @@ __all__ = [
     "Rotate", "Scale", "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
     "Tooltip", "TooltipTriggerMode",
 ]
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 # flet-style module aliases: ft.dropdown.Option(...)
 dropdown = SimpleNamespace(Option=Option, DropdownOption=DropdownOption)
