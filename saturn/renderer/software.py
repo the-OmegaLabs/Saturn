@@ -50,25 +50,23 @@ class SoftwareRenderer(Renderer):
     def fill_rect(self, x, y, w, h, color, radius=0):
         if w <= 0 or h <= 0:
             return
-        pygame.draw.rect(self._buf, _rgb(color),
+        c = _rgb(color)
+        if len(c) > 3 and c[3] < 255:
+            # pygame.draw REPLACES pixels (alpha included) on a SRCALPHA buf,
+            # so translucent fills accumulate frame over frame — composite
+            # through a temp surface instead
+            tmp = pygame.Surface((max(1, int(w * SCALE)), max(1, int(h * SCALE))),
+                                 pygame.SRCALPHA)
+            pygame.draw.rect(tmp, c, tmp.get_rect(),
+                             border_radius=int(radius * SCALE))
+            self._buf.blit(tmp, self._s(x, y))
+            return
+        pygame.draw.rect(self._buf, c,
                          (*self._s(x, y)[:2], int(w * SCALE), int(h * SCALE)),
                          border_radius=int(radius * SCALE))
 
     def overlay_rect(self, x, y, w, h, color, radius=0):
-        """Alpha-blended rect (blit composites; direct draw would overwrite)."""
-        if w <= 0 or h <= 0:
-            return
-        c = _rgb(color)
-        if len(c) < 4 or c[3] >= 255:
-            self.fill_rect(x, y, w, h, color, radius)
-            return
-        tmp = pygame.Surface((max(1, int(w * SCALE)), max(1, int(h * SCALE))),
-                             pygame.SRCALPHA)
-        if radius:
-            pygame.draw.rect(tmp, c, tmp.get_rect(), border_radius=int(radius * SCALE))
-        else:
-            tmp.fill(c)
-        self._buf.blit(tmp, self._s(x, y))
+        self.fill_rect(x, y, w, h, color, radius)  # fill_rect blends now
 
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
         pygame.draw.rect(self._buf, _rgb(color),
