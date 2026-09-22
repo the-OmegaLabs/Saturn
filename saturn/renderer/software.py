@@ -69,9 +69,20 @@ class SoftwareRenderer(Renderer):
         self.fill_rect(x, y, w, h, color, radius)  # fill_rect blends now
 
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
-        pygame.draw.rect(self._buf, _rgb(color),
-                         (*self._s(x, y)[:2], int(w * SCALE), int(h * SCALE)),
-                         width=max(1, int(width * SCALE)),
+        c = _rgb(color)
+        sw, sh = max(1, int(w * SCALE)), max(1, int(h * SCALE))
+        line_w = max(1, int(width * SCALE))
+        if len(c) > 3 and c[3] < 255:
+            # Like fill_rect, pygame.draw replaces destination alpha on an
+            # SRCALPHA surface. Draw translucent strokes into a temporary
+            # layer so they blend over the already-opaque frame like GL.
+            tmp = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            pygame.draw.rect(tmp, c, tmp.get_rect(), width=line_w,
+                             border_radius=int(radius * SCALE))
+            self._buf.blit(tmp, self._s(x, y))
+            return
+        pygame.draw.rect(self._buf, c,
+                         (*self._s(x, y)[:2], sw, sh), width=line_w,
                          border_radius=int(radius * SCALE))
 
     def line(self, x1, y1, x2, y2, color, width=1):
