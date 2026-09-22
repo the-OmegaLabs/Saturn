@@ -68,11 +68,15 @@ class Window:
             self._app.post(self._app._window.minimize)
 
     def _set_size(self, w, h):
+        # pygame-ce fires no WINDOWRESIZED for programmatic sets, and the GL
+        # context is UI-thread-bound — so the renderer update rides along
+        # with the SDL size change on the UI thread. Manual resizes still
+        # come through the WINDOWRESIZED event.
         def _do():
             self._app._window.size = (w, h)
+            self._app.renderer.on_resize(w, h)
         self._app._size = [w, h]
         self._app.post(_do)
-        self._app.renderer.on_resize(w, h)
         self._app.mark_dirty()
 
     def close(self):
