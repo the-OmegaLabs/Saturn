@@ -67,9 +67,13 @@ _font_cache: dict = {}
 _line_surface_cache: OrderedDict = OrderedDict()
 _line_surface_lock = threading.RLock()
 _icon_cache: dict = {}
+_icon_surface_cache: OrderedDict = OrderedDict()
 _probe_cache: dict[tuple, _freetype.Font] = {}
 _cover_cache: dict[tuple, bool] = {}
-ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
+# Flet renders the default ``Icons`` family filled. Saturn's generated icon
+# values are Material Symbols codepoints, so use the FILL=1 static instance of
+# that same font rather than Flet's runtime-ID based Material Icons asset.
+ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsFilled.ttf"
 
 # Regular-first async instancing (see module docstring)
 on_weight_ready = None                          # set by App.start(): mark_dirty
@@ -366,6 +370,21 @@ def get_icon_font(px_size: int) -> pygame.font.Font:
         f = pygame.font.Font(str(ICON_FONT_PATH), px_size)
         _icon_cache[px_size] = f
     return f
+
+
+def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
+    """Render an immutable Material icon once and reuse it across frames."""
+    rgba = tuple(color)
+    key = (int(icon), int(px_size), rgba)
+    surface = _icon_surface_cache.get(key)
+    if surface is None:
+        surface = get_icon_font(px_size).render(chr(int(icon)), True, rgba)
+        _icon_surface_cache[key] = surface
+        if len(_icon_surface_cache) > 256:
+            _icon_surface_cache.popitem(last=False)
+    else:
+        _icon_surface_cache.move_to_end(key)
+    return surface
 
 
 # -- segmentation + rendering -----------------------------------------------------

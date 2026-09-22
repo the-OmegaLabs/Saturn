@@ -8,8 +8,7 @@ from __future__ import annotations
 from .. import colors, motion, text as txt
 from ..control import Control
 from ..event import fire
-from ..text import get_icon_font
-from ..text import weight_num
+from ..text import render_icon_cached
 from ._material import (draw_state_layer, init_state_layer, press,
                         release, set_hover, tick_state_layer)
 
@@ -18,6 +17,7 @@ _HEIGHT = 40.0
 _PAD_H = 24.0
 _GAP = 8.0
 _LABEL_SIZE = 14.0
+_LABEL_WEIGHT = 500
 _ICON_SIZE = 18.0
 
 
@@ -64,7 +64,7 @@ class Button(Control):
         w, h = 0.0, _HEIGHT
         if label := self._label():
             lw, lh = txt.measure(label, _LABEL_SIZE, scale=scale,
-                                 weight=400)
+                                 weight=_LABEL_WEIGHT)
             w += lw
             h = max(h, lh + 20)
         elif isinstance(self.content, Control):
@@ -73,7 +73,9 @@ class Button(Control):
             h = max(h, ch + 20)
         if self.icon is not None:
             w += _ICON_SIZE + (_GAP if w else 0)
-        w += 2 * _PAD_H
+        # Material buttons with a leading icon use 16px at the start and
+        # 24px at the end. Text-only buttons use 24px on both sides.
+        w += (16.0 if self.icon is not None else _PAD_H) + _PAD_H
         if self._width is not None:
             w = self._width
         if self._height is not None:
@@ -134,17 +136,20 @@ class Button(Control):
         icon_surf = label_surf = None
         label_w = icon_w = 0.0
         if self.icon is not None:
-            f = get_icon_font(round(_ICON_SIZE * scale))
-            icon_surf = f.render(chr(int(self.icon)), True, self._fg())
+            icon_surf = render_icon_cached(
+                self.icon, round(_ICON_SIZE * scale), self._fg())
             icon_w = icon_surf.get_width() / scale
         if label := self._label():
             label_surf = txt.render_line_cached(
-                label, _LABEL_SIZE, scale=scale, color=self._fg())
+                label, _LABEL_SIZE, scale=scale, weight=_LABEL_WEIGHT,
+                color=self._fg())
             label_w = label_surf.get_width() / scale
         elif isinstance(self.content, Control):
             label_w = self.content._rect[2]
         total = icon_w + ((_GAP) if icon_w and label_w else 0) + label_w
-        cx = x + (w - total) / 2
+        pad_start = 16.0 if self.icon is not None else _PAD_H
+        content_w = w - pad_start - _PAD_H
+        cx = x + pad_start + (content_w - total) / 2
         cy = y + h / 2
         if icon_surf is not None:
             r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale))
@@ -177,23 +182,24 @@ class Button(Control):
         if self.variant_elevation:
             self._animate_internal(
                 "_elevation_progress", 2.0 if on else self.variant_elevation,
-                280, motion.EMPHASIZED)
+                motion.SHORT3, motion.EMPHASIZED)
         self.update()
         fire(self, "hover", "true" if on else "false")
 
     def _pressed_hook(self, x, y):
-        press(self, x, y)
+        press(self, x, y, ripple_duration=motion.SHORT4,
+              press_duration=75)
         if self.variant_elevation:
-            self._animate_internal("_elevation_progress", 1.0, 280,
+            self._animate_internal("_elevation_progress", 1.0, motion.SHORT3,
                                    motion.EMPHASIZED)
 
     def _released_hook(self, _x, _y):
-        release(self)
+        release(self, minimum_ms=0, fade_duration=motion.SHORT2)
         if self.variant_elevation:
             self._animate_internal(
                 "_elevation_progress",
                 2.0 if self._hovered else self.variant_elevation,
-                280, motion.EMPHASIZED)
+                motion.SHORT3, motion.EMPHASIZED)
 
     def _tick_animations(self, now: float) -> bool:
         waiting = tick_state_layer(self, now)
@@ -227,10 +233,12 @@ class TextButton(Button):
     variant_fg = colors.Colors.PRIMARY
 
 
-# flet 1.0's plain `Button`: neutral filled surface, primary label
+# Flet 1.0 renamed ElevatedButton to Button. Its defaults remain the Material
+# elevated-button surface/elevation rather than a high-emphasis filled button.
 class _ConcreteButton(Button):
-    variant_bg = colors.Colors.SURFACE_CONTAINER_HIGHEST
+    variant_bg = colors.Colors.SURFACE_CONTAINER_LOW
     variant_fg = colors.Colors.PRIMARY
+    variant_elevation = 1.0
 
 
 Button = _ConcreteButton
@@ -278,8 +286,8 @@ class IconButton(Control):
         state_color = (self.hover_color or self.icon_color or
                        colors.Colors.ON_SURFACE_VARIANT)
         draw_state_layer(self, r, (x, y, w, h), state_color, min(w, h) / 2)
-        f = get_icon_font(round(self.icon_size * r.scale))
-        surf = f.render(chr(int(self._current_icon())), True, fg)
+        surf = render_icon_cached(
+            self._current_icon(), round(self.icon_size * r.scale), fg)
         r.blit(surf, x + (w - surf.get_width() / r.scale) / 2,
                y + (h - surf.get_height() / r.scale) / 2)
 
@@ -297,10 +305,11 @@ class IconButton(Control):
         fire(self, "hover", "true" if on else "false")
 
     def _pressed_hook(self, x, y):
-        press(self, x, y)
+        press(self, x, y, ripple_duration=motion.SHORT4,
+              press_duration=75)
 
     def _released_hook(self, _x, _y):
-        release(self)
+        release(self, minimum_ms=0, fade_duration=motion.SHORT2)
 
     def _tick_animations(self, now: float) -> bool:
         waiting = tick_state_layer(self, now)

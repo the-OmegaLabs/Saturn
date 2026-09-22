@@ -52,7 +52,10 @@ def check_click():
     page.add(btn, btn2)
     page.draw()
     page.pointer_down(*center(btn))
+    assert btn._animations["_state_ripple_progress"].duration == 0.2
+    assert btn._animations["_state_press_alpha"].duration == 0.075
     page.pointer_up(*center(btn))
+    assert btn._animations["_state_press_alpha"].duration == 0.1
     assert clicks.wait(), "on_click never fired"
     page.pointer_down(*center(btn2))
     page.pointer_up(*center(btn2))

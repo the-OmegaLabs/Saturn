@@ -237,8 +237,8 @@ class ProgressRing(Control):
         self._phase = 0.0
 
     def _intrinsic(self, max_w, max_h, scale):
-        return (self._width if self._width is not None else 36,
-                self._height if self._height is not None else 36)
+        return (self._width if self._width is not None else 40,
+                self._height if self._height is not None else 40)
 
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)

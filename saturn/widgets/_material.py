@@ -19,6 +19,7 @@ def init_state_layer(control):
     control._state_press_origin = (0.0, 0.0)
     control._state_press_started = 0.0
     control._state_release_deadline = None
+    control._state_release_duration = 375
 
 
 def set_hover(control, on: bool):
@@ -28,7 +29,8 @@ def set_hover(control, on: bool):
         15, AnimationCurve.LINEAR)
 
 
-def press(control, x: float, y: float):
+def press(control, x: float, y: float, *, ripple_duration=motion.LONG1,
+          press_duration=105):
     control._state_press_origin = (x, y)
     control._state_press_started = time.perf_counter()
     control._state_release_deadline = None
@@ -37,19 +39,22 @@ def press(control, x: float, y: float):
     control._state_ripple_progress = 0.0
     control._animation_targets["_state_ripple_progress"] = 0.0
     control._animate_internal(
-        "_state_ripple_progress", 1.0, motion.LONG1, motion.STANDARD)
+        "_state_ripple_progress", 1.0, ripple_duration, motion.STANDARD)
     control._animate_internal(
-        "_state_press_alpha", PRESS_OPACITY, 105, AnimationCurve.LINEAR)
+        "_state_press_alpha", PRESS_OPACITY, press_duration,
+        AnimationCurve.LINEAR)
 
 
-def release(control, *, now: float | None = None):
+def release(control, *, now: float | None = None, minimum_ms=225,
+            fade_duration=375):
     now = time.perf_counter() if now is None else now
-    minimum_end = control._state_press_started + 0.225
+    control._state_release_duration = fade_duration
+    minimum_end = control._state_press_started + minimum_ms / 1000.0
     if now < minimum_end:
         control._state_release_deadline = minimum_end
     else:
         control._animate_internal(
-            "_state_press_alpha", 0.0, 375,
+            "_state_press_alpha", 0.0, fade_duration,
             AnimationCurve.LINEAR, now=now)
 
 
@@ -58,7 +63,8 @@ def tick_state_layer(control, now: float) -> bool:
     if deadline is not None and now >= deadline:
         control._state_release_deadline = None
         control._animate_internal(
-            "_state_press_alpha", 0.0, 375,
+            "_state_press_alpha", 0.0,
+            control._state_release_duration,
             AnimationCurve.LINEAR, now=now)
     return control._state_release_deadline is not None
 

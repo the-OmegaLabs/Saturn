@@ -9,6 +9,7 @@ sys.path.insert(0, ".")
 import pygame
 
 import saturn as ft
+from saturn import text as saturn_text
 from saturn.widgets.containers import Row
 from saturn.widgets.inputs import (Checkbox, Dropdown, DropdownOption, Radio,
                                    RadioGroup, Slider, Switch, TextField)
@@ -103,6 +104,29 @@ def check_password_and_hint():
     print("password ok")
 
 
+def check_textfield_overflow():
+    app, page = make_page()
+    value = "123123123请问去问去问我去饿我去饿我去饿"
+    tf = TextField(value, width=180)
+    page.add(tf)
+    page.draw()
+    assert tf._scroll_x == 0.0
+    page.focus(tf)
+    tf._caret = len(value)
+    page.draw()
+    left, viewport_w = tf._text_viewport()
+    family, size, _ = tf._style()
+    caret_x = left - tf._scroll_x + saturn_text.line_width(
+        tf._visible_text(), size, scale=app.renderer.scale, family=family)
+    assert tf._scroll_x > 0
+    assert left <= caret_x <= left + viewport_w
+
+    tf._key(FakeKey(pygame.K_HOME))
+    page.draw()
+    assert tf._scroll_x == 0.0
+    print("textfield overflow ok")
+
+
 def check_textfield_animations():
     app, page = make_page()
     tf = TextField(label="Name", hint_text="Enter a name")
@@ -194,7 +218,10 @@ def check_checkbox_switch():
     page.pointer_up(*center(c))
     assert c.value is True and cb.wait() and cb.items[-1] == "true"
     page.pointer_down(*center(s))
+    assert s._animations["_thumb_press_progress"].duration == 0.075
     page.pointer_up(*center(s))
+    assert s._animations["_thumb_press_progress"].duration == 0.1
+    assert s._animations["_thumb_press_progress"].end_value == 0.0
     assert s.value is True and sw.wait()
     print("checkbox/switch ok")
 
@@ -244,6 +271,9 @@ def check_dropdown():
     page.pointer_down(*center(dd))
     page.pointer_up(*center(dd))
     assert dd.open and len(page.overlay) == 1
+    assert dd._menu_surface._rect[1] == dd._rect[1] + dd._rect[3] + 4
+    assert dd._menu_surface._rect[3] == len(dd.options) * 36
+    assert all(item._rect[3] == 36 for item in dd._menu)
     assert dd._animations["_menu_progress"].duration == 0.3
     opened = dd._animations["_menu_progress"].started
     dd._tick_animations(opened + 0.31)
@@ -261,6 +291,7 @@ def check_dropdown():
 if __name__ == "__main__":
     check_textfield()
     check_password_and_hint()
+    check_textfield_overflow()
     check_textfield_animations()
     check_cjk_ime()
     check_checkbox_switch()

@@ -17,12 +17,12 @@ from .._gen.icons import Icons
 from ..control import Control
 from ..event import fire
 from ..text import get_font, get_icon_font
-from ..types import (AnimationCurve, LabelPosition, OutlineInputBorder,
-                     as_border_radius)
+from ..types import (Alignment, AnimationCurve, LabelPosition,
+                     OutlineInputBorder, Padding, as_border_radius)
 
 _FIELD_H = 48.0
 _FIELD_PAD = 12.0
-_RADIUS = 8.0
+_RADIUS = 4.0
 _ITEM_H = 36.0
 _IME_OFFSET_X = -6.0
 _IME_OFFSET_Y = -4.0
@@ -66,7 +66,7 @@ class TextField(Control):
         self.on_blur = on_blur
         self.on_click = on_click
         self.on_hover = on_hover
-        self.filled = filled          # flet flag; saturn always draws filled
+        self.filled = filled
         self.bgcolor = bgcolor
         self.border_color = border_color
         self.cursor_color = cursor_color
@@ -91,6 +91,7 @@ class TextField(Control):
         self._cursor_generation = 0
         self._line_cache = {}
         self._last_value = value
+        self._scroll_x = 0.0
 
     def _style(self):
         """(family, value size, value color) from the flet text_style."""
@@ -126,7 +127,7 @@ class TextField(Control):
 
     # -- layout --------------------------------------------------------------
     def _intrinsic(self, max_w, max_h, scale):
-        w = self._width if self._width is not None else (max_w or 280)
+        w = self._width if self._width is not None else min(300.0, max_w or 300.0)
         if self.multiline:
             lines = max(1, self.max_lines or 3)
             h = _FIELD_PAD * 2 + txt.line_height(self.text_size, scale=scale) * lines
@@ -221,7 +222,7 @@ class TextField(Control):
         """Place the caret from a pointer x position."""
         scale = self.page._app.renderer.scale if self.page else 1.0
         family, vsize, _ = self._style()
-        px = x - (self._rect[0] + _FIELD_PAD)
+        px = x - (self._rect[0] + _FIELD_PAD) + self._scroll_x
         vis = self._visible_text()
         acc, idx = 0.0, 0
         for i, ch in enumerate(vis):
@@ -237,6 +238,44 @@ class TextField(Control):
         self._restart_cursor_blink()
         self._update_ime_rect()
         self.update()
+
+    def _text_viewport(self):
+        """Return the horizontal content viewport, excluding adornments."""
+        x, _y, w, _h = self._rect
+        trailing = 36.0 if self.password and self.can_reveal_password else 0.0
+        return x + _FIELD_PAD, max(0.0, w - 2 * _FIELD_PAD - trailing)
+
+    def _sync_horizontal_scroll(self, scale):
+        """Keep the active caret visible inside a single-line field."""
+        if self.multiline:
+            self._scroll_x = 0.0
+            return
+        family, vsize, _ = self._style()
+        shown = self._visible_text()
+        composition = self._visible_composition()
+        ime_cursor = min(len(composition),
+                         self._composition_start + self._composition_length)
+        caret_text = shown[:self._caret] + composition[:ime_cursor]
+        displayed = shown[:self._caret] + composition + shown[self._caret:]
+        caret_x = txt.line_width(
+            caret_text, vsize, scale=scale, family=family)
+        content_w = txt.line_width(
+            displayed, vsize, scale=scale, family=family)
+        _left, viewport_w = self._text_viewport()
+        if viewport_w <= 0:
+            self._scroll_x = 0.0
+            return
+        max_scroll = max(0.0, content_w + 2.0 - viewport_w)
+        if not self._focused:
+            # Keep the current view on blur; a freshly created field starts
+            # at the beginning until its caret actually receives focus.
+            self._scroll_x = max(0.0, min(self._scroll_x, max_scroll))
+            return
+        if caret_x < self._scroll_x:
+            self._scroll_x = caret_x
+        elif caret_x + 2.0 > self._scroll_x + viewport_w:
+            self._scroll_x = caret_x + 2.0 - viewport_w
+        self._scroll_x = max(0.0, min(self._scroll_x, max_scroll))
 
     # -- editing ----------------------------------------------------------------
     def _changed(self):
@@ -285,14 +324,17 @@ class TextField(Control):
             return
         scale = self.page._app.renderer.scale
         family, vsize, _ = self._style()
+        self._sync_horizontal_scroll(scale)
         shown = self._visible_text()
         prefix = shown[:self._caret]
         composition = self._visible_composition()
         ime_cursor = min(len(composition),
                          self._composition_start + self._composition_length)
         caret_text = prefix + composition[:ime_cursor]
-        cx = self._rect[0] + _FIELD_PAD + txt.line_width(
+        text_left, viewport_w = self._text_viewport()
+        cx = text_left - self._scroll_x + txt.line_width(
             caret_text, vsize, scale=scale, family=family)
+        cx = max(text_left, min(text_left + viewport_w, cx))
         text_y = self._rect[1] + (self._rect[3] - vsize) / 2
         # SDL's Windows backend treats this as both the current composition
         # point and an exclusion area. Start at the visual caret but extend to
@@ -356,11 +398,13 @@ class TextField(Control):
             _RADIUS if radius_value is None else radius_value).top_left
         focus = self._focus_progress
         hover = self._hover_progress
-        field_bg = _parse(
-            self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST)
-        if hover:
-            field_bg = _mix(field_bg, colors.Colors.ON_SURFACE, 0.04 * hover)
-        r.fill_rect(x, y, w, h, field_bg, radius=radius)
+        if self.filled or self.bgcolor is not None:
+            field_bg = _parse(
+                self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST)
+            if hover:
+                field_bg = _mix(field_bg, colors.Colors.ON_SURFACE,
+                                0.04 * hover)
+            r.fill_rect(x, y, w, h, field_bg, radius=radius)
         border_width = 0.0
         border_draw_color = None
         if outline is not None:
@@ -437,15 +481,18 @@ class TextField(Control):
         composition = self._visible_composition()
         prefix, suffix = shown[:self._caret], shown[self._caret:]
         displayed = prefix + composition + suffix
+        self._sync_horizontal_scroll(scale)
+        text_left, viewport_w = self._text_viewport()
+        draw_x = text_left - self._scroll_x
         hint_progress = 0.0
         if displayed:
             surf = self._render_cached(
                 "value", displayed, vsize, scale, family, _parse(vcolor))
             text_y = ty + (th - surf.get_height() / scale) / 2
-            r.clip_push(x, y, w, h)
-            r.blit(surf, x + _FIELD_PAD, text_y)
+            r.clip_push(text_left, y, viewport_w, h)
+            r.blit(surf, draw_x, text_y)
             if composition:
-                comp_x = x + _FIELD_PAD + txt.line_width(
+                comp_x = draw_x + txt.line_width(
                     prefix, vsize, scale=scale, family=family)
                 comp_w = txt.line_width(
                     composition, vsize, scale=scale, family=family)
@@ -475,9 +522,11 @@ class TextField(Control):
             surf = self._render_cached(
                 "hint", self.hint_text, self.text_size, scale, family,
                 _parse(colors.Colors.ON_SURFACE_VARIANT))
-            r.blit(surf, x + _FIELD_PAD,
+            r.clip_push(text_left, y, viewport_w, h)
+            r.blit(surf, text_left,
                    ty + (th - surf.get_height() / scale) / 2,
                    alpha=hint_progress)
+            r.clip_pop()
         if self.password and self.can_reveal_password:
             icon = Icons.VISIBILITY_OFF if self._password_revealed else Icons.VISIBILITY
             af = get_icon_font(round(24 * scale))
@@ -489,10 +538,12 @@ class TextField(Control):
             ime_cursor = min(len(composition),
                              self._composition_start + self._composition_length)
             caret_text = prefix + composition[:ime_cursor]
-            cx = x + _FIELD_PAD + txt.line_width(
+            cx = draw_x + txt.line_width(
                 caret_text, vsize, scale=scale, family=family)
+            r.clip_push(text_left, y, viewport_w, h)
             r.fill_rect(cx, ty + (th - vsize) / 2, 2, vsize,
                         _parse(self.cursor_color or colors.Colors.PRIMARY))
+            r.clip_pop()
             self._update_ime_rect()
 
 
@@ -632,9 +683,16 @@ class Switch(_Toggle):
         initial = 1.0 if self.value else 0.0
         self._color_progress = initial
         self._size_progress = initial
+        self._thumb_press_progress = 0.0
 
     def _box_size(self):
-        return 40.0  # track width
+        return 52.0  # Material 3 track width
+
+    def _intrinsic(self, max_w, max_h, scale):
+        lw, _ = txt.measure(self.label, 14, scale=scale) if self.label else (0, 0)
+        w = 52.0 + (8.0 + lw if self.label else 0.0)
+        return (self._width if self._width is not None else w,
+                self._height if self._height is not None else 40.0)
 
     def _animate_value(self, selected: bool):
         target = 1.0 if selected else 0.0
@@ -646,7 +704,7 @@ class Switch(_Toggle):
                                motion.STANDARD)
 
     def _draw_box(self, r, x, y, w):
-        h = 20.0
+        h = 32.0
         track_y = y + (w - h) / 2
         progress = self._value_progress
         color_progress = self._color_progress
@@ -656,11 +714,17 @@ class Switch(_Toggle):
         track_c = tuple(round(a + (b - a) * color_progress)
                         for a, b in zip(inactive, active))
         r.fill_rect(x, track_y, w, h, track_c, radius=h / 2)
+        if color_progress < 1.0:
+            r.opacity_push(1.0 - color_progress)
+            r.stroke_rect(x, track_y, w, h,
+                          _parse(colors.Colors.OUTLINE), width=2,
+                          radius=h / 2)
+            r.opacity_pop()
         thumb_r = 8.0 + 4.0 * size_progress
-        if self._state_press_alpha > 0:
-            thumb_r += (10.0 - thumb_r) * min(
-                1.0, self._state_press_alpha / 0.12)
-        tx = x + 10.0 + (w - 20.0) * progress
+        # Flet's Material switch snaps its handle to the 28px pressed size;
+        # this is intentionally independent of the slower state-layer alpha.
+        thumb_r += (14.0 - thumb_r) * self._thumb_press_progress
+        tx = x + 16.0 + (w - 32.0) * progress
         on_thumb = _parse(colors.Colors.ON_PRIMARY)
         off_thumb = _parse(colors.Colors.OUTLINE)
         tc = tuple(round(a + (b - a) * color_progress)
@@ -669,11 +733,22 @@ class Switch(_Toggle):
 
     def _draw_state(self, r, bx, cy, box):
         size = 40.0
-        tx = bx + 10.0 + (box - 20.0) * self._value_progress
+        tx = bx + 16.0 + (box - 32.0) * self._value_progress
         state_color = (self.active_color or colors.Colors.PRIMARY
                        if self.value else colors.Colors.ON_SURFACE)
         draw_state_layer(self, r, (tx - size / 2, cy - size / 2,
                                    size, size), state_color, size / 2)
+
+    def _pressed_hook(self, x, y):
+        press(self, x, y, ripple_duration=motion.SHORT4,
+              press_duration=75)
+        self._animate_internal("_thumb_press_progress", 1.0,
+                               75, motion.STANDARD_ACCELERATE)
+
+    def _released_hook(self, _x, _y):
+        release(self, minimum_ms=0, fade_duration=motion.SHORT2)
+        self._animate_internal("_thumb_press_progress", 0.0,
+                               motion.SHORT2, motion.STANDARD_DECELERATE)
 
 
 class RadioGroup(Control):
@@ -849,7 +924,8 @@ class Slider(Control):
         init_state_layer(self)
 
     def _intrinsic(self, max_w, max_h, scale):
-        return (self._width if self._width is not None else (max_w or 300),
+        return (self._width if self._width is not None
+                else min(300.0, max_w or 300.0),
                 self._height if self._height is not None else 40.0)
 
     def _place(self, x, y, w, h, scale):
@@ -1044,7 +1120,9 @@ class _DropdownMenu(Control):
 
 class Dropdown(Control):
     def __init__(self, value=None, *, options=None, hint_text=None, label=None,
-                 on_select=None, text_size: float = 14.0, **base):
+                 on_select=None, text_size: float = 14.0, filled=False,
+                 fill_color=None, bgcolor=None, border=None,
+                 border_radius=None, **base):
         super().__init__(**base)
         self.value = value
         self.options = list(options or [])
@@ -1052,6 +1130,11 @@ class Dropdown(Control):
         self.label = label
         self.on_select = on_select
         self.text_size = text_size
+        self.filled = filled
+        self.fill_color = fill_color
+        self.bgcolor = bgcolor
+        self.border = border
+        self.border_radius = border_radius
         self.open = False
         self._menu: list[Control] = []
         self._menu_surface = None
@@ -1071,7 +1154,7 @@ class Dropdown(Control):
         return ""
 
     def _intrinsic(self, max_w, max_h, scale):
-        w = self._width if self._width is not None else (max_w or 280)
+        w = self._width if self._width is not None else min(300.0, max_w or 300.0)
         return (w, self._height if self._height is not None else _FIELD_H)
 
     def _place(self, x, y, w, h, scale):
@@ -1134,7 +1217,9 @@ class Dropdown(Control):
             item = Container(Text(opt.text or opt.key, size=self.text_size,
                                   color=colors.Colors.ON_SURFACE),
                              bgcolor=colors.Colors.SURFACE_CONTAINER,
-                             padding=8, border_radius=4, ink=True,
+                             padding=Padding.symmetric(horizontal=_FIELD_PAD),
+                             alignment=Alignment.CENTER_LEFT,
+                             border_radius=4, ink=True,
                              on_click=pick)
             self._menu.append(item)
         self._menu_surface = _DropdownMenu(self, self._menu)
@@ -1146,18 +1231,26 @@ class Dropdown(Control):
         x, y, w, h = self._rect
         if self._menu_surface is not None:
             self._menu_surface._place(
-                x, y + h + 4, w, len(self._menu) * _ITEM_H,
+                x, y + h + 4.0, w, len(self._menu) * _ITEM_H,
                 self.page._app.renderer.scale)
 
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
-        r.fill_rect(x, y, w, h,
-                    _parse(colors.Colors.SURFACE_CONTAINER_HIGHEST), radius=_RADIUS)
+        radius = as_border_radius(
+            _RADIUS if self.border_radius is None else self.border_radius).top_left
+        if self.filled or self.fill_color is not None or self.bgcolor is not None:
+            r.fill_rect(
+                x, y, w, h,
+                _parse(self.fill_color or self.bgcolor or
+                       colors.Colors.SURFACE_CONTAINER_HIGHEST),
+                radius=radius)
         draw_state_layer(self, r, (x, y, w, h),
-                         colors.Colors.ON_SURFACE, _RADIUS)
-        if self.open or self._menu_closing:
-            r.stroke_rect(x, y, w, h, _parse(colors.Colors.PRIMARY),
-                          width=1 + min(1.0, self._menu_timeline), radius=_RADIUS)
+                         colors.Colors.ON_SURFACE, radius)
+        border_color = (colors.Colors.PRIMARY
+                        if self.open or self._menu_closing
+                        else colors.Colors.OUTLINE)
+        r.stroke_rect(x, y, w, h, _parse(border_color),
+                      width=1 + min(1.0, self._menu_timeline), radius=radius)
         shown = self._selected_text() or self.hint_text or ""
         c = _parse(colors.Colors.ON_SURFACE if self._selected_text()
                    else colors.Colors.ON_SURFACE_VARIANT)
