@@ -15,14 +15,23 @@ import saturn as ft
 from saturn import text as txt
 
 
+def _cache_inst(wnum):
+    inter = str(txt.INTER)
+    key = (f"{Path(inter).stem}.{wnum}.{int(Path(inter).stat().st_mtime)}."
+           f"{Path(inter).stat().st_size}")
+    return Path.home() / ".cache" / "saturn" / "font-cache" / f"{key}.ttf"
+
+
 def check_placeholder_then_swap():
     inter = str(txt.INTER)
     wnum = 500  # not a shipped static; Inter's fvar default is 400
-    key = (f"{Path(inter).stem}.{wnum}.{int(Path(inter).stat().st_mtime)}."
-           f"{Path(inter).stat().st_size}")
-    inst = Path.home() / ".cache" / "saturn" / "font-cache" / f"{key}.ttf"
-    if inst.exists():
-        inst.unlink()
+    # every weight this check first-misses must start uncached, or earlier
+    # app runs (which built 300/600 into the shared cache) break the run
+    for w in (wnum, 300):
+        p = _cache_inst(w)
+        if p.exists():
+            p.unlink()
+    inst = _cache_inst(wnum)
     txt._font_cache.clear()
     txt._pending_inst.clear()
     txt._inst_failed.clear()
