@@ -16,19 +16,19 @@ class Window:
 
     @property
     def width(self) -> int:
-        return self._app.size[0]
+        return self._app.outer_size[0]
 
     @width.setter
     def width(self, v: int):
-        self._set_size(int(v), self._app.size[1])
+        self._set_size(int(v), self._app.outer_size[1])
 
     @property
     def height(self) -> int:
-        return self._app.size[1]
+        return self._app.outer_size[1]
 
     @height.setter
     def height(self, v: int):
-        self._set_size(self._app.size[0], int(v))
+        self._set_size(self._app.outer_size[0], int(v))
 
     @property
     def title(self) -> str:
@@ -72,10 +72,13 @@ class Window:
         # context is UI-thread-bound — so the renderer update rides along
         # with the SDL size change on the UI thread. Manual resizes still
         # come through the WINDOWRESIZED event.
+        client_w, client_h = self._app.client_size_for_outer(w, h)
+
         def _do():
-            self._app._window.size = (w, h)
-            self._app.renderer.on_resize(w, h)
-        self._app._size = [w, h]
+            self._app._window.size = (client_w, client_h)
+            self._app.renderer.on_resize(client_w, client_h)
+        self._app._outer_size[:] = [w, h]
+        self._app._size[:] = [client_w, client_h]
         self._app.post(_do)
         self._app.mark_dirty()
 
@@ -90,7 +93,7 @@ class Window:
         # size changes queued earlier, so it centers the final size
         def _do():
             sw, sh = pygame.display.get_desktop_sizes()[0]
-            w, h = self._app._window.size
+            w, h = self._app.outer_size
             self._app._window.position = ((sw - w) // 2, (sh - h) // 2)
         self._app.post(_do)
 

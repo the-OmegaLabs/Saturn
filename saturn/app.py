@@ -15,6 +15,7 @@ import enum
 import inspect
 import os
 import queue
+import sys
 import threading
 
 import pygame
@@ -34,7 +35,12 @@ class App:
     def __init__(self, main, backend: Render, width: int, height: int, title: str):
         self._main = main
         self._backend = backend
-        self._size = [int(width), int(height)]
+        # Flet Window.width/height describe the native outer window. Page
+        # width/height describe the drawable client area. SDL's Window.size
+        # is client-only, so keep the two coordinate spaces separate.
+        self._outer_size = [int(width), int(height)]
+        self._size = list(self._outer_size)
+        self._frame_size = (0, 0)
         self._title = title
         self._dirty = threading.Event()
         self._closed = threading.Event()
@@ -58,6 +64,11 @@ class App:
         pygame.display.set_mode(tuple(self._size), flags)
         pygame.display.set_caption(self._title)
         self._window = pygame.Window.from_display_module()
+        self._frame_size = self._measure_frame_size()
+        client = self.client_size_for_outer(*self._outer_size)
+        if tuple(self._window.size) != client:
+            self._window.size = client
+        self._size[:] = client
         self.renderer = create_renderer(self._backend)
         from .page import Page  # deferred: page imports app bits
         self.page = Page(self)
@@ -91,6 +102,8 @@ class App:
                     self._closed.set()
                 elif e.type == pygame.WINDOWRESIZED:
                     self._size[0], self._size[1] = e.x, e.y
+                    self._outer_size[0] = e.x + self._frame_size[0]
+                    self._outer_size[1] = e.y + self._frame_size[1]
                     if self.renderer is not None:
                         self.renderer.on_resize(*self._size)
                     self._dirty.set()
@@ -157,6 +170,39 @@ class App:
     @property
     def size(self):
         return tuple(self._size)
+
+    @property
+    def outer_size(self):
+        return tuple(self._outer_size)
+
+    def client_size_for_outer(self, width, height):
+        return (max(1, int(width) - self._frame_size[0]),
+                max(1, int(height) - self._frame_size[1]))
+
+    def _measure_frame_size(self):
+        """Return native non-client (border + title bar) width/height.
+
+        Win32 reports the real metrics for the current DPI/theme, avoiding
+        hard-coded 16x39 assumptions. Other platforms retain SDL semantics.
+        """
+        if sys.platform != "win32":
+            return (0, 0)
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            hwnd = pygame.display.get_wm_info()["window"]
+            outer = wintypes.RECT()
+            client = wintypes.RECT()
+            user32 = ctypes.windll.user32
+            if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
+                return (0, 0)
+            if not user32.GetClientRect(hwnd, ctypes.byref(client)):
+                return (0, 0)
+            return ((outer.right - outer.left) - (client.right - client.left),
+                    (outer.bottom - outer.top) - (client.bottom - client.top))
+        except (KeyError, OSError):
+            return (0, 0)
 
 
 def _swallow(fn, *args):
