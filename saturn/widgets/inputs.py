@@ -3,6 +3,8 @@ Dropdown (+ legacy Option alias).
 """
 from __future__ import annotations
 
+import threading
+
 import pygame
 
 from .containers import Container, Row
@@ -12,7 +14,8 @@ from .._gen.icons import Icons
 from ..control import Control
 from ..event import fire
 from ..text import get_font, get_icon_font
-from ..types import LabelPosition, OutlineInputBorder, as_border_radius
+from ..types import (AnimationCurve, LabelPosition, OutlineInputBorder,
+                     as_border_radius)
 
 _FIELD_H = 48.0
 _FIELD_PAD = 12.0
@@ -24,6 +27,13 @@ def _parse(c):
     return colors.parse_color(c)
 
 
+def _mix(a, b, progress: float):
+    """Blend two RGBA colors using an animation progress value."""
+    a, b = _parse(a), _parse(b)
+    progress = max(0.0, min(1.0, progress))
+    return tuple(round(x + (y - x) * progress) for x, y in zip(a, b))
+
+
 class TextField(Control):
     def __init__(self, value: str = "", *, label=None, hint_text=None,
                  password: bool = False, multiline: bool = False,
@@ -33,7 +43,7 @@ class TextField(Control):
                  filled: bool = False, bgcolor=None, border_color=None,
                  cursor_color=None, border_radius: float | None = None,
                  border=None, text_style=None,
-                 can_reveal_password: bool = False, **base):
+                 can_reveal_password: bool = False, on_hover=None, **base):
         super().__init__(**base)
         self.value = value
         self.label = label
@@ -48,6 +58,7 @@ class TextField(Control):
         self.on_focus = on_focus
         self.on_blur = on_blur
         self.on_click = on_click
+        self.on_hover = on_hover
         self.filled = filled          # flet flag; saturn always draws filled
         self.bgcolor = bgcolor
         self.border_color = border_color
@@ -64,6 +75,13 @@ class TextField(Control):
         self._last_ime_rect = None
         self._focused = False
         self._focusable = True
+        self._hovered = False
+        self._focus_progress = 0.0
+        self._label_progress = 1.0 if value else 0.0
+        self._hover_progress = 0.0
+        self._cursor_visible = True
+        self._cursor_timer = None
+        self._cursor_generation = 0
 
     def _style(self):
         """(family, value size, value color) from the flet text_style."""
@@ -105,6 +123,61 @@ class TextField(Control):
                 self._password_revealed = not self._password_revealed
                 self.update()
 
+    def _hit_test_hover(self, x, y):
+        if not self.visible or self.disabled:
+            return None
+        return self if self._contains(x, y) else None
+
+    def _set_hover(self, on: bool):
+        self._hovered = bool(on)
+        self._animate_internal("_hover_progress", 1.0 if on else 0.0, 120,
+                               AnimationCurve.FAST_OUT_SLOWIN)
+        self.update()
+        fire(self, "hover", "true" if on else "false")
+
+    def _set_focused(self, focused: bool):
+        self._focused = bool(focused)
+        self._animate_internal("_focus_progress", 1.0 if focused else 0.0,
+                               180, AnimationCurve.FAST_OUT_SLOWIN)
+        self._animate_internal(
+            "_label_progress", 1.0 if focused or bool(self.value) else 0.0,
+            180, AnimationCurve.FAST_OUT_SLOWIN)
+        if focused:
+            self._restart_cursor_blink()
+        else:
+            self._stop_cursor_blink()
+        self.update()
+
+    def _stop_cursor_blink(self):
+        self._cursor_generation += 1
+        timer, self._cursor_timer = self._cursor_timer, None
+        if timer is not None:
+            timer.cancel()
+        self._cursor_visible = False
+
+    def _restart_cursor_blink(self):
+        self._cursor_generation += 1
+        generation = self._cursor_generation
+        timer = self._cursor_timer
+        if timer is not None:
+            timer.cancel()
+        self._cursor_visible = True
+
+        def blink():
+            if not self._focused or generation != self._cursor_generation:
+                return
+            self._cursor_visible = not self._cursor_visible
+            self.update()
+            next_timer = threading.Timer(0.5, blink)
+            next_timer.daemon = True
+            self._cursor_timer = next_timer
+            next_timer.start()
+
+        timer = threading.Timer(0.5, blink)
+        timer.daemon = True
+        self._cursor_timer = timer
+        timer.start()
+
     def _font(self, scale):
         family, vsize, _ = self._style()
         return get_font(vsize, scale=scale, family=family,
@@ -127,11 +200,16 @@ class TextField(Control):
             idx = i + 1
         self._caret = idx
         self._clear_composition(update=False)
+        self._restart_cursor_blink()
         self._update_ime_rect()
         self.update()
 
     # -- editing ----------------------------------------------------------------
     def _changed(self):
+        self._animate_internal(
+            "_label_progress", 1.0 if self._focused or bool(self.value) else 0.0,
+            180, AnimationCurve.FAST_OUT_SLOWIN)
+        self._restart_cursor_blink()
         self._update_ime_rect()
         self.update()
         fire(self, "change", self.value)
@@ -155,6 +233,7 @@ class TextField(Control):
         self._composition_length = max(
             0, min(len(self._composition) - self._composition_start,
                    int(length)))
+        self._restart_cursor_blink()
         self._update_ime_rect()
         self.update()
 
@@ -216,6 +295,8 @@ class TextField(Control):
         elif k == pygame.K_END:
             self._caret = len(v)
             self.update()
+        if k in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_HOME, pygame.K_END):
+            self._restart_cursor_blink()
         self._update_ime_rect()
 
     # -- drawing ------------------------------------------------------------------
@@ -227,33 +308,52 @@ class TextField(Control):
                         else self.border_radius)
         radius = as_border_radius(
             _RADIUS if radius_value is None else radius_value).top_left
-        r.fill_rect(x, y, w, h,
-                    _parse(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
-                    radius=radius)
+        focus = self._focus_progress
+        hover = self._hover_progress
+        field_bg = _parse(
+            self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST)
+        if hover:
+            field_bg = _mix(field_bg, colors.Colors.ON_SURFACE, 0.04 * hover)
+        r.fill_rect(x, y, w, h, field_bg, radius=radius)
         if outline is not None:
             side = outline.side
             if side.width > 0:
+                border_color = side.color
+                if border_color is None:
+                    inactive = _mix(colors.Colors.OUTLINE,
+                                    colors.Colors.ON_SURFACE, 0.25 * hover)
+                    border_color = _mix(inactive, colors.Colors.PRIMARY, focus)
                 r.stroke_rect(x, y, w, h,
-                              _parse(side.color or colors.Colors.OUTLINE),
-                              width=side.width, radius=radius)
+                              _parse(border_color or colors.Colors.OUTLINE),
+                              width=side.width + focus, radius=radius)
         elif self.border_color is not None:
             r.stroke_rect(x, y, w, h, _parse(self.border_color),
-                          width=2 if self._focused else 1, radius=radius)
-        elif self._focused:
-            r.stroke_rect(x, y, w, h, _parse(colors.Colors.PRIMARY),
-                          width=2, radius=radius)
-        has_label = bool(self.label) and (self._focused or bool(self.value))
-        ty = y + 6.0 if has_label else y
-        th = h - 12.0 if has_label else h
+                          width=1 + focus, radius=radius)
+        else:
+            inactive = _mix(colors.Colors.OUTLINE,
+                            colors.Colors.ON_SURFACE, 0.25 * hover)
+            r.stroke_rect(x, y, w, h,
+                          _mix(inactive, colors.Colors.PRIMARY, focus),
+                          width=1 + focus, radius=radius)
+        label_progress = self._label_progress if self.label else 0.0
+        ty = y + 6.0 * label_progress
+        th = h - 12.0 * label_progress
         family, vsize, vcolor = self._style()
-        if has_label:
-            r.blit(txt.render_line(self.label, 10, scale=scale, family=family,
-                                   color=_parse(colors.Colors.PRIMARY)),
-                   x + _FIELD_PAD, y + 6)
+        if self.label:
+            label_size = vsize + (10.0 - vsize) * label_progress
+            label_color = _mix(colors.Colors.ON_SURFACE_VARIANT,
+                               colors.Colors.PRIMARY, focus)
+            label_surface = txt.render_line(
+                self.label, label_size, scale=scale, family=family,
+                color=label_color)
+            inline_y = y + (h - label_surface.get_height() / scale) / 2
+            label_y = inline_y + (y + 6.0 - inline_y) * label_progress
+            r.blit(label_surface, x + _FIELD_PAD, label_y)
         shown = self._visible_text()
         composition = self._visible_composition()
         prefix, suffix = shown[:self._caret], shown[self._caret:]
         displayed = prefix + composition + suffix
+        hint_progress = 0.0
         if displayed:
             surf = txt.render_line(displayed, vsize, scale=scale, family=family,
                                    color=_parse(vcolor))
@@ -282,10 +382,15 @@ class TextField(Control):
                                 max(1, selected_w), 2,
                                 _parse(colors.Colors.PRIMARY))
             r.clip_pop()
-        elif self.hint_text:
+        else:
+            hint_progress = (1.0 if not self.label else max(
+                0.0, min(1.0, (min(label_progress, focus) - 0.6) / 0.4)))
+        if not displayed and self.hint_text and hint_progress > 0.0:
+            hint_color = list(_parse(colors.Colors.ON_SURFACE_VARIANT))
+            hint_color[3] = round(hint_color[3] * hint_progress)
             surf = txt.render_line(self.hint_text, self.text_size, scale=scale,
                                    family=family,
-                                   color=_parse(colors.Colors.ON_SURFACE_VARIANT))
+                                   color=tuple(hint_color))
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
         if self.password and self.can_reveal_password:
             icon = Icons.VISIBILITY_OFF if self._password_revealed else Icons.VISIBILITY
@@ -294,7 +399,7 @@ class TextField(Control):
                             _parse(colors.Colors.ON_SURFACE_VARIANT))
             r.blit(eye, x + w - 32,
                    y + (h - eye.get_height() / scale) / 2)
-        if self._focused:
+        if self._focused and self._cursor_visible:
             ime_cursor = min(len(composition),
                              self._composition_start + self._composition_length)
             caret_text = prefix + composition[:ime_cursor]

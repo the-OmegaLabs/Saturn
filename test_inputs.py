@@ -103,6 +103,40 @@ def check_password_and_hint():
     print("password ok")
 
 
+def check_textfield_animations():
+    app, page = make_page()
+    tf = TextField(label="Name", hint_text="Enter a name")
+    page.add(tf)
+    page.draw()
+    assert tf._label_progress == 0.0
+    assert tf._focus_progress == 0.0
+
+    page.focus(tf)
+    started = tf._animations["_focus_progress"].started
+    assert tf._cursor_visible
+    assert tf._tick_animations(started + 0.09)
+    assert 0.0 < tf._focus_progress < 1.0
+    assert 0.0 < tf._label_progress < 1.0
+    tf._tick_animations(started + 0.2)
+    assert tf._focus_progress == 1.0
+    assert tf._label_progress == 1.0
+
+    tf._set_hover(True)
+    hover_started = tf._animations["_hover_progress"].started
+    tf._tick_animations(hover_started + 0.06)
+    assert 0.0 < tf._hover_progress < 1.0
+    tf._tick_animations(hover_started + 0.13)
+    assert tf._hover_progress == 1.0
+
+    page.focus(None)
+    blur_started = tf._animations["_label_progress"].started
+    tf._tick_animations(blur_started + 0.2)
+    assert tf._focus_progress == 0.0
+    assert tf._label_progress == 0.0
+    assert not tf._cursor_visible
+    print("textfield animations ok")
+
+
 def check_cjk_ime():
     app, page = make_page()
     changed = Rec()
@@ -205,6 +239,7 @@ def check_dropdown():
 if __name__ == "__main__":
     check_textfield()
     check_password_and_hint()
+    check_textfield_animations()
     check_cjk_ime()
     check_checkbox_switch()
     check_radio_group()

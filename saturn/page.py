@@ -390,12 +390,18 @@ class Page(Control):
         from .event import fire
         old, self._focused = self._focused, control
         if old is not None:
-            old._focused = False
+            if hasattr(old, "_set_focused"):
+                old._set_focused(False)
+            else:
+                old._focused = False
             if hasattr(old, "_clear_composition"):
                 old._clear_composition(update=False)
             fire(old, "blur")
         if control is not None:
-            control._focused = True
+            if hasattr(control, "_set_focused"):
+                control._set_focused(True)
+            else:
+                control._focused = True
             if not getattr(control, "read_only", False):
                 if hasattr(control, "_update_ime_rect"):
                     control._update_ime_rect()
