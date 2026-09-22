@@ -8,6 +8,11 @@ Weights: pygame's font stack exposes no variable-font axes, so any font file
 the requested weight ON DEMAND with fonttools and cached on disk — real
 W_100..W_900 for every font. Non-variable files fall back to synthetic bold.
 
+First build of a weight runs in a BACKGROUND thread: text shows the Regular
+source immediately (printed notice), and the real weight swaps in on the
+next frame after the instance lands (placeholder fonts evicted + dirty flag
+via the `on_weight_ready` hook, wired to App.mark_dirty in App.start).
+
 Glyph fallback: a line is segmented into runs — each run renders with the
 first font in the chain that actually covers its characters — and runs are
 baseline-aligned into one surface. Coverage probing uses pygame.freetype
@@ -18,6 +23,7 @@ from __future__ import annotations
 import io
 import os
 import re
+import threading
 import warnings
 from pathlib import Path
 
@@ -60,6 +66,12 @@ _icon_cache: dict = {}
 _probe_cache: dict[tuple, _freetype.Font] = {}
 _cover_cache: dict[tuple, bool] = {}
 ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
+
+# Regular-first async instancing (see module docstring)
+on_weight_ready = None                          # set by App.start(): mark_dirty
+_pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
+_inst_failed: set[tuple[str, int]] = set()      # instancing impossible
+_mem_instances: dict[tuple[str, int], io.BytesIO] = {}  # disk write failed
 
 
 def register_fonts(fonts: dict[str, str]):
@@ -155,7 +167,8 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
     BytesIO of instanced TTF bytes.
     Order: shipped static -> variable loaded directly when the requested
     weight equals its fvar default -> runtime instancing (disk-cached under
-    ~/.cache/saturn/font-cache) -> the original file with synthetic bold."""
+    ~/.cache/saturn/font-cache, first build in the background while Regular
+    shows) -> the original file with synthetic bold."""
     static = _STATIC_WEIGHTS.get(path, {}).get(wnum)
     if static and os.path.exists(static):
         return static, True
@@ -183,18 +196,57 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
     key = f"{Path(path).stem}.{wnum}.{mtime}.{os.path.getsize(path)}"
     cache = Path.home() / ".cache" / "saturn" / "font-cache"
     inst = cache / f"{key}.ttf"
+    slot = (path, wnum)
+    mem = _mem_instances.get(slot)
+    if mem is not None:
+        return mem, True                        # usable this run, uncached
+    if slot in _inst_failed:
+        return path, False                      # instancing broke: synthetic bold
     if not inst.exists():
-        data = _instance_weight(path, wnum)
-        if data is None:
-            return path, False
-        data_io = io.BytesIO(data)
-        try:
-            cache.mkdir(parents=True, exist_ok=True)
-            inst.write_bytes(data)
-            return str(inst), True
-        except OSError:
-            return data_io, True                # usable this run, uncached
+        if slot not in _pending_inst:
+            # first miss: show Regular now, build the real weight in the
+            # background and swap when it lands
+            print("Saturn is optimizing font for better display.")
+            _pending_inst.add(slot)
+            threading.Thread(target=_instance_bg, args=(path, wnum, inst),
+                             daemon=True, name=f"saturn-font-{wnum}").start()
+        return _regular_source(path), True      # Regular until ready
     return str(inst), True
+
+
+def _regular_source(path: str) -> object:
+    """Placeholder SOURCE shown while a weight is still instancing: the
+    shipped Regular static when bundled, else the file itself (a variable
+    file loads at its default instance). Paired with is_var=True so no
+    synthetic bold gets layered on top — plain Regular, as requested."""
+    static = _STATIC_WEIGHTS.get(path, {}).get(400)
+    if static and os.path.exists(static):
+        return static
+    return path
+
+
+def _instance_bg(path: str, wnum: int, dest: Path):
+    """Background instancing worker: build the weight, persist it, then
+    evict every placeholder font built for this (path, weight) and raise
+    the dirty flag so the next frame renders with the real weight."""
+    data = _instance_weight(path, wnum)
+    if data is None:
+        _inst_failed.add((path, wnum))
+    else:
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+        except OSError:
+            _mem_instances[(path, wnum)] = io.BytesIO(data)
+    # all fallback state is final before discard, so a render racing with
+    # this thread can never re-spawn the build
+    _pending_inst.discard((path, wnum))
+    # placeholder fonts are cached under (kind, ident, wnum, italic, px)
+    for k in list(_font_cache):
+        if k[0] == "file" and k[1] == path and k[2] == wnum:
+            _font_cache.pop(k, None)
+    if on_weight_ready is not None:
+        on_weight_ready()
 
 
 # -- chain (per-glyph fallback) --------------------------------------------------

@@ -61,6 +61,8 @@ class App:
         self.renderer = create_renderer(self._backend)
         from .page import Page  # deferred: page imports app bits
         self.page = Page(self)
+        from . import text as _text
+        _text.on_weight_ready = self.mark_dirty  # Regular -> real weight swap
         autoclose = os.environ.get("SATURN_AUTOCLOSE")  # test hook
         if autoclose:
             threading.Timer(float(autoclose), self.close).start()
