@@ -27,6 +27,7 @@ def check_placeholder_then_swap():
     txt._pending_inst.clear()
     txt._inst_failed.clear()
     txt._mem_instances.clear()
+    txt._optimizing_notice = False
     swaps = []
     txt.on_weight_ready = lambda: swaps.append(1)
 
@@ -34,7 +35,6 @@ def check_placeholder_then_swap():
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         src, real = txt._weighted_source(inter, wnum)
-    assert "Saturn is optimizing font for better display." in out.getvalue()
     assert real and src == inter, (src, real)   # Regular = default instance
     assert (inter, wnum) in txt._pending_inst
 
@@ -44,6 +44,15 @@ def check_placeholder_then_swap():
         src2, real2 = txt._weighted_source(inter, wnum)
     assert (src2, real2) == (inter, True)
     assert out2.getvalue() == ""
+
+    # a second weight's first miss starts its own build but stays silent —
+    # the notice prints only once per run
+    out3 = io.StringIO()
+    with contextlib.redirect_stdout(out3):
+        src3, real3 = txt._weighted_source(inter, 300)
+    assert (src3, real3) == (inter, True)
+    assert (inter, 300) in txt._pending_inst
+    assert out3.getvalue() == ""
 
     # a placeholder font gets cached under the requested weight ...
     link = ("file", inter, wnum, False)
@@ -59,8 +68,8 @@ def check_placeholder_then_swap():
     # ... and was evicted: the link now builds from the real instance
     after = txt._render_font(link, 16)
     assert after is not ph, "placeholder font was not evicted after swap"
-    src3, real3 = txt._weighted_source(inter, wnum)
-    assert real3 and src3 == str(inst), (src3, real3)
+    src4, real4 = txt._weighted_source(inter, wnum)
+    assert real4 and src4 == str(inst), (src4, real4)
 
     txt.on_weight_ready = None
     print("fonts ok (regular-first async instancing + swap)")

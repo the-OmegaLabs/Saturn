@@ -9,9 +9,10 @@ the requested weight ON DEMAND with fonttools and cached on disk — real
 W_100..W_900 for every font. Non-variable files fall back to synthetic bold.
 
 First build of a weight runs in a BACKGROUND thread: text shows the Regular
-source immediately (printed notice), and the real weight swaps in on the
-next frame after the instance lands (placeholder fonts evicted + dirty flag
-via the `on_weight_ready` hook, wired to App.mark_dirty in App.start).
+source immediately (the notice prints once per run), and the real weight
+swaps in on the next frame after the instance lands (placeholder fonts
+evicted + dirty flag via the `on_weight_ready` hook, wired to App.mark_dirty
+in App.start).
 
 Glyph fallback: a line is segmented into runs — each run renders with the
 first font in the chain that actually covers its characters — and runs are
@@ -72,6 +73,7 @@ on_weight_ready = None                          # set by App.start(): mark_dirty
 _pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
 _inst_failed: set[tuple[str, int]] = set()      # instancing impossible
 _mem_instances: dict[tuple[str, int], io.BytesIO] = {}  # disk write failed
+_optimizing_notice = False                      # the notice prints only once
 
 
 def register_fonts(fonts: dict[str, str]):
@@ -206,7 +208,10 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
         if slot not in _pending_inst:
             # first miss: show Regular now, build the real weight in the
             # background and swap when it lands
-            print("Saturn is optimizing font for better display.")
+            global _optimizing_notice
+            if not _optimizing_notice:
+                print("Saturn is optimizing font for better display.")
+                _optimizing_notice = True
             _pending_inst.add(slot)
             threading.Thread(target=_instance_bg, args=(path, wnum, inst),
                              daemon=True, name=f"saturn-font-{wnum}").start()
