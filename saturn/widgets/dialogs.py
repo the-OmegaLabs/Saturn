@@ -1,0 +1,246 @@
+"""Dialogs: AlertDialog, SnackBar, DialogControl base.
+
+Usage (flet 1.0):
+    page.show_dialog(ft.AlertDialog(title=..., content=..., actions=[...]))
+    page.pop_dialog()
+    snack = ft.SnackBar(ft.Text("saved")); page.show_dialog(snack)
+"""
+from __future__ import annotations
+
+import threading
+
+from .. import colors
+from .. import text as txt
+from ..control import Control
+from ..event import fire
+from .containers import Container
+from .text import Text
+
+_SCRIM = (0, 0, 0, 82)
+_DIALOG_PAD = 24.0
+
+
+class DialogControl(Control):
+    """Base: fills the page as an overlay; card area is interactive."""
+
+    _overlay_fill = True
+
+    def __init__(self, *, open: bool = False, modal: bool = False,
+                 on_dismiss=None, **base):
+        super().__init__(**base)
+        self.open = bool(open)
+        self.modal = modal
+        self.on_dismiss = on_dismiss
+        self._card_rect = (0.0, 0.0, 0.0, 0.0)
+
+    # barrier handling -----------------------------------------------------
+    def _interactive_rect(self):
+        return self._card_rect
+
+    def _hit_test(self, x, y):
+        if not self.visible:
+            return None
+        cx, cy, cw, ch = self._interactive_rect()
+        if cx <= x < cx + cw and cy <= y < cy + ch:
+            hit = super()._hit_test(x, y)
+            return hit if hit is not None and hit is not self else self
+        # barrier click: dismiss (unless modal) and swallow the event
+        if not self.modal:
+            self._dismiss()
+        return self
+
+    def _hit_test_hover(self, x, y):
+        return None
+
+    def _dismiss(self):
+        if self.page is not None:
+            self.page.pop_dialog(self)
+
+    def _closed(self):
+        self.open = False
+        fire(self, "dismiss")
+
+
+class AlertDialog(DialogControl):
+    def __init__(self, title=None, content=None, *, actions=None, modal=False,
+                 bgcolor=None, open=False, on_dismiss=None, **base):
+        super().__init__(open=open, modal=modal, on_dismiss=on_dismiss, **base)
+        self.title = title          # str | Control
+        self.content = content      # Control
+        self.actions = list(actions or [])
+        self.bgcolor = bgcolor
+
+    def _attach(self, page, parent=None):
+        super()._attach(page, parent)
+        for c in self._dialog_children():
+            c._attach(page, self)
+
+    def _children(self):
+        return self._dialog_children()
+
+    def _dialog_children(self):
+        out = []
+        if isinstance(self.title, Control):
+            out.append(self.title)
+        if self.content is not None:
+            out.append(self.content)
+        out += self.actions
+        return out
+
+    def _title_text(self) -> str:
+        return self.title if isinstance(self.title, str) else ""
+
+    def _place(self, x, y, w, h, scale):
+        self._rect = (x, y, w, h)
+        # measure the card
+        tw = th = 0.0
+        if self._title_text():
+            tw, th = txt.measure(self._title_text(), 24, scale=scale,
+                                 bold=True)
+        elif isinstance(self.title, Control):
+            tw, th = self.title._intrinsic(w, h, scale)
+        cw = ch = 0.0
+        if self.content is not None:
+            cw, ch = self.content._intrinsic(w - 2 * _DIALOG_PAD, h, scale)
+        aw = sum(a._intrinsic(w, h, scale)[0] for a in self.actions)
+        aw += 8.0 * max(0, len(self.actions) - 1)
+        ah = max((a._intrinsic(w, h, scale)[1] for a in self.actions), default=0.0)
+        card_w = max(tw, cw, aw) + 2 * _DIALOG_PAD
+        card_h = (_DIALOG_PAD if th or cw else _DIALOG_PAD * 0.6) + th + \
+            (12.0 if th and ch else 0) + ch + \
+            (16.0 if ah else 0) + ah + _DIALOG_PAD
+        card_w = min(card_w, w * 0.9)
+        cx = x + (w - card_w) / 2
+        cy = y + (h - card_h) / 2
+        self._card_rect = (cx, cy, card_w, card_h)
+        # place children inside the card
+        py = cy + _DIALOG_PAD
+        px = cx + _DIALOG_PAD
+        inner_w = card_w - 2 * _DIALOG_PAD
+        if isinstance(self.title, Control):
+            self.title._place(px, py, inner_w, th, scale)
+            py += th + 12.0
+        elif self._title_text():
+            self._title_rect = (px, py, inner_w, th)
+            py += th + 12.0
+        if self.content is not None:
+            self.content._place(px, py, inner_w, ch, scale)
+            py += ch + 16.0
+        ax = px
+        for a in self.actions:
+            aw2, ah2 = a._intrinsic(inner_w, ah, scale)
+            a._place(ax, py, aw2, ah2, scale)
+            ax += aw2 + 8.0
+    def _draw(self, r, x, y):
+        r.overlay_rect(*self._rect[:2], self._rect[2], self._rect[3], _SCRIM)
+        cx, cy, cw, ch = self._card_rect
+        r.fill_rect(cx, cy, cw, ch,
+                    colors.parse_color(self.bgcolor or
+                                       colors.Colors.SURFACE_CONTAINER_HIGH),
+                    radius=28)
+        if isinstance(self.title, str) and self.title:
+            f = txt.get_font(24, scale=r.scale, bold=True, text=self.title)
+            r.blit(f.render(self.title, True,
+                            colors.parse_color(colors.Colors.ON_SURFACE)),
+                   self._title_rect[0], self._title_rect[1])
+
+    def _draw_all(self, r):
+        if not self.visible:
+            return
+        self._draw(r, *self._rect[:2])
+        for c in self._dialog_children():
+            if isinstance(c, Control):
+                c._draw_all(r)
+
+
+class SnackBar(DialogControl):
+    def __init__(self, content, *, action=None, bgcolor=None, duration: int = 4000,
+                 on_action=None, open=False, on_dismiss=None, **base):
+        super().__init__(open=open, on_dismiss=on_dismiss, **base)
+        self.content = content      # str | Control
+        self.action = action        # str label
+        self.bgcolor = bgcolor
+        self.duration = duration
+        self.on_action = on_action
+        self._timer = None
+
+    def _attach(self, page, parent=None):
+        super()._attach(page, parent)
+        if isinstance(self.content, Control):
+            self.content._attach(page, self)
+        if self._action_btn is not None:
+            self._action_btn._attach(page, self)
+
+    @property
+    def _action_btn(self):
+        return getattr(self, "_action_control", None)
+
+    def _children(self):
+        out = []
+        if isinstance(self.content, Control):
+            out.append(self.content)
+        if self._action_btn is not None:
+            out.append(self._action_btn)
+        return out
+
+    def _place(self, x, y, w, h, scale):
+        self._rect = (x, y, w, h)
+        cw = ch = 0.0
+        if isinstance(self.content, Control):
+            cw, ch = self.content._intrinsic(w, h, scale)
+        else:
+            cw, ch = txt.measure(str(self.content), 14, scale=scale)
+        action_w = 0.0
+        if self.action:
+            from .buttons import TextButton
+            self._action_control = TextButton(
+                self.action, on_click=self._on_action)
+            action_w = self._action_control._intrinsic(w, h, scale)[0] + 16
+            self._action_control._attach(self.page, self)
+        margin = 16.0
+        bar_w = min(w - 2 * margin, cw + action_w + 32)
+        bar_h = 48.0
+        self._bar_rect = (x + (w - bar_w) / 2, y + h - bar_h - margin,
+                          bar_w, bar_h)
+        if isinstance(self.content, Control):
+            self.content._place(self._bar_rect[0] + 16,
+                                self._bar_rect[1] + (bar_h - ch) / 2, cw, ch, scale)
+        if self.action:
+            ab = self._action_control
+            aw, ah = ab._intrinsic(bar_w, bar_h, scale)
+            ab._place(self._bar_rect[0] + bar_w - aw - 12,
+                      self._bar_rect[1] + (bar_h - ah) / 2, aw, ah, scale)
+
+    def _draw(self, r, x, y):
+        bx, by, bw, bh = self._bar_rect
+        r.fill_rect(bx, by, bw, bh,
+                    colors.parse_color(self.bgcolor or
+                                       colors.Colors.INVERSE_SURFACE),
+                    radius=8)
+        if isinstance(self.content, str):
+            f = txt.get_font(14, scale=r.scale, text=str(self.content))
+            r.blit(f.render(self.content, True,
+                            colors.parse_color(colors.Colors.ON_INVERSE_SURFACE)),
+                   bx + 16, by + (bh - 20) / 2)
+
+    def _interactive_rect(self):
+        return self._bar_rect
+
+    def _draw_all(self, r):
+        if not self.visible:
+            return
+        self._draw(r, *self._rect[:2])
+        for c in self._children():
+            c._draw_all(r)
+
+    def _on_action(self, e=None):
+        fire(self, "action")
+        self._dismiss()
+
+    def _start_timer(self, page):
+        if self.duration and self.duration > 0:
+            self._timer = threading.Timer(
+                self.duration / 1000.0,
+                lambda: page.pop_dialog(self) if self in page.overlay else None)
+            self._timer.daemon = True
+            self._timer.start()
