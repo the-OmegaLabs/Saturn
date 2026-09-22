@@ -115,6 +115,7 @@ class Page(Control):
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
         self.overlay: list[Control] = []  # drawn + hit-tested above the tree
+        self.services: list = []          # Flet 1.0 service registration parity
         self.on_resize: list = []  # flet-style event handler lists
         self.on_keyboard_event: list = []
         self._pressed = None
