@@ -153,6 +153,8 @@ def check_cjk_ime():
     assert tf._composition_start == 1 and tf._composition_length == 1
     assert changed.items == [], "preedit must not fire on_change"
     assert tf._last_ime_rect is not None
+    assert tf._last_ime_rect.y > round(tf._rect[1])
+    assert tf._last_ime_rect.bottom == round(tf._rect[1] + tf._rect[3])
 
     page.handle_event(pygame.event.Event(pygame.KEYDOWN,
                                          key=pygame.K_BACKSPACE))

@@ -101,15 +101,12 @@ def check_native_ime_ui_enabled_before_pygame_init():
             os.environ["SDL_IME_SHOW_UI"] = previous
 
 
-def check_native_ime_candidate_follows_caret():
+def check_ime_input_rect_forwarded_to_sdl():
     app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
-    app._window = type("Window", (), {"handle": 123})()
     rect = pygame.Rect(64, 80, 1, 48)
-    with patch("pygame.key.set_text_input_rect") as sdl_position, \
-            patch("saturn.app._set_windows_ime_candidate") as native_position:
+    with patch("pygame.key.set_text_input_rect") as sdl_position:
         app.set_text_input_rect(rect)
     sdl_position.assert_called_once_with(rect)
-    native_position.assert_called_once_with(123, 64, 130)
 
 
 if __name__ == "__main__":
@@ -118,5 +115,5 @@ if __name__ == "__main__":
     check_refresh_rate_detection()
     check_default_window_icon_contract()
     check_native_ime_ui_enabled_before_pygame_init()
-    check_native_ime_candidate_follows_caret()
+    check_ime_input_rect_forwarded_to_sdl()
     print("ALL WINDOW TESTS PASS")

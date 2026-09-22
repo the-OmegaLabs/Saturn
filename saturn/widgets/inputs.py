@@ -258,8 +258,17 @@ class TextField(Control):
         caret_text = prefix + composition[:ime_cursor]
         cx = self._rect[0] + _FIELD_PAD + txt.line_width(
             caret_text, vsize, scale=scale, family=family)
-        rect = pygame.Rect(round(cx), round(self._rect[1]), 1,
-                           max(1, round(self._rect[3])))
+        label_progress = self._label_progress if self.label else 0.0
+        text_y = (self._rect[1] + 6.0 * label_progress
+                  + (self._rect[3] - 12.0 * label_progress - vsize) / 2)
+        # SDL's Windows backend treats this as both the current composition
+        # point and an exclusion area. Start at the visual caret but extend to
+        # the field bottom so the candidate UI sits below, never over the next
+        # line or control.
+        rect = pygame.Rect(
+            round(cx), round(text_y), 1,
+            max(1, round(self._rect[1] + self._rect[3] - text_y)),
+        )
         self.page._app.set_text_input_rect(rect)
         self._last_ime_rect = rect
 
