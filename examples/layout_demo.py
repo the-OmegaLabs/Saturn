@@ -77,4 +77,4 @@ class Application:
 
 
 s = Application()
-app = ft.run(main=s.create_window, backend=ft.Render.SOFTWARE, width=520, height=420)
+app = ft.run(main=s.create_window, backend=ft.Render.SOFTWARE, width=520, height=560)
