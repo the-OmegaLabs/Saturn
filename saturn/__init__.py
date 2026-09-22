@@ -16,6 +16,14 @@ from ._gen.icons import Icons
 from .colors import BASELINE_DARK, BASELINE_LIGHT, Colors, parse_color, theme_dark
 from .control import Control
 from .page import Page, Window
+from .services import (
+    FilePicker,
+    FilePickerFile,
+    FilePickerFileType,
+    FilePickerResultEvent,
+    FilePickerUploadEvent,
+    FilePickerUploadFile,
+)
 from .types import (
     Alignment,
     Border,
@@ -37,6 +45,8 @@ from .types import (
     ThemeMode,
     TextOverflow,
     TextStyle,
+    Tooltip,
+    TooltipTriggerMode,
 )
 from .widgets import (
     AlertDialog,
@@ -82,10 +92,13 @@ __all__ = [
     "TextField", "Checkbox", "Switch", "Radio", "RadioGroup", "Dropdown",
     "DropdownOption", "Option", "Slider", "AlertDialog", "SnackBar",
     "ListView", "GestureDetector",
+    "FilePicker", "FilePickerFile", "FilePickerFileType",
+    "FilePickerResultEvent", "FilePickerUploadEvent", "FilePickerUploadFile",
     "Alignment", "Border", "BorderRadius", "BorderSide", "BoxFit", "BoxShadow",
     "CrossAxisAlignment", "FontWeight", "KeyboardType", "LabelPosition",
     "MainAxisAlignment", "Margin", "Offset", "Padding", "ScrollMode",
     "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
+    "Tooltip", "TooltipTriggerMode",
 ]
 __version__ = "0.0.1"
 

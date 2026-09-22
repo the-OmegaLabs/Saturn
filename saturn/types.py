@@ -82,6 +82,12 @@ class KeyboardType(enum.Enum):
     NONE = "none"
 
 
+class TooltipTriggerMode(enum.Enum):
+    MANUAL = "manual"
+    TAP = "tap"
+    LONG_PRESS = "long_press"
+
+
 @dataclass
 class Theme:
     """flet Theme subset. font_family overrides the default UI font
@@ -244,6 +250,29 @@ class TextStyle:
     font_family: str | None = None
     letter_spacing: float | None = None
     overflow: TextOverflow | None = None
+
+
+@dataclass
+class Tooltip:
+    """Flet-compatible tooltip value used by every Control.tooltip."""
+    message: str
+    decoration: object = None
+    enable_feedback: bool | None = None
+    vertical_offset: float | None = None
+    margin: object = None
+    padding: object = None
+    bgcolor: object = None
+    text_style: TextStyle | None = None
+    text_align: TextAlign | None = None
+    prefer_below: bool | None = None
+    show_duration: object = None
+    wait_duration: object = None
+    exit_duration: object = None
+    tap_to_dismiss: bool = True
+    exclude_from_semantics: bool | None = False
+    trigger_mode: TooltipTriggerMode | None = None
+    mouse_cursor: object = None
+    size_constraints: object = None
 
 
 # -- shorthand resolvers (flet *Value unions) ----------------------------------

@@ -118,6 +118,7 @@ class Page(Control):
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
         self.overlay: list[Control] = []  # drawn + hit-tested above the tree
+        self.services: list = []          # Flet 1.0 service registration parity
         self.on_resize: list = []  # flet-style event handler lists
         self.on_keyboard_event: list = []
         self._pressed = None
@@ -264,6 +265,44 @@ class Page(Control):
             if getattr(c, "_overlay_fill", False):
                 c._place(0, 0, self.width, self.height, r.scale)
             c._draw_all(r)
+        self._draw_tooltip(r)
+
+    def _draw_tooltip(self, r):
+        target = self._hovered
+        tip = getattr(target, "tooltip", None) if target is not None else None
+        if not tip:
+            return
+        from . import text as _text
+        from .types import Padding, Tooltip, as_padding
+
+        value = tip if isinstance(tip, Tooltip) else Tooltip(str(tip))
+        style = value.text_style
+        size = (style.size if style and style.size is not None else 12)
+        fg = (style.color if style and style.color is not None else
+              (colors.Colors.BLACK if self._dark else colors.Colors.WHITE))
+        bg = value.bgcolor or colors.with_opacity(
+            0.9, colors.Colors.WHITE if self._dark else colors.Colors.GREY_700)
+        pad = as_padding(value.padding if value.padding is not None else
+                         Padding.symmetric(horizontal=8, vertical=4))
+        surface = _text.render_line(
+            value.message, size, scale=r.scale,
+            weight=style.weight if style else None,
+            italic=style.italic if style else False,
+            family=style.font_family if style else None,
+            color=colors.parse_color(fg))
+        w = surface.get_width() / r.scale + pad.left + pad.right
+        h = surface.get_height() / r.scale + pad.top + pad.bottom
+        tx, ty, tw, th = target._rect
+        x = max(4, min(self.width - w - 4, tx + (tw - w) / 2))
+        gap = value.vertical_offset if value.vertical_offset is not None else 8
+        below = value.prefer_below is not False
+        y = ty + th + gap if below else ty - h - gap
+        if y + h > self.height:
+            y = ty - h - gap
+        if y < 0:
+            y = ty + th + gap
+        r.overlay_rect(x, y, w, h, colors.parse_color(bg), radius=4)
+        r.blit(surface, x + pad.left, y + pad.top)
 
     def handle_event(self, e):
         if e.type == pygame.WINDOWRESIZED:
