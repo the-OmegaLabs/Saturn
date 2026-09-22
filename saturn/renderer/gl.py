@@ -1,0 +1,290 @@
+"""OpenGL renderer (moderngl): SDF rounded rects + textured quads.
+
+Draw calls execute immediately into the default framebuffer; blending is
+standard alpha. Clip = scissor stack. Coordinates arrive in logical px with
+origin top-left and are flipped on the GPU side.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+import struct
+
+import pygame
+import moderngl
+
+from ..colors import parse_color
+from .base import Renderer
+
+RECT_VS = """
+#version 330
+in vec2 in_pos;          // px, origin top-left
+in vec2 in_center;       // rect center px
+in vec2 in_half;         // half size px
+in vec2 in_rb;           // radius, border width (radius < 0 -> no SDF)
+in vec4 in_color;
+in vec4 in_border_color;
+uniform vec2 u_size;
+out vec2 v_local;
+flat out vec2 v_half;
+flat out vec2 v_rb;
+flat out vec4 v_color;
+flat out vec4 v_border_color;
+void main() {
+    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+    v_local = in_pos - in_center;
+    v_half = in_half;
+    v_rb = in_rb;
+    v_color = in_color;
+    v_border_color = in_border_color;
+}
+"""
+
+RECT_FS = """
+#version 330
+in vec2 v_local;
+flat in vec2 v_half;
+flat in vec2 v_rb;
+flat in vec4 v_color;
+flat in vec4 v_border_color;
+out vec4 frag;
+float sd_round(vec2 p, vec2 b, float r) {
+    vec2 q = abs(p) - b + r;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+void main() {
+    float radius = v_rb.x;
+    float bw = v_rb.y;
+    vec4 c = v_color;
+    float d;
+    if (radius < 0.0) {
+        d = -1.0;  // geometry-only quad, no SDF
+    } else {
+        d = sd_round(v_local, v_half, radius);
+        if (bw > 0.0 && d > -bw) {
+            c = v_border_color;
+        }
+    }
+    float alpha = 1.0 - smoothstep(-1.0, 1.0, d);
+    if (c.a * alpha <= 0.0) discard;
+    frag = vec4(c.rgb, c.a * alpha);
+}
+"""
+
+TEX_VS = """
+#version 330
+in vec2 in_pos;
+in vec2 in_uv;
+in vec4 in_color;
+uniform vec2 u_size;
+out vec2 v_uv;
+out vec4 v_color;
+void main() {
+    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+    v_uv = in_uv;
+    v_color = in_color;
+}
+"""
+
+TEX_FS = """
+#version 330
+in vec2 v_uv;
+in vec4 v_color;
+uniform sampler2D u_tex;
+out vec4 frag;
+void main() {
+    vec4 t = texture(u_tex, v_uv);
+    frag = vec4(t.rgb, t.a) * v_color;
+}
+"""
+
+
+class GLRenderer(Renderer):
+    # text/icons are rendered at 2x and downsampled in blit (matches the
+    # software backend's supersampling); rects get SDF AA at device resolution
+    scale = 2.0
+
+    def __init__(self):
+        self.ctx = moderngl.create_context()
+        self.ctx.enable(moderngl.BLEND)
+        # the GL backbuffer follows the OS window automatically, but pygame's
+        # get_surface() and moderngl's ctx.screen both cache the CREATION size —
+        # never trust them; on_resize is the source of truth
+        self._size = self._query_size()
+        self._prog = self.ctx.program(vertex_shader=RECT_VS, fragment_shader=RECT_FS)
+        self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
+        self._prog["u_size"].value = self._fb_size()
+        self._prog_tex["u_size"].value = self._fb_size()
+        self._prog_tex["u_tex"].value = 0
+        self._tex_cache: dict = {}  # surface digest -> texture
+        self._clip_stack: list = []
+
+    def _query_size(self):
+        try:
+            return pygame.display.get_surface().get_size()
+        except Exception:
+            return (0, 0)
+
+    # -- helpers -----------------------------------------------------------
+    def _fb_size(self):
+        return (float(self._size[0]), float(self._size[1]))
+
+    def _draw_rect(self, corners, center, half, radius, border_w, color,
+                   border_color):
+        """corners: 6 (x, y) tuples (two triangles, any winding)."""
+        r, g, b, a = parse_color(color)
+        if border_color is not None:
+            br, bg, bb, ba = parse_color(border_color)
+        else:
+            br = bg = bb = ba = 0.0
+        color4 = (r / 255, g / 255, b / 255, a / 255)
+        border4 = (br / 255, bg / 255, bb / 255, ba / 255)
+        data = []
+        for (px, py) in corners:
+            data += [px, py, *center, *half, radius, border_w, *color4, *border4]
+        vbo = self.ctx.buffer(data=struct.pack(f"{len(data)}f", *data))
+        vao = self.ctx.vertex_array(
+            self._prog,
+            [(vbo, "2f 2f 2f 2f 4f 4f", "in_pos", "in_center", "in_half",
+              "in_rb", "in_color", "in_border_color")])
+        vao.render(moderngl.TRIANGLES)
+        vao.release()
+        vbo.release()
+
+    def _rect_call(self, x, y, w, h, color, radius=0.0, border_w=0.0,
+                   border_color=(0, 0, 0, 0)):
+        if w <= 0 or h <= 0:
+            return
+        # pixel-snap: half-px offsets turn every edge fuzzy under bilinear/SDF AA
+        x0, y0 = round(x), round(y)
+        x1, y1 = round(x + w), round(y + h)
+        w, h = x1 - x0, y1 - y0
+        cx, cy = x0 + w / 2, y0 + h / 2
+        hw, hh = w / 2, h / 2
+        corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y0), (x1, y1), (x0, y1)]
+        self._draw_rect(corners, (cx, cy), (hw, hh), float(radius), float(border_w),
+                        color, border_color)
+
+    # -- Renderer API ---------------------------------------------------------
+    def clear(self, color):
+        r, g, b, a = parse_color(color)
+        self.ctx.clear(r / 255, g / 255, b / 255, a / 255)
+
+    def fill_rect(self, x, y, w, h, color, radius=0):
+        self._rect_call(x, y, w, h, color, radius=radius)
+
+    def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
+        self._rect_call(x, y, w, h, (0, 0, 0, 0), radius=radius,
+                        border_w=width, border_color=color)
+
+    def line(self, x1, y1, x2, y2, color, width=1):
+        # axis-aligned exact; diagonal = bounding quad (ponytail: tessellate when needed)
+        x, y = min(x1, x2), min(y1, y2)
+        w = abs(x2 - x1) or width
+        h = abs(y2 - y1) or width
+        if x1 == x2:
+            x, w = x1 - width / 2, width
+        if y1 == y2:
+            y, h = y1 - width / 2, width
+        self._rect_call(x, y, w, h, color)
+
+    def circle(self, x, y, radius, color, fill=True):
+        if fill:
+            self._rect_call(round(x - radius), round(y - radius),
+                            round(radius * 2), round(radius * 2),
+                            color, radius=radius)
+        else:
+            self._rect_call(round(x - radius), round(y - radius),
+                            round(radius * 2), round(radius * 2),
+                            (0, 0, 0, 0), radius=radius, border_w=max(1.0, radius / 8),
+                            border_color=color)
+
+    def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
+        # v1: full ring (arc sweep approximation needs a fan)
+        self._rect_call(round(x - radius), round(y - radius),
+                        round(radius * 2), round(radius * 2),
+                        (0, 0, 0, 0), radius=radius, border_w=width,
+                        border_color=color)
+
+    def _texture(self, surface):
+        raw = pygame.image.tobytes(surface, "RGBA")
+        digest = hashlib.blake2b(raw, digest_size=12).digest()
+        tex = self._tex_cache.get(digest)
+        if tex is None:
+            tex = self.ctx.texture(surface.get_size(), 4, raw)
+            tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            self._tex_cache[digest] = tex
+            # ponytail: unbounded texture cache; LRU if long sessions leak
+            if len(self._tex_cache) > 600:
+                old = next(iter(self._tex_cache))
+                self._tex_cache.pop(old).release()
+        return tex, raw
+
+    def blit(self, surface, x, y, alpha=1.0):
+        tex, _ = self._texture(surface)
+        # surface is rendered at `scale`x device px; draw at logical size so a
+        # 2x glyph downsamples 1 texel-per-2-pixels (supersampled, crisp)
+        s = self.scale
+        w = surface.get_width() / s
+        h = surface.get_height() / s
+        x0, y0 = round(x), round(y)
+        x1, y1 = x0 + round(w), y0 + round(h)
+        # tobytes row 0 (glyph top) lands at v=0 -> v=0 at quad top
+        verts = [(x0, y0, 0.0, 0.0), (x1, y0, 1.0, 0.0), (x1, y1, 1.0, 1.0),
+                 (x0, y0, 0.0, 0.0), (x1, y1, 1.0, 1.0), (x0, y1, 0.0, 1.0)]
+        data = []
+        for vx, vy, u, v in verts:
+            data += [vx, vy, u, v, 1.0, 1.0, 1.0, alpha]
+        vbo = self.ctx.buffer(data=struct.pack(f"{len(data)}f", *data))
+        vao = self.ctx.vertex_array(self._prog_tex,
+                                    [(vbo, "2f 2f 4f", "in_pos", "in_uv", "in_color")])
+        tex.use(0)
+        vao.render(moderngl.TRIANGLES)
+        vao.release()
+        vbo.release()
+
+    def overlay_rect(self, x, y, w, h, color, radius=0):
+        self._rect_call(x, y, w, h, color, radius=radius)  # blend handles alpha
+
+    # -- clip -------------------------------------------------------------------
+    def clip_push(self, x, y, w, h):
+        sw, sh = self._fb_size()
+        rect = (int(x), int(sh - y - h), max(0, int(w)), max(0, int(h)))
+        if self._clip_stack:
+            px0, py0, pw, ph = self._clip_stack[-1]
+            ex0, ey0 = max(px0, rect[0]), max(py0, rect[1])
+            ex1 = min(px0 + pw, rect[0] + rect[2])
+            ey1 = min(py0 + ph, rect[1] + rect[3])
+            rect = (ex0, ey0, max(0, ex1 - ex0), max(0, ey1 - ey0))
+        self._clip_stack.append(rect)
+        self.ctx.scissor = rect
+
+    def clip_pop(self):
+        if self._clip_stack:
+            self._clip_stack.pop()
+        self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
+
+    # -- present -------------------------------------------------------------
+    def screenshot(self):
+        """Current framebuffer contents (must run on the UI thread, pre-swap)."""
+        w, h = int(self._size[0]), int(self._size[1])
+        if w <= 0 or h <= 0:
+            return pygame.Surface((1, 1), pygame.SRCALPHA)
+        data = self.ctx.screen.read(components=3, viewport=(0, 0, w, h))
+        stride = w * 3
+        rows = [data[i * stride:(i + 1) * stride] for i in range(h)]
+        return pygame.image.frombuffer(b"".join(reversed(rows)), (w, h), "RGB")
+
+    def flip(self):
+        if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
+            # read BEFORE the swap: after SwapWindow the back buffer is stale
+            pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
+        pygame.display.flip()
+
+    def on_resize(self, width, height):
+        self._size = (int(width), int(height))
+        self.ctx.viewport = (0, 0, int(width), int(height))
+        self._prog["u_size"].value = (float(width), float(height))
+        self._prog_tex["u_size"].value = (float(width), float(height))
