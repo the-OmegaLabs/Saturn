@@ -3,7 +3,9 @@ import sys
 
 sys.path.insert(0, ".")
 
-from saturn.app import App, Render
+import pygame
+
+from saturn.app import App, Render, _system_refresh_rate
 
 
 def check_outer_to_client_conversion():
@@ -52,7 +54,24 @@ def check_live_resize_frame():
     assert app.page.dispatches == 1, "same SDL resize must not dispatch twice"
 
 
+def check_refresh_rate_detection():
+    current = pygame.display.get_current_refresh_rate
+    desktops = pygame.display.get_desktop_refresh_rates
+    try:
+        pygame.display.get_current_refresh_rate = lambda: 165
+        pygame.display.get_desktop_refresh_rates = lambda: [144]
+        assert _system_refresh_rate() == 165
+        pygame.display.get_current_refresh_rate = lambda: 0
+        assert _system_refresh_rate() == 144
+        pygame.display.get_desktop_refresh_rates = lambda: [0]
+        assert _system_refresh_rate() == 60
+    finally:
+        pygame.display.get_current_refresh_rate = current
+        pygame.display.get_desktop_refresh_rates = desktops
+
+
 if __name__ == "__main__":
     check_outer_to_client_conversion()
     check_live_resize_frame()
+    check_refresh_rate_detection()
     print("ALL WINDOW TESTS PASS")

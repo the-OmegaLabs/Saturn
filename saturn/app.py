@@ -2,7 +2,7 @@
 
 Thread rules:
 - The thread that calls run() owns the window: it pumps SDL events, re-layouts
-  and redraws when dirty, then presents (~60 fps).
+  and redraws when dirty, then presents at the active display refresh rate.
 - main(page) and every event handler run off the UI thread (sync -> daemon
   thread, async -> the app's asyncio loop), so blocking handlers never freeze
   the window. Control state changes from those threads are only safe between
@@ -34,6 +34,23 @@ class Render(enum.Enum):
     VULKAN = "vulkan"  # placeholder, see TODO
 
 
+def _system_refresh_rate() -> int:
+    """Return the active display refresh rate, with a conservative fallback."""
+    try:
+        rate = int(pygame.display.get_current_refresh_rate())
+        if rate > 0:
+            return rate
+    except (AttributeError, pygame.error, TypeError, ValueError):
+        pass
+    try:
+        rates = pygame.display.get_desktop_refresh_rates()
+        if rates and int(rates[0]) > 0:
+            return int(rates[0])
+    except (AttributeError, pygame.error, TypeError, ValueError):
+        pass
+    return 60
+
+
 class App:
     def __init__(self, main, backend: Render, width: int, height: int, title: str):
         self._main = main
@@ -58,6 +75,7 @@ class App:
         self._live_resize_callback = None
         self._last_live_resize_frame = 0.0
         self._last_resize_dispatched_size = None
+        self._refresh_rate = 60
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -68,7 +86,13 @@ class App:
         if self._backend is Render.OPENGL:
             flags |= pygame.DOUBLEBUF | pygame.OPENGL
         self._sdl_flags = flags
-        pygame.display.set_mode(tuple(self._size), flags)
+        # SDL requests swap interval 1 for OpenGL. Software presentation is
+        # paced below using the active monitor's refresh rate.
+        pygame.display.set_mode(
+            tuple(self._size), flags,
+            vsync=1 if self._backend is Render.OPENGL else 0,
+        )
+        self._refresh_rate = _system_refresh_rate()
         pygame.display.set_caption(self._title)
         self._window = pygame.Window.from_display_module()
         self._frame_size = self._measure_frame_size()
@@ -133,7 +157,9 @@ class App:
                 self._dirty.clear()
                 self.page.draw()
                 self.renderer.flip()
-            clock.tick(60)
+            # Do not assume a 60 Hz monitor. OpenGL's swap is synchronized by
+            # SDL; the cap also provides safe pacing if a driver ignores it.
+            clock.tick(self._refresh_rate)
         self._remove_live_resize_watch()
         pygame.display.quit()
 
@@ -278,6 +304,10 @@ class App:
     @property
     def outer_size(self):
         return tuple(self._outer_size)
+
+    @property
+    def refresh_rate(self):
+        return self._refresh_rate
 
     def client_size_for_outer(self, width, height):
         return (max(1, int(width) - self._frame_size[0]),
