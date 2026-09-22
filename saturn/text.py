@@ -21,6 +21,9 @@ import pygame
 import pygame.freetype as _freetype
 
 # bundled default UI font (SIL OFL 1.1 — see saturn/assets/OFL.txt)
+# Noto Sans SC is the default: it covers Latin + CJK with consistent metrics,
+# so mixed-script lines share one baseline. Inter is the Latin fallback.
+NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.ttf"
 INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.ttf"
 INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.ttf"
 
@@ -56,26 +59,28 @@ def family_for(text: str, family: str | None = None) -> str | None:
 
 
 def _primary_source(family: str | None, italic: bool) -> tuple:
-    """(kind, identifier) for the primary font. kind: 'file' | 'sys'."""
+    """(kind, identifier) for the primary font. kind: 'file' | 'sys'.
+    Default = bundled Noto Sans SC (Latin + CJK); italic prefers the real
+    Inter Italic for Latin, falling back to Noto for CJK glyphs."""
     resolved = family_for("", family)
     if resolved:
         reg = registered_fonts.get(resolved)
         if reg is not None:
             if os.path.exists(reg):
                 return ("file", reg)
-            # registered but missing -> bundled Inter (italic variant if needed)
-            return ("file", str(INTER_ITALIC if italic else INTER))
+            # registered but missing -> bundled default
+            return ("file", str(INTER_ITALIC if italic else NOTO))
         return ("sys", resolved)
-    return ("file", str(INTER_ITALIC if italic else INTER))
+    return ("file", str(INTER_ITALIC if italic else NOTO))
 
 
 def _chain_sources(family: str | None, italic: bool) -> list[tuple]:
-    """Primary font source first, then fallbacks: bundled Inter (if not
-    primary), then the CJK system chain. Deduped, order = priority."""
+    """Primary font source first, then fallbacks: the other bundled fonts
+    (Noto Sans SC, Inter), then the CJK system chain. Deduped by priority."""
     sources = [_primary_source(family, italic)]
-    inter = ("file", str(INTER))
-    if sources[0][1] not in (str(INTER), str(INTER_ITALIC)):
-        sources.append(inter)
+    for path in (str(NOTO), str(INTER)):
+        if ("file", path) not in sources:
+            sources.append(("file", path))
     sources += [("sys", n.strip()) for n in CJK_FAMILY.split(",") if n.strip()]
     out, seen = [], set()
     for s in sources:
@@ -90,8 +95,10 @@ def _probe(source: tuple) -> _freetype.Font:
     if f is None:
         if not _freetype.get_init():
             _freetype.init()
-        f = _freetype.Font(source[1], 16) if source[0] == "file" \
-            else _freetype.SysFont(source[1], 16)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            f = _freetype.Font(source[1], 16) if source[0] == "file" \
+                else _freetype.SysFont(source[1], 16)
         _probe_cache[source] = f
     return f
 
@@ -162,7 +169,9 @@ def _segment(text: str, px: int, bold: bool, italic: bool,
 def render_line(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
                 italic: bool = False, family: str | None = None,
                 color=(0, 0, 0, 255)) -> pygame.Surface:
-    """Render one line with per-glyph fallback, concatenated into a surface."""
+    """Render one line with per-glyph fallback, concatenated into a surface.
+    Runs are aligned by BASELINE (ascent difference), not top edge — mixed
+    fonts share one visual baseline."""
     px = max(1, round(size * scale))
     runs = _segment(text, px, bold, italic, family)
     if not runs:
@@ -170,12 +179,15 @@ def render_line(text: str, size: float, *, scale: float = 1.0, bold: bool = Fals
     surfs = [f.render(part, True, color) for f, part in runs]
     if len(surfs) == 1:
         return surfs[0]
+    ascents = [f.get_ascent() for f, _ in runs]
+    base = max(ascents)
+    ys = [base - a for a in ascents]
     w = sum(s.get_width() for s in surfs)
-    h = max(s.get_height() for s in surfs)
+    h = max(y + s.get_height() for y, s in zip(ys, surfs))
     out = pygame.Surface((w, h), pygame.SRCALPHA)
     x = 0
-    for s in surfs:
-        out.blit(s, (x, 0))
+    for s, y in zip(surfs, ys):
+        out.blit(s, (x, y))
         x += s.get_width()
     return out
 

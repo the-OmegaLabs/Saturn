@@ -12,6 +12,10 @@ from saturn.widgets.scrolling import GestureDetector, ListView
 from saturn.widgets.text import Text
 
 
+def approx(a, b, tol=1.0):
+    return abs(a - b) <= tol
+
+
 class Rec:
     def __init__(self):
         self.items = []
@@ -42,7 +46,8 @@ def check_listview_scroll():
     app, page = make_page(lv)  # page.draw() lays out: lv at (10,10,200,200)
     assert lv._content_size > 200, lv._content_size  # 20 x 40px + spacing
     first = items[0]._rect
-    assert first == (10.0, 10.0, 200.0, 40.0), first
+    assert first[:2] == (10.0, 10.0) and approx(first[2], 200), first
+    assert 40 <= first[3] <= 42, first  # button height tracks font metrics
     # wheel down 100px: item 0 moves up out of view (draw offset), hit maps back
     lv._wheel(100)
     page.draw()
