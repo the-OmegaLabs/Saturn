@@ -78,6 +78,18 @@ class Window:
     def close(self):
         self._app.close()
 
+    def destroy(self):
+        self._app.close()
+
+    async def center(self):
+        # posted: SDL display calls are main-thread-only; runs after any
+        # size changes queued earlier, so it centers the final size
+        def _do():
+            sw, sh = pygame.display.get_desktop_sizes()[0]
+            w, h = self._app._window.size
+            self._app._window.position = ((sw - w) // 2, (sh - h) // 2)
+        self._app.post(_do)
+
 
 class Page(Control):
     """Root control container. Handlers (on_resize etc.) run off the UI thread."""
@@ -204,6 +216,10 @@ class Page(Control):
 
     def update(self):
         self._app.mark_dirty()
+
+    def run_task(self, handler, *args):
+        """flet run_task: schedule a coroutine handler on the app's loop."""
+        return self._app.call(handler, *args)
 
     async def take_screenshot(self, path: str | None = None):
         """flet-style async screenshot; returns the frame surface (and saves
