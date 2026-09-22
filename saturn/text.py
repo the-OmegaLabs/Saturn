@@ -10,9 +10,11 @@ from pathlib import Path
 
 import pygame
 
-# flet's default is Roboto; fall through to system fonts when absent
-DEFAULT_FAMILY = "roboto,segoeui,arial,helvetica"
-# CJK-capable system fonts (windows/mac/linux picklist; first hit wins)
+# bundled default UI font (SIL OFL 1.1 — see saturn/assets/OFL.txt)
+INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.ttf"
+INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.ttf"
+
+# CJK-capable system fonts (Inter has no CJK glyphs; windows/mac/linux picklist)
 CJK_FAMILY = "microsoftyahei,msyh,pingfangsc,hiraginosansgb,notosanscjk,wqymicrohei,simhei"
 _CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
 
@@ -21,13 +23,15 @@ _icon_cache: dict = {}
 ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
 
 
-def family_for(text: str, family: str | None = None) -> str:
-    """Pick a font family that can actually render `text` (CJK fallback)."""
+def family_for(text: str, family: str | None = None) -> str | None:
+    """Resolve the font family for `text`: explicit family wins, CJK text gets
+    a system CJK chain (Inter covers Latin only), everything else = bundled
+    Inter (None = load by path, not SysFont)."""
     if family:
         return family
     if text and _CJK_RE.search(text):
         return CJK_FAMILY
-    return DEFAULT_FAMILY
+    return None  # bundled Inter
 
 
 def get_font(size: float, scale: float = 1.0, bold: bool = False,
@@ -35,10 +39,20 @@ def get_font(size: float, scale: float = 1.0, bold: bool = False,
              text: str | None = None) -> pygame.font.Font:
     if not pygame.font.get_init():
         pygame.font.init()
-    key = (family_for(text, family), max(1, round(size * scale)), bold, italic)
+    resolved = family_for(text, family)
+    px = max(1, round(size * scale))
+    if resolved is None:
+        key = ("@inter-italic" if italic else "@inter", px, bold)
+        f = _font_cache.get(key)
+        if f is None:
+            f = pygame.font.Font(str(INTER_ITALIC if italic else INTER), px)
+            f.set_bold(bold)  # no variable-axis API in pygame.font; synthetic
+            _font_cache[key] = f
+        return f
+    key = (resolved, px, bold, italic)
     f = _font_cache.get(key)
     if f is None:
-        f = pygame.font.SysFont(key[0], key[1], bold=bold, italic=italic)
+        f = pygame.font.SysFont(resolved, px, bold=bold, italic=italic)
         _font_cache[key] = f
     return f
 
