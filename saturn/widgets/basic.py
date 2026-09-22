@@ -20,6 +20,22 @@ ASSETS = Path(__file__).parent.parent / "assets"
 _img_cache: dict = {}
 
 
+def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
+    """Return an RGBA surface without consulting pygame.display.
+
+    ``Surface.convert_alpha()`` still relies on the legacy display module's
+    pixel format.  Saturn creates windows through ``pygame.Window`` instead,
+    and OpenGL windows intentionally have no display-module surface.  Blitting
+    into an explicit SRCALPHA surface performs the only conversion we need and
+    works for both software and OpenGL windows.
+    """
+    if surface.get_flags() & pygame.SRCALPHA:
+        return surface
+    converted = pygame.Surface(surface.get_size(), pygame.SRCALPHA, 32)
+    converted.blit(surface, (0, 0))
+    return converted
+
+
 def _segment(t, start_t, end_t, start_value, end_value, curve):
     if t <= start_t:
         return start_value
@@ -74,7 +90,7 @@ class Image(Control):
             s = pygame.image.load(base64.b64decode(b64))
         else:
             s = pygame.image.load(self.src)
-        self._surface = s.convert_alpha()
+        self._surface = _as_alpha_surface(s)
         self._loaded_key = key
         return self._surface
 

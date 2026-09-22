@@ -19,6 +19,15 @@ def _rgb(color) -> tuple:
     return parse_color(color)
 
 
+def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
+    """Convert to RGBA without depending on pygame.display's pixel format."""
+    if surface.get_flags() & pygame.SRCALPHA:
+        return surface
+    converted = pygame.Surface(surface.get_size(), pygame.SRCALPHA, 32)
+    converted.blit(surface, (0, 0))
+    return converted
+
+
 class SoftwareRenderer(Renderer):
     scale = SCALE
 
@@ -125,8 +134,7 @@ class SoftwareRenderer(Renderer):
         x, y = self._translate(x, y)
         alpha *= self.opacity
         s = surface
-        if not s.get_flags() & pygame.SRCALPHA:
-            s = s.convert_alpha()
+        s = _as_alpha_surface(s)
         if alpha < 1.0:
             s = s.copy()
             s.set_alpha(int(alpha * 255))
@@ -140,8 +148,7 @@ class SoftwareRenderer(Renderer):
                   max(1, round(height * SCALE)))
         s = surface if surface.get_size() == target else \
             pygame.transform.smoothscale(surface, target)
-        if not s.get_flags() & pygame.SRCALPHA:
-            s = s.convert_alpha()
+        s = _as_alpha_surface(s)
         if alpha < 1.0:
             s = s.copy()
             s.set_alpha(int(alpha * 255))

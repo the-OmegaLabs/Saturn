@@ -6,6 +6,16 @@ sys.path.insert(0, ".")
 import pygame
 
 from saturn.renderer.software import SCALE, SoftwareRenderer
+from saturn.widgets.basic import Image
+
+
+def check_image_load_without_display_surface():
+    pygame.display.quit()
+    image = Image("examples/assets/test_img.png")
+    surface = image._load()
+    assert surface is not None
+    assert surface.get_flags() & pygame.SRCALPHA
+    assert surface.get_size() == (240, 140)
 
 
 def check_translucent_stroke_composites():
@@ -52,6 +62,7 @@ def check_translucent_circle_composites():
 
 
 if __name__ == "__main__":
+    check_image_load_without_display_surface()
     check_translucent_stroke_composites()
     check_scaled_blit()
     check_translucent_circle_composites()
