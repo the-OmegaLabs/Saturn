@@ -1,0 +1,15 @@
+[project]
+name = "xwork"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Stevesuk", email = "stevesukawa@outlook.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "flet-mcp>=1.0.0",
+    "flet[all]>=1.0.0",
+    "moderngl>=5.12.0",
+    "pygame-ce>=2.5.8",
+]

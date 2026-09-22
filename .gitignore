@@ -1,0 +1,12 @@
+# python
+__pycache__/
+*.pyc
+
+# envs & tooling
+.venv/
+.flet/
+.zcode/
+
+# scratch artifacts (test screenshots, temp scripts)
+/*.png
+/_*.py
