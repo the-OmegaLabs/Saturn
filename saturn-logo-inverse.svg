@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="192" height="192" viewBox="0 0 192 192"
+     fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Saturn logo — inverse</title>
+  <desc id="desc">A minimal black ringed planet on a white rounded square.</desc>
+  <defs>
+    <path id="front-ring" d="M49 98 A47 12.5 0 0 0 143 98"/>
+  </defs>
+  <rect x="20" y="20" width="152" height="152" rx="12" fill="#FFFFFF"/>
+  <ellipse cx="96" cy="98" rx="47" ry="12.5"
+           transform="rotate(-15 96 98)"
+           stroke="#000000" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="94" cy="96" r="32.5"
+          fill="#FFFFFF" stroke="#000000" stroke-width="5"/>
+  <g transform="rotate(-15 96 98)" stroke-linejoin="round">
+    <use href="#front-ring" stroke="#FFFFFF" stroke-width="5.4"
+         stroke-linecap="butt"/>
+    <use href="#front-ring" stroke="#000000" stroke-width="5"
+         stroke-linecap="round"/>
+  </g>
+</svg>

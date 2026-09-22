@@ -12,6 +12,7 @@ __pycache__/
 # scratch artifacts (test screenshots, temp scripts)
 /*.png
 /_*.py
+/test_*.py
 
 # local Chinese-language documentation
 /README.md

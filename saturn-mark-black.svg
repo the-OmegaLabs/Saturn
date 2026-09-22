@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="104" height="84" viewBox="44 54 104 84"
+     fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Saturn mark — black</title>
+  <desc id="desc">A minimal black Saturn symbol for light backgrounds.</desc>
+  <defs>
+    <path id="front-ring" d="M49 98 A47 12.5 0 0 0 143 98"/>
+    <mask id="mark-mask" maskUnits="userSpaceOnUse" x="44" y="54" width="104" height="84">
+      <rect x="44" y="54" width="104" height="84" fill="#000000"/>
+      <ellipse cx="96" cy="98" rx="47" ry="12.5"
+               transform="rotate(-15 96 98)"
+               stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="94" cy="96" r="32.5"
+              fill="#000000" stroke="#FFFFFF" stroke-width="5"/>
+      <g transform="rotate(-15 96 98)" stroke-linejoin="round">
+        <use href="#front-ring" stroke="#000000" stroke-width="5.4"
+             stroke-linecap="butt"/>
+        <use href="#front-ring" stroke="#FFFFFF" stroke-width="5"
+             stroke-linecap="round"/>
+      </g>
+    </mask>
+  </defs>
+  <rect x="44" y="54" width="104" height="84"
+        fill="#000000" mask="url(#mark-mask)"/>
+</svg>
