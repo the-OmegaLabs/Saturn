@@ -103,6 +103,7 @@ class Page(Control):
         self.padding = 10
         self._title = ""
         self._theme_mode = ThemeMode.SYSTEM
+        colors.theme_dark = colors.system_prefers_dark()  # SYSTEM default
         self.theme = None       # ft.Theme(font_family=...) overrides default font
         self.dark_theme = None
         self._fonts: dict[str, str] = {}  # flet page.fonts: alias -> file path
@@ -132,8 +133,10 @@ class Page(Control):
     @theme_mode.setter
     def theme_mode(self, mode):
         self._theme_mode = mode if isinstance(mode, ThemeMode) else ThemeMode(mode)
-        # ponytail: SYSTEM always resolves light; OS-theme detection when needed
-        colors.theme_dark = self._theme_mode is ThemeMode.DARK
+        # SYSTEM follows the OS app-mode preference (Windows dark mode)
+        colors.theme_dark = (self._theme_mode is ThemeMode.DARK
+                             or (self._theme_mode is ThemeMode.SYSTEM
+                                 and colors.system_prefers_dark()))
         self.update()
 
     @property

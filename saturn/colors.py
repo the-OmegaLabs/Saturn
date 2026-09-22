@@ -7,6 +7,8 @@ Colors members, and named values ("red", "red500") or M3 role names
 """
 from __future__ import annotations
 
+import sys
+
 from ._gen.colors import MATERIAL, Colors  # noqa: F401  (re-exported)
 
 # M3 baseline schemes (the classic 2021 spec defaults; Flutter derives these
@@ -63,6 +65,26 @@ BASELINE_DARK = {
 # set by the active Page's theme_mode; role names resolve against it
 theme_dark: bool = False
 role_overrides: dict[str, str] = {}  # Theme(color_scheme=...) lands in M3
+
+_system_dark_cache: bool | None = None
+
+
+def system_prefers_dark() -> bool:
+    """Windows app-mode dark preference (ThemeMode.SYSTEM resolution);
+    cached once per run — flipping the OS theme mid-run is not a thing."""
+    global _system_dark_cache
+    if _system_dark_cache is None:
+        v = False
+        if sys.platform == "win32":
+            try:
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+                    v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
+            except OSError:
+                pass
+        _system_dark_cache = v
+    return _system_dark_cache
 
 
 def _hex_to_rgba(hex6: str, alpha: int = 255) -> tuple[int, int, int, int]:
