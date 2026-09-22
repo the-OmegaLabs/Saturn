@@ -80,6 +80,13 @@ class KeyboardType(enum.Enum):
     NONE = "none"
 
 
+@dataclass
+class Theme:
+    """flet Theme subset. font_family overrides the default UI font
+    (bundled Inter) for the whole app via page.theme."""
+    font_family: str | None = None
+
+
 class BoxFit(enum.Enum):
     FILL = "fill"
     CONTAIN = "contain"

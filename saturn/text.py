@@ -22,13 +22,18 @@ _font_cache: dict = {}
 _icon_cache: dict = {}
 ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
 
+# set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
+default_family: str | None = None
+
 
 def family_for(text: str, family: str | None = None) -> str | None:
-    """Resolve the font family for `text`: explicit family wins, CJK text gets
-    a system CJK chain (Inter covers Latin only), everything else = bundled
-    Inter (None = load by path, not SysFont)."""
+    """Resolve the font family for `text`: explicit family wins, then the
+    theme default (page.theme), then a system CJK chain for CJK text (Inter
+    covers Latin only), otherwise the bundled Inter (None = load by path)."""
     if family:
         return family
+    if default_family:
+        return default_family
     if text and _CJK_RE.search(text):
         return CJK_FAMILY
     return None  # bundled Inter

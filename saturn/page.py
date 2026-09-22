@@ -91,6 +91,8 @@ class Page(Control):
         self.padding = 10
         self._title = ""
         self._theme_mode = ThemeMode.SYSTEM
+        self.theme = None       # ft.Theme(font_family=...) overrides default font
+        self.dark_theme = None
         self.vertical_alignment = MainAxisAlignment.START    # flet BasePage
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
@@ -119,6 +121,17 @@ class Page(Control):
         self._theme_mode = mode if isinstance(mode, ThemeMode) else ThemeMode(mode)
         # ponytail: SYSTEM always resolves light; OS-theme detection when needed
         colors.theme_dark = self._theme_mode is ThemeMode.DARK
+        self.update()
+
+    @property
+    def theme(self):
+        return self._theme
+
+    @theme.setter
+    def theme(self, t):
+        self._theme = t
+        from . import text as _txt
+        _txt.default_family = t.font_family if t is not None else None
         self.update()
 
     @property

@@ -33,6 +33,7 @@ from .types import (
     Padding,
     ScrollMode,
     TextAlign,
+    Theme,
     ThemeMode,
     TextOverflow,
     TextStyle,
@@ -84,7 +85,7 @@ __all__ = [
     "Alignment", "Border", "BorderRadius", "BorderSide", "BoxFit", "BoxShadow",
     "CrossAxisAlignment", "FontWeight", "KeyboardType", "LabelPosition",
     "MainAxisAlignment", "Margin", "Offset", "Padding", "ScrollMode",
-    "TextAlign", "ThemeMode", "TextOverflow", "TextStyle",
+    "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
 ]
 __version__ = "0.0.1"
 
