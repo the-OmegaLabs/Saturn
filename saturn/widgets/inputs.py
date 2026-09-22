@@ -21,6 +21,8 @@ _FIELD_H = 48.0
 _FIELD_PAD = 12.0
 _RADIUS = 8.0
 _ITEM_H = 36.0
+_IME_OFFSET_X = -6.0
+_IME_OFFSET_Y = -4.0
 
 
 def _parse(c):
@@ -265,9 +267,12 @@ class TextField(Control):
         # point and an exclusion area. Start at the visual caret but extend to
         # the field bottom so the candidate UI sits below, never over the next
         # line or control.
+        anchor_x = cx + _IME_OFFSET_X
+        anchor_y = text_y + _IME_OFFSET_Y
+        field_bottom = self._rect[1] + self._rect[3] + _IME_OFFSET_Y
         rect = pygame.Rect(
-            round(cx), round(text_y), 1,
-            max(1, round(self._rect[1] + self._rect[3] - text_y)),
+            round(anchor_x), round(anchor_y), 1,
+            max(1, round(field_bottom - anchor_y)),
         )
         self.page._app.set_text_input_rect(rect)
         self._last_ime_rect = rect

@@ -154,7 +154,7 @@ def check_cjk_ime():
     assert changed.items == [], "preedit must not fire on_change"
     assert tf._last_ime_rect is not None
     assert tf._last_ime_rect.y > round(tf._rect[1])
-    assert tf._last_ime_rect.bottom == round(tf._rect[1] + tf._rect[3])
+    assert tf._last_ime_rect.bottom == round(tf._rect[1] + tf._rect[3] - 4)
 
     page.handle_event(pygame.event.Event(pygame.KEYDOWN,
                                          key=pygame.K_BACKSPACE))
