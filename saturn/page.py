@@ -185,6 +185,10 @@ class Page(Control):
         self._hovered = None
         self._focused = None
         self._pointer_pos = None
+        self._last_click_at = 0.0
+        self._last_click_pos = None
+        self._last_click_target = None
+        self._click_count = 0
 
     # -- flet API ---------------------------------------------------------
     @property
@@ -458,12 +462,31 @@ class Page(Control):
         self.update()
 
     # -- pointer plumbing (called from the UI loop) ------------------------
-    def pointer_down(self, x, y):
+    def pointer_down(self, x, y, clicks=None):
         self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
+        now = time.perf_counter()
+        if clicks is None:
+            close = (self._last_click_pos is not None
+                     and (x - self._last_click_pos[0]) ** 2
+                     + (y - self._last_click_pos[1]) ** 2 <= 16)
+            if (hit is self._last_click_target and close
+                    and now - self._last_click_at <= 0.5):
+                self._click_count = self._click_count % 3 + 1
+            else:
+                self._click_count = 1
+            clicks = self._click_count
+        else:
+            clicks = max(1, int(clicks))
+            self._click_count = clicks
+        self._last_click_at = now
+        self._last_click_pos = (x, y)
+        self._last_click_target = hit
         if hit is not None and getattr(hit, "_focusable", False):
             self.focus(hit)
-            if hasattr(hit, "_caret_at"):
+            if hasattr(hit, "_pointer_down"):
+                hit._pointer_down(x, y, clicks)
+            elif hasattr(hit, "_caret_at"):
                 hit._caret_at(x)
         elif hit is None and self._focused is not None:
             self.focus(None)
@@ -485,7 +508,9 @@ class Page(Control):
                 self._pressed._drag_end()
             if hasattr(self._pressed, "_released_hook"):
                 self._pressed._released_hook(x, y)
-            if hit is self._pressed:
+            consume_click = bool(getattr(self._pressed, "_consume_click", False))
+            self._pressed._consume_click = False
+            if hit is self._pressed and not consume_click:
                 from .event import fire
                 fire(hit, "click")
             self._pressed = None

@@ -7,6 +7,7 @@ import threading
 import time
 
 import pygame
+import pyperclip
 
 from .containers import Container, Row
 from ._material import (draw_state_layer, init_state_layer, press,
@@ -39,6 +40,35 @@ def _mix(a, b, progress: float):
     a, b = _parse(a), _parse(b)
     progress = max(0.0, min(1.0, progress))
     return tuple(round(x + (y - x) * progress) for x, y in zip(a, b))
+
+
+def _clipboard_copy(value: str) -> bool:
+    try:
+        pyperclip.copy(value)
+        return True
+    except (OSError, RuntimeError, pyperclip.PyperclipException):
+        try:
+            if not pygame.scrap.get_init():
+                pygame.scrap.init()
+            pygame.scrap.put(pygame.SCRAP_TEXT,
+                              value.encode("utf-8") + b"\0")
+            return True
+        except (pygame.error, UnicodeError):
+            return False
+
+
+def _clipboard_paste() -> str | None:
+    try:
+        return str(pyperclip.paste())
+    except (OSError, RuntimeError, pyperclip.PyperclipException):
+        try:
+            if not pygame.scrap.get_init():
+                pygame.scrap.init()
+            value = pygame.scrap.get(pygame.SCRAP_TEXT)
+            return (value.decode("utf-8", errors="replace").rstrip("\0")
+                    if value is not None else None)
+        except (pygame.error, UnicodeError):
+            return None
 
 
 class TextField(Control):
@@ -76,6 +106,10 @@ class TextField(Control):
         self.can_reveal_password = can_reveal_password
         self._password_revealed = False
         self._caret = len(value)
+        self._selection_anchor = None
+        self._selection_dragging = False
+        self._selection_drag_mode = "character"
+        self._drag_selection_origin = (self._caret, self._caret)
         self._composition = ""
         self._composition_start = 0
         self._composition_length = 0
@@ -121,6 +155,9 @@ class TextField(Control):
         if self.value != self._last_value:
             self._last_value = self.value
             self._caret = min(self._caret, len(self.value))
+            if self._selection_anchor is not None:
+                self._selection_anchor = min(
+                    self._selection_anchor, len(self.value))
             self._animate_internal(
                 "_label_progress",
                 1.0 if self._focused or bool(self.value) else 0.0,
@@ -219,8 +256,8 @@ class TextField(Control):
         return get_font(vsize, scale=scale, family=family,
                         text=self.value or self.hint_text or self.label)
 
-    def _caret_at(self, x):
-        """Place the caret from a pointer x position."""
+    def _index_at(self, x) -> int:
+        """Return the nearest text boundary for a page-space x coordinate."""
         scale = self.page._app.renderer.scale if self.page else 1.0
         family, vsize, _ = self._style()
         px = x - (self._rect[0] + self._paint_offset[0] + _FIELD_PAD) \
@@ -235,11 +272,120 @@ class TextField(Control):
                 break
             acc += w
             idx = i + 1
-        self._caret = idx
+        return idx
+
+    def _selection(self):
+        anchor = self._selection_anchor
+        if anchor is None or anchor == self._caret:
+            return None
+        return (min(anchor, self._caret), max(anchor, self._caret))
+
+    def _selected_text(self) -> str:
+        selected = self._selection()
+        return self.value[selected[0]:selected[1]] if selected else ""
+
+    def _clear_selection(self):
+        self._selection_anchor = None
+
+    def _select_range(self, start: int, end: int):
+        length = len(self.value)
+        self._selection_anchor = max(0, min(length, start))
+        self._caret = max(0, min(length, end))
+
+    def _word_bounds(self, index: int):
+        value = self.value
+        if not value:
+            return (0, 0)
+        index = max(0, min(len(value) - 1, index))
+
+        def char_class(char):
+            if char.isalnum() or char == "_":
+                return "word"
+            if char.isspace():
+                return "space"
+            return "punctuation"
+
+        kind = char_class(value[index])
+        start, end = index, index + 1
+        while start > 0 and char_class(value[start - 1]) == kind:
+            start -= 1
+        while end < len(value) and char_class(value[end]) == kind:
+            end += 1
+        return (start, end)
+
+    def _line_bounds(self, index: int):
+        index = max(0, min(len(self.value), index))
+        start = self.value.rfind("\n", 0, index) + 1
+        newline = self.value.find("\n", index)
+        end = len(self.value) if newline < 0 else newline + 1
+        return (start, end)
+
+    def _pointer_down(self, x, _y, clicks=1):
+        """Position or select text using desktop single/double/triple click."""
+        if (self.password and self.can_reveal_password
+                and x >= self._rect[0] + self._rect[2] - 48):
+            self._selection_dragging = False
+            return
+        index = self._index_at(x)
+        clicks = max(1, int(clicks or 1))
+        if clicks % 3 == 0:
+            start, end = self._line_bounds(index)
+            self._select_range(start, end)
+            self._selection_drag_mode = "line"
+        elif clicks % 3 == 2:
+            word_index = min(index, max(0, len(self.value) - 1))
+            start, end = self._word_bounds(word_index)
+            self._select_range(start, end)
+            self._selection_drag_mode = "word"
+        else:
+            self._caret = index
+            self._clear_selection()
+            start = end = index
+            self._selection_drag_mode = "character"
+        self._drag_selection_origin = (start, end)
         self._clear_composition(update=False)
         self._restart_cursor_blink()
         self._update_ime_rect()
         self.update()
+
+    def _caret_at(self, x):
+        """Compatibility hook: place the caret with a single click."""
+        self._pointer_down(x, self._rect[1], 1)
+
+    def _drag_start(self, x, _y):
+        if (self.password and self.can_reveal_password
+                and x >= self._rect[0] + self._rect[2] - 48):
+            self._selection_dragging = False
+            return
+        self._selection_dragging = True
+
+    def _drag(self, x, _y):
+        if not self._selection_dragging:
+            return
+        index = self._index_at(x)
+        start, end = self._drag_selection_origin
+        if self._selection_drag_mode == "word":
+            next_start, next_end = self._word_bounds(
+                min(index, max(0, len(self.value) - 1)))
+            if index < start:
+                self._select_range(end, next_start)
+            else:
+                self._select_range(start, next_end)
+        elif self._selection_drag_mode == "line":
+            next_start, next_end = self._line_bounds(index)
+            if index < start:
+                self._select_range(end, next_start)
+            else:
+                self._select_range(start, next_end)
+        else:
+            self._selection_anchor = start
+            self._caret = index
+        self._restart_cursor_blink()
+        self._update_ime_rect()
+        self.update()
+
+    def _drag_end(self):
+        self._selection_dragging = False
 
     def _text_viewport(self):
         """Return the horizontal content viewport, excluding adornments."""
@@ -290,13 +436,58 @@ class TextField(Control):
         self.update()
         fire(self, "change", self.value)
 
+    def _delete_selection(self) -> bool:
+        selected = self._selection()
+        if selected is None:
+            return False
+        start, end = selected
+        self.value = self.value[:start] + self.value[end:]
+        self._caret = start
+        self._clear_selection()
+        return True
+
+    def _replace_selection(self, value: str):
+        selected = self._selection()
+        start, end = selected if selected is not None else (
+            self._caret, self._caret)
+        self.value = self.value[:start] + value + self.value[end:]
+        self._caret = start + len(value)
+        self._clear_selection()
+
+    def _previous_word_boundary(self, index: int) -> int:
+        value = self.value
+        index = max(0, min(len(value), index))
+        while index > 0 and value[index - 1].isspace():
+            index -= 1
+        if index > 0:
+            index = self._word_bounds(index - 1)[0]
+        return index
+
+    def _next_word_boundary(self, index: int) -> int:
+        value = self.value
+        index = max(0, min(len(value), index))
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index < len(value):
+            index = self._word_bounds(index)[1]
+        return index
+
+    def _move_caret(self, target: int, *, extend: bool):
+        target = max(0, min(len(self.value), target))
+        if extend:
+            if self._selection_anchor is None:
+                self._selection_anchor = self._caret
+        else:
+            self._clear_selection()
+        self._caret = target
+        self._restart_cursor_blink()
+        self.update()
+
     def _text_input(self, t):
         if self.read_only:
             return
         self._clear_composition(update=False)
-        v = self.value
-        self.value = v[:self._caret] + t + v[self._caret:]
-        self._caret += len(t)
+        self._replace_selection(t)
         self._update_ime_rect()
         self._changed()
 
@@ -358,38 +549,89 @@ class TextField(Control):
 
     def _key(self, e):
         k = e.key
+        modifiers = getattr(e, "mod", 0)
+        shortcut = bool(modifiers & (pygame.KMOD_CTRL | pygame.KMOD_META))
+        extend = bool(modifiers & pygame.KMOD_SHIFT)
+
+        if shortcut and k == pygame.K_a:
+            self._clear_composition(update=False)
+            self._select_range(0, len(self.value))
+            self._restart_cursor_blink()
+            self._update_ime_rect()
+            self.update()
+            return
+        if shortcut and k == pygame.K_c:
+            selected = self._selected_text()
+            if selected:
+                _clipboard_copy(selected)
+            return
+        if shortcut and k == pygame.K_x:
+            if not self.read_only:
+                selected = self._selected_text()
+                if selected and _clipboard_copy(selected):
+                    self._delete_selection()
+                    self._changed()
+            return
+        if shortcut and k == pygame.K_v:
+            if not self.read_only:
+                pasted = _clipboard_paste()
+                if pasted is not None:
+                    pasted = pasted.replace("\r\n", "\n").replace("\r", "\n")
+                    if not self.multiline:
+                        pasted = pasted.replace("\n", "")
+                    self._clear_composition(update=False)
+                    self._replace_selection(pasted)
+                    self._changed()
+            return
         if self._composition:
             # The platform IME owns editing/navigation keys until it emits a
             # TEXTINPUT commit or clears the TEXTEDITING preedit string.
             return
         v, c = self.value, self._caret
-        if k == pygame.K_BACKSPACE and c > 0 and not self.read_only:
-            self.value, self._caret = v[:c - 1] + v[c:], c - 1
-            self._changed()
-        elif k == pygame.K_DELETE and c < len(v) and not self.read_only:
-            self.value = v[:c] + v[c + 1:]
-            self._changed()
+        if k == pygame.K_BACKSPACE and not self.read_only:
+            if self._delete_selection():
+                self._changed()
+            elif c > 0:
+                start = self._previous_word_boundary(c) if shortcut else c - 1
+                self.value, self._caret = v[:start] + v[c:], start
+                self._changed()
+        elif k == pygame.K_DELETE and not self.read_only:
+            if self._delete_selection():
+                self._changed()
+            elif c < len(v):
+                end = self._next_word_boundary(c) if shortcut else c + 1
+                self.value = v[:c] + v[end:]
+                self._changed()
         elif k in (pygame.K_RETURN, pygame.K_KP_ENTER):
             if self.multiline and not self.read_only:
-                self.value = v[:c] + "\n" + v[c:]
-                self._caret = c + 1
+                self._replace_selection("\n")
                 self._changed()
             else:
                 fire(self, "submit", self.value)
         elif k == pygame.K_LEFT:
-            self._caret = max(0, c - 1)
-            self.update()
+            selected = self._selection()
+            if selected and not extend and not shortcut:
+                target = selected[0]
+            else:
+                target = (self._previous_word_boundary(c) if shortcut
+                          else c - 1)
+            self._move_caret(target, extend=extend)
         elif k == pygame.K_RIGHT:
-            self._caret = min(len(v), c + 1)
-            self.update()
+            selected = self._selection()
+            if selected and not extend and not shortcut:
+                target = selected[1]
+            else:
+                target = (self._next_word_boundary(c) if shortcut
+                          else c + 1)
+            self._move_caret(target, extend=extend)
         elif k == pygame.K_HOME:
-            self._caret = 0
-            self.update()
+            target = (0 if shortcut or not self.multiline
+                      else self._line_bounds(c)[0])
+            self._move_caret(target, extend=extend)
         elif k == pygame.K_END:
-            self._caret = len(v)
-            self.update()
-        if k in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_HOME, pygame.K_END):
-            self._restart_cursor_blink()
+            target = (len(v) if shortcut or not self.multiline
+                      else self._line_bounds(c)[1])
+            self._move_caret(target, extend=extend)
         self._update_ime_rect()
 
     # -- drawing ------------------------------------------------------------------
@@ -497,6 +739,18 @@ class TextField(Control):
                 "value", displayed, vsize, scale, family, _parse(vcolor))
             text_y = ty + (th - surf.get_height() / scale) / 2
             r.clip_push(text_left, y, viewport_w, h)
+            selected = self._selection()
+            if selected is not None and not composition:
+                start, end = selected
+                selected_x = draw_x + txt.line_width(
+                    shown[:start], vsize, scale=scale, family=family)
+                selected_w = txt.line_width(
+                    shown[start:end], vsize, scale=scale, family=family)
+                r.fill_rect(
+                    selected_x, text_y, max(1.0, selected_w),
+                    surf.get_height() / scale,
+                    _parse(colors.with_opacity(0.36, colors.Colors.PRIMARY)),
+                    radius=2)
             r.blit(surf, draw_x, text_y)
             if composition:
                 comp_x = draw_x + txt.line_width(
@@ -691,6 +945,10 @@ class Switch(_Toggle):
         self._color_progress = initial
         self._size_progress = initial
         self._thumb_press_progress = 0.0
+        self._switch_drag_start_x = 0.0
+        self._switch_drag_start_progress = initial
+        self._switch_dragged = False
+        self._consume_click = False
 
     def _box_size(self):
         return 52.0  # Material 3 track width
@@ -709,6 +967,37 @@ class Switch(_Toggle):
                                AnimationCurve.LINEAR)
         self._animate_internal("_size_progress", target, motion.MEDIUM1,
                                motion.STANDARD)
+
+    def _drag_start(self, x, _y):
+        self._switch_drag_start_x = x
+        self._switch_drag_start_progress = float(self._value_progress)
+        self._switch_dragged = False
+
+    def _drag(self, x, _y):
+        delta = x - self._switch_drag_start_x
+        if abs(delta) < 2.0 and not self._switch_dragged:
+            return
+        self._switch_dragged = True
+        progress = max(0.0, min(
+            1.0, self._switch_drag_start_progress + delta / 20.0))
+        self._animate_internal("_value_progress", progress, 0)
+        self._animate_internal("_color_progress", progress, 0)
+        self._animate_internal("_size_progress", progress, 0)
+        self.update()
+
+    def _drag_end(self):
+        if not self._switch_dragged:
+            return
+        selected = self._value_progress >= 0.5
+        changed = selected != self.value
+        self.value = selected
+        self._last_value = selected
+        self._animate_value(selected)
+        self._consume_click = True
+        self._switch_dragged = False
+        self.update()
+        if changed:
+            fire(self, "change", "true" if selected else "false")
 
     def _draw_box(self, r, x, y, w):
         h = 32.0

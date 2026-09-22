@@ -3,6 +3,7 @@ dropdown menu. Headless + assert-based.
 """
 import sys
 import time
+from unittest.mock import patch
 
 sys.path.insert(0, ".")
 
@@ -44,8 +45,9 @@ def center(c):
 
 
 class FakeKey:
-    def __init__(self, key):
+    def __init__(self, key, mod=0):
         self.key = key
+        self.mod = mod
 
 
 class FakeText:
@@ -172,6 +174,81 @@ def check_textfield_animations():
     print("textfield animations ok")
 
 
+def check_textfield_desktop_selection_and_clipboard():
+    app, page = make_page()
+    tf = TextField("alpha beta gamma", width=300)
+    page.add(tf)
+    page.draw()
+    left, _ = tf._text_viewport()
+    family, size, _ = tf._style()
+
+    def x_at(index):
+        return left - tf._scroll_x + saturn_text.line_width(
+            tf._visible_text()[:index], size,
+            scale=app.renderer.scale, family=family)
+
+    y = tf._rect[1] + tf._rect[3] / 2
+    page.pointer_down(x_at(6), y, clicks=1)
+    assert tf._caret == 6 and tf._selection() is None
+    page.pointer_up(x_at(6), y)
+
+    page.pointer_down(x_at(8), y, clicks=2)
+    assert tf._selected_text() == "beta"
+    page.pointer_up(x_at(8), y)
+
+    page.pointer_down(x_at(8), y, clicks=3)
+    assert tf._selected_text() == tf.value
+    page.pointer_up(x_at(8), y)
+
+    page.pointer_down(x_at(0), y, clicks=1)
+    page.pointer_move(x_at(5), y)
+    page.pointer_up(x_at(5), y)
+    assert tf._selected_text() == "alpha"
+
+    tf._select_range(6, 10)
+    with patch("saturn.widgets.inputs.pyperclip.copy") as copy:
+        tf._key(FakeKey(pygame.K_c, pygame.KMOD_CTRL))
+        copy.assert_called_once_with("beta")
+        tf._key(FakeKey(pygame.K_x, pygame.KMOD_CTRL))
+    assert tf.value == "alpha  gamma" and tf._caret == 6
+
+    with patch("saturn.widgets.inputs.pyperclip.paste", return_value="BETA"):
+        tf._key(FakeKey(pygame.K_v, pygame.KMOD_CTRL))
+    assert tf.value == "alpha BETA gamma"
+
+    tf._key(FakeKey(pygame.K_a, pygame.KMOD_CTRL))
+    assert tf._selected_text() == tf.value
+    tf._text_input("replacement")
+    assert tf.value == "replacement" and tf._selection() is None
+
+    tf._key(FakeKey(pygame.K_LEFT, pygame.KMOD_SHIFT))
+    assert tf._selected_text() == "t"
+    tf._key(FakeKey(pygame.K_BACKSPACE))
+    assert tf.value == "replacemen"
+    print("textfield desktop selection/clipboard ok")
+
+
+def check_textfield_native_click_counting():
+    app, page = make_page()
+    tf = TextField("one two three", width=260)
+    page.add(tf)
+    page.draw()
+    left, _ = tf._text_viewport()
+    family, size, _ = tf._style()
+    x = left + saturn_text.line_width(
+        "one t", size, scale=app.renderer.scale, family=family)
+    y = tf._rect[1] + tf._rect[3] / 2
+    page.pointer_down(x, y)
+    page.pointer_up(x, y)
+    page.pointer_down(x, y)
+    assert tf._selected_text() == "two"
+    page.pointer_up(x, y)
+    page.pointer_down(x, y)
+    assert tf._selected_text() == tf.value
+    page.pointer_up(x, y)
+    print("textfield click counting ok")
+
+
 def check_cjk_ime():
     app, page = make_page()
     changed = Rec()
@@ -224,6 +301,30 @@ def check_checkbox_switch():
     assert s._animations["_thumb_press_progress"].end_value == 0.0
     assert s.value is True and sw.wait()
     print("checkbox/switch ok")
+
+
+def check_switch_drag():
+    app, page = make_page()
+    changed = Rec()
+    switch = Switch(on_change=changed)
+    page.add(switch)
+    page.draw()
+    x, y, _w, h = switch._rect
+    cy = y + h / 2
+
+    page.pointer_down(x + 16, cy)
+    page.pointer_move(x + 36, cy)
+    assert switch._value_progress == 1.0
+    assert switch.value is False, "drag commits only when released"
+    page.pointer_up(x + 36, cy)
+    assert switch.value is True
+    assert changed.items == ["true"], "drag release must not also click-toggle"
+
+    page.pointer_down(x + 36, cy)
+    page.pointer_move(x + 16, cy)
+    page.pointer_up(x + 16, cy)
+    assert switch.value is False and changed.items[-1] == "false"
+    print("switch drag ok")
 
 
 def check_radio_group():
@@ -293,8 +394,11 @@ if __name__ == "__main__":
     check_password_and_hint()
     check_textfield_overflow()
     check_textfield_animations()
+    check_textfield_desktop_selection_and_clipboard()
+    check_textfield_native_click_counting()
     check_cjk_ime()
     check_checkbox_switch()
+    check_switch_drag()
     check_radio_group()
     check_slider()
     check_dropdown()
