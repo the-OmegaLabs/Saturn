@@ -181,7 +181,7 @@ class TextField(Control):
             caret_text, vsize, scale=scale, family=family)
         rect = pygame.Rect(round(cx), round(self._rect[1]), 1,
                            max(1, round(self._rect[3])))
-        pygame.key.set_text_input_rect(rect)
+        self.page._app.set_text_input_rect(rect)
         self._last_ime_rect = rect
 
     def _key(self, e):

@@ -74,6 +74,54 @@ def _set_windows_default_icon(hwnd: int) -> bool:
         return False
 
 
+class _WinPoint(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+class _WinRect(ctypes.Structure):
+    _fields_ = [
+        ("left", ctypes.c_long), ("top", ctypes.c_long),
+        ("right", ctypes.c_long), ("bottom", ctypes.c_long),
+    ]
+
+
+class _CandidateForm(ctypes.Structure):
+    _fields_ = [
+        ("dwIndex", ctypes.c_uint32),
+        ("dwStyle", ctypes.c_uint32),
+        ("ptCurrentPos", _WinPoint),
+        ("rcArea", _WinRect),
+    ]
+
+
+def _set_windows_ime_candidate(hwnd: int, x: int, y: int) -> bool:
+    """Move the native IMM candidate window in client coordinates."""
+    if sys.platform != "win32" or not hwnd:
+        return False
+    try:
+        imm32 = ctypes.windll.imm32
+        imm32.ImmGetContext.argtypes = [ctypes.c_void_p]
+        imm32.ImmGetContext.restype = ctypes.c_void_p
+        imm32.ImmSetCandidateWindow.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(_CandidateForm),
+        ]
+        imm32.ImmSetCandidateWindow.restype = ctypes.c_int
+        imm32.ImmReleaseContext.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        imm32.ImmReleaseContext.restype = ctypes.c_int
+        context = imm32.ImmGetContext(hwnd)
+        if not context:
+            return False
+        try:
+            form = _CandidateForm(
+                0, 0x0040, _WinPoint(int(x), int(y)), _WinRect())
+            return bool(imm32.ImmSetCandidateWindow(
+                context, ctypes.byref(form)))
+        finally:
+            imm32.ImmReleaseContext(hwnd, context)
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
 def _set_gl_swap_interval(interval: int = 1) -> bool:
     """Request v-sync for the current SDL OpenGL context."""
     try:
@@ -214,6 +262,12 @@ class App:
     def post(self, fn):
         """Run a callable on the UI thread (required for SDL display calls)."""
         self._ui_q.put(fn)
+
+    def set_text_input_rect(self, rect: pygame.Rect):
+        """Position both SDL text input and the native Windows candidate UI."""
+        pygame.key.set_text_input_rect(rect)
+        _set_windows_ime_candidate(
+            self._window.handle, rect.x, rect.bottom + 2)
 
     def _apply_default_window_icon(self):
         return _set_windows_default_icon(self._window.handle)
