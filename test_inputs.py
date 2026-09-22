@@ -6,6 +6,8 @@ import time
 
 sys.path.insert(0, ".")
 
+import pygame
+
 import saturn as ft
 from saturn.widgets.containers import Row
 from saturn.widgets.inputs import (Checkbox, Dropdown, DropdownOption, Radio,
@@ -101,6 +103,39 @@ def check_password_and_hint():
     print("password ok")
 
 
+def check_cjk_ime():
+    app, page = make_page()
+    changed = Rec()
+    tf = TextField("前", on_change=changed)
+    page.add(tf)
+    page.draw()
+    page.pointer_down(*center(tf))
+    tf._caret = len(tf.value)
+
+    page.handle_event(pygame.event.Event(
+        pygame.TEXTEDITING, text="中文", start=1, length=1))
+    assert tf.value == "前", "preedit text must not mutate the committed value"
+    assert tf._composition == "中文"
+    assert tf._composition_start == 1 and tf._composition_length == 1
+    assert changed.items == [], "preedit must not fire on_change"
+    assert tf._last_ime_rect is not None
+
+    page.handle_event(pygame.event.Event(pygame.KEYDOWN,
+                                         key=pygame.K_BACKSPACE))
+    assert tf.value == "前", "IME must own editing keys during composition"
+
+    page.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="中文"))
+    assert tf.value == "前中文"
+    assert tf._composition == ""
+    assert changed.wait() and changed.items == ["前中文"]
+
+    page.handle_event(pygame.event.Event(
+        pygame.TEXTEDITING, text="输入", start=2, length=0))
+    page.focus(None)
+    assert tf._composition == "", "blur must cancel unfinished preedit text"
+    print("CJK IME ok")
+
+
 def check_checkbox_switch():
     app, page = make_page()
     cb, sw = Rec(), Rec()
@@ -170,6 +205,7 @@ def check_dropdown():
 if __name__ == "__main__":
     check_textfield()
     check_password_and_hint()
+    check_cjk_ime()
     check_checkbox_switch()
     check_radio_group()
     check_slider()

@@ -106,8 +106,9 @@ class GLRenderer(Renderer):
     # software backend's supersampling); rects get SDF AA at device resolution
     scale = 2.0
 
-    def __init__(self):
+    def __init__(self, window):
         self._init_effect_stacks()
+        self.window = window
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.BLEND)
         # the GL backbuffer follows the OS window automatically, but pygame's
@@ -124,7 +125,7 @@ class GLRenderer(Renderer):
 
     def _query_size(self):
         try:
-            return pygame.display.get_surface().get_size()
+            return tuple(self.window.size)
         except Exception:
             return (0, 0)
 
@@ -291,7 +292,7 @@ class GLRenderer(Renderer):
         if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
             # read BEFORE the swap: after SwapWindow the back buffer is stale
             pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
-        pygame.display.flip()
+        self.window.flip()
 
     def on_resize(self, width, height):
         self._size = (int(width), int(height))

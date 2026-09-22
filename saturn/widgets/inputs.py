@@ -58,6 +58,10 @@ class TextField(Control):
         self.can_reveal_password = can_reveal_password
         self._password_revealed = False
         self._caret = len(value)
+        self._composition = ""
+        self._composition_start = 0
+        self._composition_length = 0
+        self._last_ime_rect = None
         self._focused = False
         self._focusable = True
 
@@ -89,6 +93,11 @@ class TextField(Control):
         return ("•" * len(self.value)
                 if self.password and not self._password_revealed else self.value)
 
+    def _visible_composition(self) -> str:
+        if self.password and not self._password_revealed:
+            return "•" * len(self._composition)
+        return self._composition
+
     def _pressed_hook(self, x, y):
         if self.password and self.can_reveal_password:
             rx, _, rw, _ = self._rect
@@ -117,23 +126,70 @@ class TextField(Control):
             acc += w
             idx = i + 1
         self._caret = idx
+        self._clear_composition(update=False)
+        self._update_ime_rect()
         self.update()
 
     # -- editing ----------------------------------------------------------------
     def _changed(self):
+        self._update_ime_rect()
         self.update()
         fire(self, "change", self.value)
 
     def _text_input(self, t):
         if self.read_only:
             return
+        self._clear_composition(update=False)
         v = self.value
         self.value = v[:self._caret] + t + v[self._caret:]
         self._caret += len(t)
+        self._update_ime_rect()
         self._changed()
+
+    def _text_editing(self, text: str, start: int = 0, length: int = 0):
+        """Update SDL IME preedit state without committing it to ``value``."""
+        if self.read_only:
+            return
+        self._composition = text or ""
+        self._composition_start = max(0, min(len(self._composition), int(start)))
+        self._composition_length = max(
+            0, min(len(self._composition) - self._composition_start,
+                   int(length)))
+        self._update_ime_rect()
+        self.update()
+
+    def _clear_composition(self, *, update=True):
+        changed = bool(self._composition)
+        self._composition = ""
+        self._composition_start = 0
+        self._composition_length = 0
+        if changed and update:
+            self.update()
+
+    def _update_ime_rect(self):
+        if not self._focused or self.page is None:
+            return
+        scale = self.page._app.renderer.scale
+        family, vsize, _ = self._style()
+        shown = self._visible_text()
+        prefix = shown[:self._caret]
+        composition = self._visible_composition()
+        ime_cursor = min(len(composition),
+                         self._composition_start + self._composition_length)
+        caret_text = prefix + composition[:ime_cursor]
+        cx = self._rect[0] + _FIELD_PAD + txt.line_width(
+            caret_text, vsize, scale=scale, family=family)
+        rect = pygame.Rect(round(cx), round(self._rect[1]), 1,
+                           max(1, round(self._rect[3])))
+        pygame.key.set_text_input_rect(rect)
+        self._last_ime_rect = rect
 
     def _key(self, e):
         k = e.key
+        if self._composition:
+            # The platform IME owns editing/navigation keys until it emits a
+            # TEXTINPUT commit or clears the TEXTEDITING preedit string.
+            return
         v, c = self.value, self._caret
         if k == pygame.K_BACKSPACE and c > 0 and not self.read_only:
             self.value, self._caret = v[:c - 1] + v[c:], c - 1
@@ -160,6 +216,7 @@ class TextField(Control):
         elif k == pygame.K_END:
             self._caret = len(v)
             self.update()
+        self._update_ime_rect()
 
     # -- drawing ------------------------------------------------------------------
     def _draw(self, r, x, y):
@@ -194,11 +251,36 @@ class TextField(Control):
                                    color=_parse(colors.Colors.PRIMARY)),
                    x + _FIELD_PAD, y + 6)
         shown = self._visible_text()
-        if shown:
-            surf = txt.render_line(shown, vsize, scale=scale, family=family,
+        composition = self._visible_composition()
+        prefix, suffix = shown[:self._caret], shown[self._caret:]
+        displayed = prefix + composition + suffix
+        if displayed:
+            surf = txt.render_line(displayed, vsize, scale=scale, family=family,
                                    color=_parse(vcolor))
+            text_y = ty + (th - surf.get_height() / scale) / 2
             r.clip_push(x, y, w, h)
-            r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
+            r.blit(surf, x + _FIELD_PAD, text_y)
+            if composition:
+                comp_x = x + _FIELD_PAD + txt.line_width(
+                    prefix, vsize, scale=scale, family=family)
+                comp_w = txt.line_width(
+                    composition, vsize, scale=scale, family=family)
+                underline_y = min(y + h - 2,
+                                  text_y + surf.get_height() / scale)
+                r.fill_rect(comp_x, underline_y, max(1, comp_w), 1,
+                            _parse(colors.Colors.ON_SURFACE_VARIANT))
+                if self._composition_length:
+                    selected = composition[
+                        self._composition_start:
+                        self._composition_start + self._composition_length]
+                    selected_x = comp_x + txt.line_width(
+                        composition[:self._composition_start], vsize,
+                        scale=scale, family=family)
+                    selected_w = txt.line_width(
+                        selected, vsize, scale=scale, family=family)
+                    r.fill_rect(selected_x, underline_y - 1,
+                                max(1, selected_w), 2,
+                                _parse(colors.Colors.PRIMARY))
             r.clip_pop()
         elif self.hint_text:
             surf = txt.render_line(self.hint_text, self.text_size, scale=scale,
@@ -213,10 +295,14 @@ class TextField(Control):
             r.blit(eye, x + w - 32,
                    y + (h - eye.get_height() / scale) / 2)
         if self._focused:
-            cx = x + _FIELD_PAD + txt.line_width(shown[:self._caret], vsize,
-                                                 scale=scale, family=family)
+            ime_cursor = min(len(composition),
+                             self._composition_start + self._composition_length)
+            caret_text = prefix + composition[:ime_cursor]
+            cx = x + _FIELD_PAD + txt.line_width(
+                caret_text, vsize, scale=scale, family=family)
             r.fill_rect(cx, ty + (th - vsize) / 2, 2, vsize,
                         _parse(self.cursor_color or colors.Colors.PRIMARY))
+            self._update_ime_rect()
 
 
 class _Toggle(Control):

@@ -15,6 +15,9 @@ class Window:
 
     def __init__(self, app):
         self._app = app
+        self._maximized = False
+        self._full_screen = False
+        self._minimized = False
 
     @property
     def width(self) -> int:
@@ -39,7 +42,7 @@ class Window:
     @title.setter
     def title(self, v: str):
         self._app._title = v
-        self._app.post(lambda: pygame.display.set_caption(v))
+        self._app.post(lambda: setattr(self._app._window, "title", v))
 
     @property
     def icon(self):
@@ -51,7 +54,7 @@ class Window:
 
         def _set_icon():
             if path:
-                pygame.display.set_icon(pygame.image.load(path))
+                self._app._window.set_icon(pygame.image.load(path))
             else:
                 self._app._apply_default_window_icon()
 
@@ -60,30 +63,35 @@ class Window:
     # flet Window booleans; all SDL calls marshaled to the UI thread
     @property
     def maximized(self) -> bool:
-        return self._app._window.maximized
+        return self._maximized
 
     @maximized.setter
     def maximized(self, v: bool):
+        self._maximized = bool(v)
         win = self._app._window
         self._app.post(win.maximize if v else win.restore)
 
     @property
     def full_screen(self) -> bool:
-        return getattr(self._app._window, "fullscreen", False)
+        return self._full_screen
 
     @full_screen.setter
     def full_screen(self, v: bool):
+        self._full_screen = bool(v)
         win = self._app._window
         self._app.post(win.set_fullscreen if v else win.set_windowed)
 
     @property
     def minimized(self) -> bool:
-        return False
+        return self._minimized
 
     @minimized.setter
     def minimized(self, v: bool):
+        self._minimized = bool(v)
         if v:
             self._app.post(self._app._window.minimize)
+        else:
+            self._app.post(self._app._window.restore)
 
     def _set_size(self, w, h):
         # pygame-ce fires no WINDOWRESIZED for programmatic sets, and the GL
@@ -351,6 +359,12 @@ class Page(Control):
             if self._focused is not None:
                 self._focused._text_input(e.text)
             return
+        if e.type == pygame.TEXTEDITING:
+            if (self._focused is not None
+                    and hasattr(self._focused, "_text_editing")):
+                self._focused._text_editing(
+                    e.text, getattr(e, "start", 0), getattr(e, "length", 0))
+            return
         if e.type == pygame.KEYDOWN:
             self._dispatch(self.on_keyboard_event)
             if self._focused is not None:
@@ -377,10 +391,17 @@ class Page(Control):
         old, self._focused = self._focused, control
         if old is not None:
             old._focused = False
+            if hasattr(old, "_clear_composition"):
+                old._clear_composition(update=False)
             fire(old, "blur")
         if control is not None:
             control._focused = True
-            pygame.key.start_text_input()
+            if not getattr(control, "read_only", False):
+                pygame.key.start_text_input()
+                if hasattr(control, "_update_ime_rect"):
+                    control._update_ime_rect()
+            else:
+                pygame.key.stop_text_input()
             fire(control, "focus")
         else:
             pygame.key.stop_text_input()

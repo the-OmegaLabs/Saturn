@@ -33,7 +33,6 @@ class Render(enum.Enum):
     OPENGL = "opengl"
     VULKAN = "vulkan"  # placeholder, see TODO
 
-
 def _system_refresh_rate() -> int:
     """Return the active display refresh rate, with a conservative fallback."""
     try:
@@ -75,6 +74,17 @@ def _set_windows_default_icon(hwnd: int) -> bool:
         return False
 
 
+def _set_gl_swap_interval(interval: int = 1) -> bool:
+    """Request v-sync for the current SDL OpenGL context."""
+    try:
+        dll = ctypes.CDLL(str(Path(pygame.__file__).with_name("SDL2.dll")))
+        dll.SDL_GL_SetSwapInterval.argtypes = [ctypes.c_int]
+        dll.SDL_GL_SetSwapInterval.restype = ctypes.c_int
+        return dll.SDL_GL_SetSwapInterval(interval) == 0
+    except (AttributeError, OSError):
+        return False
+
+
 class App:
     def __init__(self, main, backend: Render, width: int, height: int, title: str):
         self._main = main
@@ -107,26 +117,22 @@ class App:
         pygame.init()
         if self._backend is Render.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
-        flags = pygame.RESIZABLE
-        if self._backend is Render.OPENGL:
-            flags |= pygame.DOUBLEBUF | pygame.OPENGL
-        self._sdl_flags = flags
-        # SDL requests swap interval 1 for OpenGL. Software presentation is
-        # paced below using the active monitor's refresh rate.
-        pygame.display.set_mode(
-            tuple(self._size), flags,
-            vsync=1 if self._backend is Render.OPENGL else 0,
+        self._window = pygame.Window(
+            title=self._title,
+            size=tuple(self._size),
+            resizable=True,
+            opengl=self._backend is Render.OPENGL,
         )
+        if self._backend is Render.OPENGL:
+            _set_gl_swap_interval(1)
         self._refresh_rate = _system_refresh_rate()
-        pygame.display.set_caption(self._title)
-        self._window = pygame.Window.from_display_module()
         self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
         client = self.client_size_for_outer(*self._outer_size)
         if tuple(self._window.size) != client:
             self._window.size = client
         self._size[:] = client
-        self.renderer = create_renderer(self._backend)
+        self.renderer = create_renderer(self._backend, self._window)
         # SDL/pygame can retain the set_mode creation size after the native
         # Window client area is adjusted for Flet's outer-size semantics.
         # Seed every renderer from the authoritative final client size so
@@ -175,7 +181,7 @@ class App:
                 elif e.type == pygame.MOUSEMOTION:
                     self.page.pointer_move(*e.pos)
                 elif e.type in (pygame.KEYDOWN, pygame.KEYUP, pygame.TEXTINPUT,
-                                pygame.MOUSEWHEEL):
+                                pygame.TEXTEDITING, pygame.MOUSEWHEEL):
                     self.page.handle_event(e)
                 else:
                     self.page.handle_event(e)
@@ -187,6 +193,7 @@ class App:
             # SDL; the cap also provides safe pacing if a driver ignores it.
             clock.tick(self._refresh_rate)
         self._remove_live_resize_watch()
+        self._window.destroy()
         pygame.display.quit()
 
     # -- cross-thread helpers -------------------------------------------
@@ -206,11 +213,7 @@ class App:
         self._ui_q.put(fn)
 
     def _apply_default_window_icon(self):
-        try:
-            hwnd = pygame.display.get_wm_info().get("window", 0)
-        except pygame.error:
-            hwnd = 0
-        return _set_windows_default_icon(hwnd)
+        return _set_windows_default_icon(self._window.handle)
 
     def _resize_frame(self, width: int, height: int, *, present: bool,
                       dispatch: bool = False):
@@ -358,7 +361,7 @@ class App:
             import ctypes
             from ctypes import wintypes
 
-            hwnd = pygame.display.get_wm_info()["window"]
+            hwnd = self._window.handle
             outer = wintypes.RECT()
             client = wintypes.RECT()
             user32 = ctypes.windll.user32

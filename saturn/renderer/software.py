@@ -22,16 +22,19 @@ def _rgb(color) -> tuple:
 class SoftwareRenderer(Renderer):
     scale = SCALE
 
-    def __init__(self):
+    def __init__(self, window=None):
         self._init_effect_stacks()
-        self.screen = pygame.display.get_surface()
+        self.window = window
+        self.screen = (window.get_surface() if window is not None
+                       else pygame.display.get_surface())
         w, h = self.screen.get_size()
         self._buf = pygame.Surface((w * SCALE, h * SCALE), pygame.SRCALPHA)
         self._clip: list[tuple] = []
         self._apply_clip()
 
     def on_resize(self, width, height):
-        self.screen = pygame.display.get_surface()
+        self.screen = (self.window.get_surface() if self.window is not None
+                       else pygame.display.get_surface())
         self._buf = pygame.Surface((width * SCALE, height * SCALE), pygame.SRCALPHA)
         self._apply_clip()
 
@@ -131,7 +134,10 @@ class SoftwareRenderer(Renderer):
     def flip(self):
         out = pygame.transform.smoothscale(self._buf, self.screen.get_size())
         self.screen.blit(out, (0, 0))
-        pygame.display.flip()
+        if self.window is not None:
+            self.window.flip()
+        else:
+            pygame.display.flip()
         if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
             pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
 
