@@ -98,9 +98,9 @@ def check_ink_hover_without_handler():
     app, page = make_page(ink)
     page.pointer_move(*center(ink))
     assert page._hovered is ink
-    assert ink._animations["_ink_alpha"].end_value == 0.08
+    assert ink._animations["_state_hover_alpha"].end_value == 0.08
     page.pointer_move(700, 500)
-    assert ink._animations["_ink_alpha"].end_value == 0.0
+    assert ink._animations["_state_hover_alpha"].end_value == 0.0
     print("ink hover without handler ok")
 
 

@@ -2,18 +2,33 @@
 from __future__ import annotations
 
 import base64
+import math
+import time
 from pathlib import Path
 
 import pygame
 
 from .containers import Container
 from .. import colors
+from .. import motion
+from ..animation import _cubic_bezier, ease
 from ..control import Control
 from ..text import get_icon_font
-from ..types import BoxFit
+from ..types import AnimationCurve, BoxFit
 
 ASSETS = Path(__file__).parent.parent / "assets"
 _img_cache: dict = {}
+
+
+def _segment(t, start_t, end_t, start_value, end_value, curve):
+    if t <= start_t:
+        return start_value
+    if t >= end_t:
+        return end_value
+    local = (t - start_t) / (end_t - start_t)
+    if curve is not None:
+        local = _cubic_bezier(local, *curve)
+    return start_value + (end_value - start_value) * local
 
 
 class Icon(Control):
@@ -113,7 +128,10 @@ class ProgressBar(Control):
         self.color = color
         self.bgcolor = bgcolor
         self.border_radius = border_radius
-        # ponytail: indeterminate is a static stub; animate via frame clock later
+        self._display_value = 0.0 if value is None else float(value)
+        self._last_value = value
+        self._phase_started = time.perf_counter()
+        self._phase = 0.0
 
     def _intrinsic(self, max_w, max_h, scale):
         return (self._width if self._width is not None else (max_w or 100),
@@ -124,14 +142,69 @@ class ProgressBar(Control):
 
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
-        v = self.value if self.value is not None else 0.35
         r.fill_rect(x, y, w, h,
                     colors.parse_color(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
                     radius=h / 2)
-        if v > 0:
-            r.fill_rect(x, y, w * min(1.0, v), h,
+        if self.value is None:
+            phase = self._phase
+            # Exact Material Web 2s keyframe geometry: two independently
+            # translating and scaling bars, clipped by the track.
+            p_tx = (0.0 if phase <= 0.2 else
+                    _segment(phase, 0.2, 0.5915, 0.0, 0.836714,
+                             (0.5, 0.0, 0.701732, 0.495819)) if phase <= 0.5915
+                    else _segment(phase, 0.5915, 1.0, 0.836714, 2.00611,
+                                  (0.302435, 0.381352, 0.55, 0.956352)))
+            p_scale = (0.08 if phase <= 0.3665 else
+                       _segment(phase, 0.3665, 0.6915, 0.08, 0.661479,
+                                (0.334731, 0.12482, 0.785844, 1.0))
+                       if phase <= 0.6915 else
+                       _segment(phase, 0.6915, 1.0, 0.661479, 0.08,
+                                (0.06, 0.11, 0.6, 1.0)))
+            s_tx = (_segment(phase, 0.0, 0.25, 0.0, 0.376519,
+                             (0.15, 0.0, 0.515058, 0.409685))
+                    if phase <= 0.25 else
+                    _segment(phase, 0.25, 0.4835, 0.376519, 0.843862,
+                             (0.31033, 0.284058, 0.8, 0.733712))
+                    if phase <= 0.4835 else
+                    _segment(phase, 0.4835, 1.0, 0.843862, 1.60278,
+                             (0.4, 0.627035, 0.6, 0.902026)))
+            s_scale = (_segment(phase, 0.0, 0.1915, 0.08, 0.457104,
+                                (0.205028, 0.057051, 0.57661, 0.453971))
+                       if phase <= 0.1915 else
+                       _segment(phase, 0.1915, 0.4415, 0.457104, 0.72796,
+                                (0.152313, 0.196432, 0.648374, 1.00432))
+                       if phase <= 0.4415 else
+                       _segment(phase, 0.4415, 1.0, 0.72796, 0.08,
+                                (0.257759, -0.003163, 0.211762, 1.38179)))
+            active = colors.parse_color(self.color or colors.Colors.PRIMARY)
+            r.clip_push(x, y, w, h)
+            r.fill_rect(x + w * (-1.45167 + p_tx), y,
+                        w * p_scale, h, active, radius=h / 2)
+            r.fill_rect(x + w * (-0.548889 + s_tx), y,
+                        w * s_scale, h, active, radius=h / 2)
+            r.clip_pop()
+        elif self._display_value > 0:
+            r.fill_rect(x, y, w * min(1.0, self._display_value), h,
                         colors.parse_color(self.color or colors.Colors.PRIMARY),
                         radius=h / 2)
+
+    def _prepare_animations(self, now: float):
+        super()._prepare_animations(now)
+        if self.value is None:
+            if self._last_value is not None:
+                self._last_value = None
+                self._phase_started = now
+        elif self.value != self._last_value:
+            self._last_value = self.value
+            self._animate_internal("_display_value", float(self.value),
+                                   motion.MEDIUM1, motion.PROGRESS, now=now)
+
+    def _tick_animations(self, now: float) -> bool:
+        active = super()._tick_animations(now)
+        if self.value is None:
+            self._phase = ((now - self._phase_started) % 2.0) / 2.0
+            return True
+        return active
 
 
 class ProgressRing(Control):
@@ -142,6 +215,10 @@ class ProgressRing(Control):
         self.stroke_width = stroke_width
         self.color = color
         self.bgcolor = bgcolor
+        self._display_value = 0.0 if value is None else float(value)
+        self._last_value = value
+        self._phase_started = time.perf_counter()
+        self._phase = 0.0
 
     def _intrinsic(self, max_w, max_h, scale):
         return (self._width if self._width is not None else 36,
@@ -154,14 +231,48 @@ class ProgressRing(Control):
         x, y, w, h = self._rect
         cx, cy = x + w / 2, y + h / 2
         radius = min(w, h) / 2 - self.stroke_width / 2
-        import math
         r.circle(cx, cy, radius,
                  colors.parse_color(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
                  fill=False)
-        v = self.value if self.value is not None else 0.25
-        if v > 0:
-            # pygame arc angles: 0 = +x axis, counterclockwise (y-down: visually clockwise)
-            start = math.pi / 2  # top
-            r.arc(cx, cy, radius, start, start + 2 * math.pi * min(1.0, v),
+        if self.value is None:
+            elapsed = self._phase
+            arc_phase = (elapsed % 1.333) / 1.333
+            if arc_phase <= 0.5:
+                sweep = 10 + 260 * ease(
+                    AnimationCurve.FAST_OUT_SLOWIN, arc_phase * 2)
+            else:
+                sweep = 270 - 260 * ease(
+                    AnimationCurve.FAST_OUT_SLOWIN, (arc_phase - 0.5) * 2)
+            linear_rotation = (elapsed / (1.333 * 360 / 306) * 360) % 360
+            cycle = (elapsed % (4 * 1.333)) / (4 * 1.333)
+            arc_rotation = ease(AnimationCurve.FAST_OUT_SLOWIN, cycle) * 1080
+            start = math.radians(-90 + linear_rotation + arc_rotation)
+            end = start + math.radians(sweep)
+            r.arc(cx, cy, radius, start, end,
                   colors.parse_color(self.color or colors.Colors.PRIMARY),
                   width=self.stroke_width)
+        elif self._display_value > 0:
+            start = -math.pi / 2
+            r.arc(cx, cy, radius,
+                  start, start + 2 * math.pi * min(1.0, self._display_value),
+                  colors.parse_color(self.color or colors.Colors.PRIMARY),
+                  width=self.stroke_width)
+
+    def _prepare_animations(self, now: float):
+        super()._prepare_animations(now)
+        if self.value is None:
+            if self._last_value is not None:
+                self._last_value = None
+                self._phase_started = now
+        elif self.value != self._last_value:
+            self._last_value = self.value
+            self._animate_internal("_display_value", float(self.value),
+                                   motion.LONG2,
+                                   AnimationCurve.DECELERATE, now=now)
+
+    def _tick_animations(self, now: float) -> bool:
+        active = super()._tick_animations(now)
+        if self.value is None:
+            self._phase = now - self._phase_started
+            return True
+        return active

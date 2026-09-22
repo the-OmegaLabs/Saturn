@@ -114,23 +114,34 @@ def check_textfield_animations():
     page.focus(tf)
     started = tf._animations["_focus_progress"].started
     assert tf._cursor_visible
-    assert tf._tick_animations(started + 0.09)
+    assert tf._tick_animations(started + 0.075)
     assert 0.0 < tf._focus_progress < 1.0
     assert 0.0 < tf._label_progress < 1.0
-    tf._tick_animations(started + 0.2)
+    tf._tick_animations(started + 0.16)
     assert tf._focus_progress == 1.0
     assert tf._label_progress == 1.0
 
+    # Intermediate label frames must reuse fixed rasters instead of creating
+    # a new font surface/GL texture for every interpolated size.
+    tf._focus_progress = tf._label_progress = 0.8
+    tf._draw(app.renderer, 0, 0)
+    cached_lines = len(tf._line_cache)
+    for progress in (0.1, 0.25, 0.5, 0.75, 0.9):
+        tf._focus_progress = tf._label_progress = progress
+        tf._draw(app.renderer, 0, 0)
+        assert len(tf._line_cache) == cached_lines
+    tf._focus_progress = tf._label_progress = 1.0
+
     tf._set_hover(True)
     hover_started = tf._animations["_hover_progress"].started
-    tf._tick_animations(hover_started + 0.06)
+    tf._tick_animations(hover_started + 0.075)
     assert 0.0 < tf._hover_progress < 1.0
-    tf._tick_animations(hover_started + 0.13)
+    tf._tick_animations(hover_started + 0.16)
     assert tf._hover_progress == 1.0
 
     page.focus(None)
     blur_started = tf._animations["_label_progress"].started
-    tf._tick_animations(blur_started + 0.2)
+    tf._tick_animations(blur_started + 0.16)
     assert tf._focus_progress == 0.0
     assert tf._label_progress == 0.0
     assert not tf._cursor_visible
@@ -229,12 +240,18 @@ def check_dropdown():
     page.draw()
     page.pointer_down(*center(dd))
     page.pointer_up(*center(dd))
-    assert dd.open and len(page.overlay) == 2
-    item_b = page.overlay[1]
+    assert dd.open and len(page.overlay) == 1
+    assert dd._animations["_menu_progress"].duration == 0.3
+    opened = dd._animations["_menu_progress"].started
+    dd._tick_animations(opened + 0.31)
+    item_b = dd._menu[1]
     page.pointer_down(*center(item_b))
     page.pointer_up(*center(item_b))
     assert picked.wait() and picked.items[-1] == "b" and dd.value == "b"
-    assert not dd.open and page.overlay == []
+    assert not dd.open and dd._menu_closing
+    assert dd._animations["_menu_progress"].duration == 0.15
+    dd._tick_animations(dd._menu_close_deadline + 0.01)
+    assert page.overlay == []
     print("dropdown ok")
 
 

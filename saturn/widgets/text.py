@@ -4,7 +4,7 @@ from __future__ import annotations
 from .. import colors
 from ..control import Control
 from ..text import (family_for, line_height, line_width, measure,
-                    render_line, wrap)
+                    render_line_cached, wrap)
 from ..text import weight_num
 from ..types import TextAlign
 
@@ -69,7 +69,8 @@ class Text(Control):
         align = self.text_align or TextAlign.START
         w = self._rect[2]
         for line in self._lines:
-            surf = render_line(line, self.size, color=color, **self._style(r.scale))
+            surf = render_line_cached(
+                line, self.size, color=color, **self._style(r.scale))
             lw = surf.get_width() / r.scale
             if align in (TextAlign.CENTER, TextAlign.JUSTIFY):
                 ox = (w - lw) / 2

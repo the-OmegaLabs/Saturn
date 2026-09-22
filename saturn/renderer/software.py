@@ -100,8 +100,18 @@ class SoftwareRenderer(Renderer):
 
     def circle(self, x, y, radius, color, fill=True):
         x, y = self._translate(x, y)
-        pygame.draw.circle(self._buf, self._effect_color(color), self._s(x, y),
-                           int(radius * SCALE), 0 if fill else max(1, SCALE))
+        c = self._effect_color(color)
+        rr = max(1, int(radius * SCALE))
+        if len(c) > 3 and c[3] < 255:
+            size = rr * 2 + 4
+            tmp = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(tmp, c, (size // 2, size // 2), rr,
+                               0 if fill else max(1, SCALE))
+            self._buf.blit(tmp, (round(x * SCALE) - size // 2,
+                                 round(y * SCALE) - size // 2))
+            return
+        pygame.draw.circle(self._buf, c, self._s(x, y), rr,
+                           0 if fill else max(1, SCALE))
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
         x, y = self._translate(x, y)
@@ -115,6 +125,21 @@ class SoftwareRenderer(Renderer):
         x, y = self._translate(x, y)
         alpha *= self.opacity
         s = surface
+        if not s.get_flags() & pygame.SRCALPHA:
+            s = s.convert_alpha()
+        if alpha < 1.0:
+            s = s.copy()
+            s.set_alpha(int(alpha * 255))
+        self._buf.blit(s, self._s(x, y))
+
+    def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
+        """Draw a cached device-pixel surface at a logical target size."""
+        x, y = self._translate(x, y)
+        alpha *= self.opacity
+        target = (max(1, round(width * SCALE)),
+                  max(1, round(height * SCALE)))
+        s = surface if surface.get_size() == target else \
+            pygame.transform.smoothscale(surface, target)
         if not s.get_flags() & pygame.SRCALPHA:
             s = s.convert_alpha()
         if alpha < 1.0:

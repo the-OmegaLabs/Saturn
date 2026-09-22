@@ -11,6 +11,7 @@ from saturn.animation import animation_spec, ease
 from saturn.control import Control
 from saturn.renderer.software import SCALE, SoftwareRenderer
 from saturn.widgets.buttons import FilledButton
+from saturn.widgets.basic import ProgressBar, ProgressRing
 from saturn.widgets.containers import Container, Stack
 from saturn.widgets.inputs import Checkbox, Switch
 
@@ -119,34 +120,62 @@ def check_material_state_transitions():
     button = FilledButton("go")
     button._attach(page)
     button._set_hover(True)
-    button._animations["_state_alpha"].started = 0.0
-    button._tick_animations(0.075)
-    assert 0 < button._state_alpha < 0.08
+    button._animations["_state_hover_alpha"].started = 0.0
+    button._tick_animations(0.0075)
+    assert 0 < button._state_hover_alpha < 0.08
     button._pressed = True
     button._pressed_hook(0, 0)
-    assert button._animations["_state_alpha"].end_value == 0.12
+    assert button._animations["_state_press_alpha"].end_value == 0.12
+    assert button._animations["_state_ripple_progress"].duration == 0.45
 
-    for control in (Checkbox(value=False), Switch(value=False)):
+    for control, midpoint, endpoint in (
+            (Checkbox(value=False), 0.175, 0.36),
+            (Switch(value=False), 0.075, 0.31)):
         control._attach(page)
         control._toggle()
         control._animations["_value_progress"].started = 0.0
-        control._tick_animations(0.1)
+        control._tick_animations(midpoint)
         assert 0 < control._value_progress < 1
-        control._tick_animations(0.2)
+        control._tick_animations(endpoint)
         assert control._value_progress == 1
 
     ink = Container(width=100, height=40, ink=True)
     ink._attach(page)
     ink._pressed = True
     ink._pressed_hook(10, 10)
-    assert ink._animations["_ink_alpha"].end_value == 0.12
+    assert ink._animations["_state_press_alpha"].end_value == 0.12
     ink._pressed = False
     ink._released_hook(10, 10)
-    assert ink._ink_release_deadline is not None, "quick taps need a visible pulse"
-    deadline = ink._ink_release_deadline
+    assert ink._state_release_deadline is not None, "quick taps need a visible pulse"
+    deadline = ink._state_release_deadline
     ink._tick_animations(deadline)
-    assert ink._ink_release_deadline is None
-    assert ink._animations["_ink_alpha"].end_value == 0.0
+    assert ink._state_release_deadline is None
+    assert ink._animations["_state_press_alpha"].end_value == 0.0
+
+
+def check_material_progress_transitions():
+    page = _Page()
+    bar = ProgressBar(0.1)
+    bar._attach(page)
+    bar.value = 0.9
+    bar._prepare_animations(0.0)
+    assert bar._animations["_display_value"].duration == 0.25
+    bar._tick_animations(0.125)
+    assert 0.1 < bar._display_value < 0.9
+
+    ring = ProgressRing(0.1)
+    ring._attach(page)
+    ring.value = 0.9
+    ring._prepare_animations(0.0)
+    assert ring._animations["_display_value"].duration == 0.5
+    ring._tick_animations(0.25)
+    assert 0.1 < ring._display_value < 0.9
+
+    busy = ProgressBar(None)
+    busy._attach(page)
+    busy._phase_started = 0.0
+    assert busy._tick_animations(1.0)
+    assert busy._phase == 0.5
 
 
 def check_worker_ui_thread_safety():
@@ -179,5 +208,6 @@ if __name__ == "__main__":
     check_size_position_and_container_color()
     check_renderer_opacity_and_translation()
     check_material_state_transitions()
+    check_material_progress_transitions()
     check_worker_ui_thread_safety()
     print("ALL ANIMATION TESTS PASS")

@@ -71,6 +71,10 @@ class Renderer(ABC):
     def blit(self, surface, x, y, alpha=1.0) -> None: ...
 
     @abstractmethod
+    def blit_scaled(self, surface, x, y, width, height,
+                    alpha=1.0) -> None: ...
+
+    @abstractmethod
     def clip_push(self, x, y, w, h) -> None: ...
 
     @abstractmethod

@@ -12,12 +12,12 @@ Stack children position via their own left/top/right/bottom.
 """
 from __future__ import annotations
 
-import time
-
 from .. import colors
 from ..control import Control
 from ..types import (CrossAxisAlignment, MainAxisAlignment,
                      as_border_radius, as_padding)
+from ._material import (draw_state_layer, init_state_layer, press,
+                        release, set_hover, tick_state_layer)
 
 
 def _margins(c):
@@ -206,9 +206,7 @@ class Container(Control):
         self.on_long_press = on_long_press
         self._hovered = False
         self._pressed = False
-        self._ink_alpha = 0.0
-        self._ink_press_started = 0.0
-        self._ink_release_deadline = None
+        init_state_layer(self)
 
     def _animation_groups(self):
         groups = super()._animation_groups()
@@ -219,11 +217,10 @@ class Container(Control):
         return groups
 
     def _set_hover(self, on: bool):
-        self._hovered = on
         if self.ink:
-            self._animate_internal(
-                "_ink_alpha", 0.12 if self._pressed else (0.08 if on else 0.0),
-                150)
+            set_hover(self, on)
+        else:
+            self._hovered = on
         self.update()
         from ..event import fire
         fire(self, "hover", "true" if on else "false")
@@ -241,33 +238,19 @@ class Container(Control):
             return self
         return None
 
-    def _pressed_hook(self, _x, _y):
+    def _pressed_hook(self, x, y):
         if not self.ink:
             return
-        self._ink_press_started = time.perf_counter()
-        self._ink_release_deadline = None
-        self._animate_internal("_ink_alpha", 0.12, 100)
+        press(self, x, y)
 
     def _released_hook(self, _x, _y):
         if not self.ink:
             return
-        now = time.perf_counter()
-        # Down/up can be drained in the same SDL event pump. Preserve a short
-        # state-layer pulse instead of cancelling it before the first frame.
-        minimum_end = self._ink_press_started + 0.08
-        if now < minimum_end:
-            self._ink_release_deadline = minimum_end
-        else:
-            self._animate_internal(
-                "_ink_alpha", 0.08 if self._hovered else 0.0, 180, now=now)
+        release(self)
 
     def _tick_animations(self, now: float) -> bool:
-        if (self._ink_release_deadline is not None
-                and now >= self._ink_release_deadline):
-            self._ink_release_deadline = None
-            self._animate_internal(
-                "_ink_alpha", 0.08 if self._hovered else 0.0, 180, now=now)
-        return super()._tick_animations(now) or self._ink_release_deadline is not None
+        waiting = tick_state_layer(self, now) if self.ink else False
+        return super()._tick_animations(now) or waiting
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -331,11 +314,9 @@ class Container(Control):
         if self.border is not None and self.border.left.color is not None:
             r.stroke_rect(x, y, w, h, colors.parse_color(self.border.left.color),
                           width=self.border.left.width, radius=self._radius())
-        if self.ink and self._ink_alpha > 0:
-            ink = colors.parse_color(colors.Colors.ON_SURFACE)
-            r.fill_rect(x, y, w, h,
-                        (ink[0], ink[1], ink[2], round(255 * self._ink_alpha)),
-                        radius=self._radius())
+        if self.ink:
+            draw_state_layer(self, r, (x, y, w, h),
+                             colors.Colors.ON_SURFACE, self._radius())
         if self.border_radius:
             r.clip_push(x, y, w, h)
 

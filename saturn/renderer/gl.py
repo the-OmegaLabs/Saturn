@@ -7,6 +7,7 @@ origin top-left and are flipped on the GPU side.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import struct
 
@@ -210,11 +211,28 @@ class GLRenderer(Renderer):
                             border_color=color)
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
-        # v1: full ring (arc sweep approximation needs a fan)
-        self._rect_call(round(x - radius), round(y - radius),
-                        round(radius * 2), round(radius * 2),
-                        (0, 0, 0, 0), radius=radius, border_w=width,
-                        border_color=color)
+        x, y = self._translate(x, y)
+        sweep = end_angle - start_angle
+        if radius <= 0 or width <= 0 or sweep == 0:
+            return
+        segments = max(8, int(abs(sweep) * radius / 3))
+        inner = max(0.0, radius - width)
+        corners = []
+        for index in range(segments):
+            a0 = start_angle + sweep * index / segments
+            a1 = start_angle + sweep * (index + 1) / segments
+            outer0 = (x + math.cos(a0) * radius,
+                      y + math.sin(a0) * radius)
+            outer1 = (x + math.cos(a1) * radius,
+                      y + math.sin(a1) * radius)
+            inner0 = (x + math.cos(a0) * inner,
+                      y + math.sin(a0) * inner)
+            inner1 = (x + math.cos(a1) * inner,
+                      y + math.sin(a1) * inner)
+            corners.extend((outer0, outer1, inner1,
+                            outer0, inner1, inner0))
+        self._draw_rect(corners, (x, y), (radius, radius), -1.0, 0.0,
+                        color, None)
 
     def _texture(self, surface):
         raw = pygame.image.tobytes(surface, "RGBA")
@@ -231,16 +249,17 @@ class GLRenderer(Renderer):
         return tex, raw
 
     def blit(self, surface, x, y, alpha=1.0):
+        s = self.scale
+        self.blit_scaled(surface, x, y,
+                         surface.get_width() / s,
+                         surface.get_height() / s, alpha)
+
+    def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
         x, y = self._translate(x, y)
         alpha *= self.opacity
         tex, _ = self._texture(surface)
-        # surface is rendered at `scale`x device px; draw at logical size so a
-        # 2x glyph downsamples 1 texel-per-2-pixels (supersampled, crisp)
-        s = self.scale
-        w = surface.get_width() / s
-        h = surface.get_height() / s
         x0, y0 = round(x), round(y)
-        x1, y1 = x0 + round(w), y0 + round(h)
+        x1, y1 = x0 + round(width), y0 + round(height)
         # tobytes row 0 (glyph top) lands at v=0 -> v=0 at quad top
         verts = [(x0, y0, 0.0, 0.0), (x1, y0, 1.0, 0.0), (x1, y1, 1.0, 1.0),
                  (x0, y0, 0.0, 0.0), (x1, y1, 1.0, 1.0), (x0, y1, 0.0, 1.0)]

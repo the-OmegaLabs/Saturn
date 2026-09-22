@@ -43,6 +43,7 @@ def check_alert():
                                ft.FilledButton("Delete", on_click=lambda e: (approved(), page.pop_dialog()))],
                       on_dismiss=dismissed)
     page.show_dialog(dlg)
+    assert dlg._animations["_reveal"].duration == 0.3
     page.draw()
     assert page.overlay == [dlg] and dlg.open
     # card is centered
@@ -53,6 +54,7 @@ def check_alert():
     btn = dlg.actions[1]
     page.pointer_down(btn._rect[0] + 5, btn._rect[1] + 5)
     page.pointer_up(btn._rect[0] + 5, btn._rect[1] + 5)
+    assert dlg._animations["_reveal"].duration == 0.15
     assert approved.wait() and dismissed.wait()
     assert page.overlay == [], page.overlay
     print("alert ok")
@@ -65,6 +67,7 @@ def check_barrier_dismiss_and_modal():
     page.draw()
     page.pointer_down(5, 5)   # barrier
     page.pointer_up(5, 5)
+    time.sleep(0.2)
     assert page.overlay == [], "non-modal barrier click should dismiss"
     dlg2 = AlertDialog(title="t", content=Text("c"), modal=True)
     page.show_dialog(dlg2)
@@ -73,6 +76,7 @@ def check_barrier_dismiss_and_modal():
     page.pointer_up(5, 5)
     assert page.overlay == [dlg2], "modal barrier click must not dismiss"
     page.pop_dialog()
+    time.sleep(0.2)
     assert page.overlay == []
     print("barrier/modal ok")
 

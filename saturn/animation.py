@@ -96,6 +96,14 @@ def ease(curve: AnimationCurve, t: float) -> float:
         "easeInToLinear": (.67, .03, .65, .09),
         "slowMiddle": (.15, .85, .85, .15),
         "easeInOutCubicEmphasized": (.2, 0, 0, 1),
+        "materialStandard": (.2, 0, 0, 1),
+        "materialStandardAccelerate": (.3, 0, 1, 1),
+        "materialStandardDecelerate": (0, 0, 0, 1),
+        "materialEmphasized": (.3, 0, 0, 1),
+        "materialEmphasizedAccelerate": (.3, 0, .8, .15),
+        "materialEmphasizedDecelerate": (.05, .7, .1, 1),
+        "materialSwitchOvershoot": (.175, .885, .32, 1.275),
+        "materialProgress": (.4, 0, .6, 1),
     }
     if name in cubics:
         return _cubic_bezier(t, *cubics[name])

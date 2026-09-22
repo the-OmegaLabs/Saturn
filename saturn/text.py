@@ -26,6 +26,7 @@ import os
 import re
 import threading
 import warnings
+from collections import OrderedDict
 from pathlib import Path
 
 import pygame
@@ -63,6 +64,8 @@ default_family: str | None = None
 registered_fonts: dict[str, str] = {}
 
 _font_cache: dict = {}
+_line_surface_cache: OrderedDict = OrderedDict()
+_line_surface_lock = threading.RLock()
 _icon_cache: dict = {}
 _probe_cache: dict[tuple, _freetype.Font] = {}
 _cover_cache: dict[tuple, bool] = {}
@@ -79,6 +82,8 @@ _optimizing_notice = False                      # the notice prints only once
 def register_fonts(fonts: dict[str, str]):
     registered_fonts.update(fonts)
     _cover_cache.clear()
+    with _line_surface_lock:
+        _line_surface_cache.clear()
 
 
 def weight_num(weight) -> int:
@@ -250,6 +255,8 @@ def _instance_bg(path: str, wnum: int, dest: Path):
     for k in list(_font_cache):
         if k[0] == "file" and k[1] == path and k[2] == wnum:
             _font_cache.pop(k, None)
+    with _line_surface_lock:
+        _line_surface_cache.clear()
     if on_weight_ready is not None:
         on_weight_ready()
 
@@ -409,6 +416,30 @@ def render_line(text: str, size: float, *, scale: float = 1.0,
         out.blit(s, (x, y))
         x += s.get_width()
     return out
+
+
+def render_line_cached(text: str, size: float, *, scale: float = 1.0,
+                       weight: int | None = None, bold: bool = False,
+                       italic: bool = False, family: str | None = None,
+                       color=(0, 0, 0, 255)) -> pygame.Surface:
+    """Return an immutable line raster from a bounded animation-safe cache."""
+    frozen_color = tuple(color) if isinstance(color, (tuple, list)) else color
+    key = (text, float(size), float(scale), weight, bool(bold), bool(italic),
+           family, default_family, frozen_color)
+    with _line_surface_lock:
+        surface = _line_surface_cache.get(key)
+        if surface is not None:
+            _line_surface_cache.move_to_end(key)
+            return surface
+    surface = render_line(
+        text, size, scale=scale, weight=weight, bold=bold, italic=italic,
+        family=family, color=color)
+    with _line_surface_lock:
+        _line_surface_cache[key] = surface
+        _line_surface_cache.move_to_end(key)
+        while len(_line_surface_cache) > 512:
+            _line_surface_cache.popitem(last=False)
+    return surface
 
 
 def line_width(text: str, size: float, *, scale: float = 1.0,

@@ -5,11 +5,13 @@ color/bgcolor, disabled.
 """
 from __future__ import annotations
 
-from .. import colors, text as txt
+from .. import colors, motion, text as txt
 from ..control import Control
 from ..event import fire
 from ..text import get_icon_font
 from ..text import weight_num
+from ._material import (draw_state_layer, init_state_layer, press,
+                        release, set_hover, tick_state_layer)
 
 # M3 button metrics
 _HEIGHT = 40.0
@@ -28,6 +30,7 @@ class Button(Control):
     variant_bg = None     # class defaults, resolved at draw (theme-aware)
     variant_fg = None
     variant_border = None
+    variant_elevation = 0.0
 
     def __init__(self, content=None, *, icon=None, icon_color=None, color=None,
                  bgcolor=None, elevation: float = 1, style=None, on_click=None,
@@ -50,7 +53,8 @@ class Button(Control):
         self.url = url
         self._hovered = False
         self._pressed = False
-        self._state_alpha = 0.0
+        self._elevation_progress = self.variant_elevation
+        init_state_layer(self)
 
     # -- metrics -----------------------------------------------------------
     def _label(self) -> str:
@@ -97,8 +101,7 @@ class Button(Control):
             base = colors.parse_color(self.variant_bg)
         else:
             return None
-        return _blend(colors.parse_color(self._fg_raw()), base,
-                      self._state_alpha) if self._state_alpha else base
+        return base
 
     def _fg_raw(self):
         return self.color or self.variant_fg or colors.Colors.ON_SURFACE
@@ -113,11 +116,19 @@ class Button(Control):
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
         bg = self._bg()
+        elevation = self._elevation_progress
+        if elevation > 0 and not self.disabled:
+            shadow_alpha = round(18 + 8 * elevation)
+            r.overlay_rect(x - elevation, y + elevation,
+                           w + 2 * elevation, h + elevation,
+                           (0, 0, 0, shadow_alpha), radius=h / 2 + elevation)
         if bg is not None:
             r.fill_rect(x, y, w, h, bg, radius=h / 2)
         if self.variant_border is not None and not self.disabled:
             r.stroke_rect(x, y, w, h, colors.parse_color(self.variant_border),
                           width=1, radius=h / 2)
+        if not self.disabled:
+            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), h / 2)
         # content: [icon] gap [label/control]
         scale = r.scale
         icon_surf = label_surf = None
@@ -127,8 +138,8 @@ class Button(Control):
             icon_surf = f.render(chr(int(self.icon)), True, self._fg())
             icon_w = icon_surf.get_width() / scale
         if label := self._label():
-            label_surf = txt.render_line(label, _LABEL_SIZE, scale=scale,
-                                         color=self._fg())
+            label_surf = txt.render_line_cached(
+                label, _LABEL_SIZE, scale=scale, color=self._fg())
             label_w = label_surf.get_width() / scale
         elif isinstance(self.content, Control):
             label_w = self.content._rect[2]
@@ -162,17 +173,31 @@ class Button(Control):
         return self._hit_test(x, y)
 
     def _set_hover(self, on: bool):
-        self._hovered = on
-        self._animate_internal("_state_alpha", 0.12 if self._pressed else
-                               (0.08 if on else 0.0), 150)
+        set_hover(self, on)
+        if self.variant_elevation:
+            self._animate_internal(
+                "_elevation_progress", 2.0 if on else self.variant_elevation,
+                280, motion.EMPHASIZED)
         self.update()
         fire(self, "hover", "true" if on else "false")
 
-    def _pressed_hook(self, _x, _y):
-        self._animate_internal("_state_alpha", 0.12, 100)
+    def _pressed_hook(self, x, y):
+        press(self, x, y)
+        if self.variant_elevation:
+            self._animate_internal("_elevation_progress", 1.0, 280,
+                                   motion.EMPHASIZED)
 
     def _released_hook(self, _x, _y):
-        self._animate_internal("_state_alpha", 0.08 if self._hovered else 0.0, 100)
+        release(self)
+        if self.variant_elevation:
+            self._animate_internal(
+                "_elevation_progress",
+                2.0 if self._hovered else self.variant_elevation,
+                280, motion.EMPHASIZED)
+
+    def _tick_animations(self, now: float) -> bool:
+        waiting = tick_state_layer(self, now)
+        return super()._tick_animations(now) or waiting
 
 
 class FilledButton(Button):
@@ -188,6 +213,7 @@ class FilledTonalButton(Button):
 class ElevatedButton(Button):
     variant_bg = colors.Colors.SURFACE_CONTAINER_LOW
     variant_fg = colors.Colors.PRIMARY
+    variant_elevation = 1.0
 
 
 class OutlinedButton(Button):
@@ -227,6 +253,7 @@ class IconButton(Control):
         self.on_hover = on_hover
         self._hovered = False
         self._pressed = False
+        init_state_layer(self)
 
     def _intrinsic(self, max_w, max_h, scale):
         s = self._width if self._width is not None else 40.0
@@ -245,11 +272,12 @@ class IconButton(Control):
         x, y, w, h = self._rect
         fg = colors.parse_color(
             self.icon_color or colors.Colors.ON_SURFACE_VARIANT)
-        if self._hovered or self._pressed:
-            if self.hover_color is not None or self.bgcolor is not None:
-                base = colors.parse_color(self.bgcolor or
-                                          colors.Colors.SURFACE_CONTAINER_HIGHEST)
-                r.fill_rect(x, y, w, h, base, radius=min(w, h) / 2)
+        if self.bgcolor is not None:
+            r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor),
+                        radius=min(w, h) / 2)
+        state_color = (self.hover_color or self.icon_color or
+                       colors.Colors.ON_SURFACE_VARIANT)
+        draw_state_layer(self, r, (x, y, w, h), state_color, min(w, h) / 2)
         f = get_icon_font(round(self.icon_size * r.scale))
         surf = f.render(chr(int(self._current_icon())), True, fg)
         r.blit(surf, x + (w - surf.get_width() / r.scale) / 2,
@@ -264,6 +292,16 @@ class IconButton(Control):
         return self._hit_test(x, y)
 
     def _set_hover(self, on: bool):
-        self._hovered = on
+        set_hover(self, on)
         self.update()
         fire(self, "hover", "true" if on else "false")
+
+    def _pressed_hook(self, x, y):
+        press(self, x, y)
+
+    def _released_hook(self, _x, _y):
+        release(self)
+
+    def _tick_animations(self, now: float) -> bool:
+        waiting = tick_state_layer(self, now)
+        return super()._tick_animations(now) or waiting
