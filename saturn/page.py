@@ -1,6 +1,8 @@
 """Page and Window (flet 1.0 subset; dialogs/services land in later milestones)."""
 from __future__ import annotations
 
+import ctypes
+import sys
 import time
 
 import pygame
@@ -8,6 +10,37 @@ import pygame
 from . import colors
 from .control import Control
 from .types import CrossAxisAlignment, MainAxisAlignment, ThemeMode
+
+
+def _set_windows_dark_title_bar(hwnd: int, dark: bool) -> bool:
+    """Match an HWND's non-client frame to the active light/dark theme."""
+    if sys.platform != "win32" or not hwnd:
+        return False
+    try:
+        dwmapi = ctypes.windll.dwmapi
+        set_attribute = dwmapi.DwmSetWindowAttribute
+        set_attribute.argtypes = [
+            ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint,
+        ]
+        set_attribute.restype = ctypes.c_long
+        enabled = ctypes.c_int(1 if dark else 0)
+        # Windows 10 20H1+ uses 20. Earlier Windows 10 builds used 19.
+        applied = any(
+            set_attribute(
+                ctypes.c_void_p(hwnd), attribute,
+                ctypes.byref(enabled), ctypes.sizeof(enabled)) == 0
+            for attribute in (20, 19)
+        )
+        if applied:
+            # Recalculate the non-client frame immediately after a live theme
+            # change instead of waiting for the next resize/maximize action.
+            user32 = ctypes.windll.user32
+            user32.SetWindowPos(
+                ctypes.c_void_p(hwnd), None, 0, 0, 0, 0,
+                0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020)
+        return applied
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
 
 
 class Window:
@@ -137,6 +170,7 @@ class Page(Control):
         self._title = ""
         self._theme_mode = ThemeMode.SYSTEM
         colors.theme_dark = colors.system_prefers_dark()  # SYSTEM default
+        self._sync_native_title_bar()
         self.theme = None       # ft.Theme(font_family=...) overrides default font
         self.dark_theme = None
         self._fonts: dict[str, str] = {}  # flet page.fonts: alias -> file path
@@ -173,7 +207,13 @@ class Page(Control):
                              or (self._theme_mode is ThemeMode.SYSTEM
                                  and colors.system_prefers_dark()))
         colors.apply_seed(getattr(self._theme, "color_scheme_seed", None))
+        self._sync_native_title_bar()
         self.update()
+
+    def _sync_native_title_bar(self):
+        dark = colors.theme_dark
+        self._app.post(lambda: _set_windows_dark_title_bar(
+            self._app._window.handle, dark))
 
     @property
     def theme(self):

@@ -1,14 +1,16 @@
 """Window/Page size semantics self-check."""
 import os
 import sys
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, ".")
 
 import pygame
 
 from saturn.app import App, Render, _system_refresh_rate
-from saturn.page import Window
+from saturn.page import Page, Window
+from saturn.types import ThemeMode
 
 
 def check_outer_to_client_conversion():
@@ -81,6 +83,35 @@ def check_default_window_icon_contract():
     assert window.icon == "custom.ico"
 
 
+def check_title_bar_tracks_page_theme():
+    app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
+    app._window = SimpleNamespace(handle=42)
+    app.post = lambda callback: callback()
+    with patch("saturn.page._set_windows_dark_title_bar") as set_dark:
+        page = Page(app)
+        set_dark.reset_mock()
+        page.theme_mode = ThemeMode.DARK
+        set_dark.assert_called_once_with(42, True)
+        set_dark.reset_mock()
+        page.theme_mode = ThemeMode.LIGHT
+        set_dark.assert_called_once_with(42, False)
+
+
+def check_windows_dark_title_bar_dwm_contract():
+    set_attribute = MagicMock(side_effect=[-1, 0])
+    set_window_pos = MagicMock()
+    libraries = SimpleNamespace(
+        dwmapi=SimpleNamespace(DwmSetWindowAttribute=set_attribute),
+        user32=SimpleNamespace(SetWindowPos=set_window_pos),
+    )
+    with patch("saturn.page.sys.platform", "win32"), \
+            patch("saturn.page.ctypes.windll", libraries):
+        from saturn.page import _set_windows_dark_title_bar
+        assert _set_windows_dark_title_bar(42, True)
+    assert set_attribute.call_count == 2, "must fall back from DWM 20 to 19"
+    set_window_pos.assert_called_once()
+
+
 def check_native_ime_ui_enabled_before_pygame_init():
     app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
     calls = []
@@ -114,6 +145,8 @@ if __name__ == "__main__":
     check_live_resize_frame()
     check_refresh_rate_detection()
     check_default_window_icon_contract()
+    check_title_bar_tracks_page_theme()
+    check_windows_dark_title_bar_dwm_contract()
     check_native_ime_ui_enabled_before_pygame_init()
     check_ime_input_rect_forwarded_to_sdl()
     print("ALL WINDOW TESTS PASS")
