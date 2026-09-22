@@ -11,12 +11,15 @@ Thread rules:
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import enum
 import inspect
 import os
 import queue
 import sys
 import threading
+import time
+from pathlib import Path
 
 import pygame
 
@@ -51,6 +54,10 @@ class App:
                          name="saturn-async").start()
         self.renderer: Renderer | None = None
         self.page = None  # set in start()
+        self._live_resize_dll = None
+        self._live_resize_callback = None
+        self._last_live_resize_frame = 0.0
+        self._last_resize_dispatched_size = None
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -88,6 +95,10 @@ class App:
         self._closed.set()
 
     def run_until_closed(self):
+        # Bind the SDL watcher to the actual event-loop lifetime. Some unit
+        # tests use start() only and create several displays in one process;
+        # leaving a watcher attached across those displays is unsafe.
+        self._install_live_resize_watch()
         clock = pygame.time.Clock()
         while not self._closed.is_set():
             # drain display-mutation commands from worker threads: SDL video
@@ -101,12 +112,7 @@ class App:
                 if e.type in (pygame.QUIT, pygame.WINDOWCLOSE):
                     self._closed.set()
                 elif e.type == pygame.WINDOWRESIZED:
-                    self._size[0], self._size[1] = e.x, e.y
-                    self._outer_size[0] = e.x + self._frame_size[0]
-                    self._outer_size[1] = e.y + self._frame_size[1]
-                    if self.renderer is not None:
-                        self.renderer.on_resize(*self._size)
-                    self._dirty.set()
+                    self._resize_frame(e.x, e.y, present=False, dispatch=True)
                 elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
                     self.page.pointer_down(*e.pos)
                 elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
@@ -123,6 +129,7 @@ class App:
                 self.page.draw()
                 self.renderer.flip()
             clock.tick(60)
+        self._remove_live_resize_watch()
         pygame.display.quit()
 
     # -- cross-thread helpers -------------------------------------------
@@ -140,6 +147,98 @@ class App:
     def post(self, fn):
         """Run a callable on the UI thread (required for SDL display calls)."""
         self._ui_q.put(fn)
+
+    def _resize_frame(self, width: int, height: int, *, present: bool,
+                      dispatch: bool = False):
+        """Apply a client-area resize, optionally drawing immediately.
+
+        ``present=True`` is used by the SDL event watch while Win32 owns the
+        modal move/size loop and Saturn's normal event loop cannot advance.
+        """
+        width, height = max(1, int(width)), max(1, int(height))
+        self._size[:] = [width, height]
+        self._outer_size[0] = width + self._frame_size[0]
+        self._outer_size[1] = height + self._frame_size[1]
+        if self.renderer is not None:
+            self.renderer.on_resize(width, height)
+        size = (width, height)
+        if (dispatch and self.page is not None
+                and size != self._last_resize_dispatched_size):
+            self._last_resize_dispatched_size = size
+            self.page._dispatch(self.page.on_resize)
+        if present and self.page is not None and self.renderer is not None:
+            self.page.draw()
+            self.renderer.flip()
+            self._dirty.clear()
+        else:
+            self._dirty.set()
+
+    def _install_live_resize_watch(self):
+        """Redraw inside SDL's Win32 modal resize loop.
+
+        pygame does not expose SDL_AddEventWatch, so bind the SDL2 bundled
+        beside pygame. SDL invokes this callback on the window/UI thread;
+        that preserves the renderer's strict thread-affinity requirement.
+        """
+        if sys.platform != "win32":
+            return
+        try:
+            dll = ctypes.CDLL(str(Path(pygame.__file__).with_name("SDL2.dll")))
+
+            class SDLWindowEvent(ctypes.Structure):
+                _fields_ = [
+                    ("type", ctypes.c_uint32), ("timestamp", ctypes.c_uint32),
+                    ("window_id", ctypes.c_uint32), ("event", ctypes.c_uint8),
+                    ("padding1", ctypes.c_uint8), ("padding2", ctypes.c_uint8),
+                    ("padding3", ctypes.c_uint8), ("data1", ctypes.c_int32),
+                    ("data2", ctypes.c_int32),
+                ]
+
+            class SDLEvent(ctypes.Union):
+                _fields_ = [("type", ctypes.c_uint32),
+                            ("window", SDLWindowEvent),
+                            ("padding", ctypes.c_uint8 * 56)]
+
+            callback_type = ctypes.CFUNCTYPE(
+                ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(SDLEvent))
+            window_id = self._window.id
+
+            @callback_type
+            def watch(_userdata, event_ptr):
+                event = event_ptr.contents
+                # SDL2: WINDOWEVENT=0x200; RESIZED=5; SIZE_CHANGED=6.
+                if (event.type == 0x200 and event.window.window_id == window_id
+                        and event.window.event in (5, 6)):
+                    # RESIZED and SIZE_CHANGED can arrive back-to-back for the
+                    # same dimensions. Avoid presenting an identical frame.
+                    size = (event.window.data1, event.window.data2)
+                    now = time.perf_counter()
+                    if size != tuple(self._size) or now - self._last_live_resize_frame > 0.1:
+                        self._last_live_resize_frame = now
+                        try:
+                            self._resize_frame(*size, present=True, dispatch=True)
+                        except Exception:
+                            # ctypes callbacks must never leak exceptions into SDL.
+                            import traceback
+                            traceback.print_exc()
+                return 1
+
+            dll.SDL_AddEventWatch.argtypes = [callback_type, ctypes.c_void_p]
+            dll.SDL_AddEventWatch.restype = None
+            dll.SDL_DelEventWatch.argtypes = [callback_type, ctypes.c_void_p]
+            dll.SDL_DelEventWatch.restype = None
+            dll.SDL_AddEventWatch(watch, None)
+            self._live_resize_dll = dll
+            self._live_resize_callback = watch
+        except (AttributeError, OSError):
+            self._live_resize_dll = None
+            self._live_resize_callback = None
+
+    def _remove_live_resize_watch(self):
+        if self._live_resize_dll is not None and self._live_resize_callback is not None:
+            self._live_resize_dll.SDL_DelEventWatch(self._live_resize_callback, None)
+        self._live_resize_callback = None
+        self._live_resize_dll = None
 
     def screenshot(self, path: str | None = None):
         """Grab the current frame from any thread; returns a pygame Surface
