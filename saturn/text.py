@@ -18,7 +18,6 @@ from __future__ import annotations
 import io
 import os
 import re
-import tempfile
 import warnings
 from pathlib import Path
 
@@ -129,11 +128,12 @@ def _fvar_default_wght(path: str) -> float | None:
     return value
 
 
-def _weighted_source(path: str, wnum: int) -> tuple[str, bool]:
-    """(path-to-load, real-weight-achieved).
+def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
+    """(source-to-load, real-weight-achieved). `source` is a path or a
+    BytesIO of instanced TTF bytes.
     Order: shipped static -> variable loaded directly when the requested
-    weight equals its fvar default -> runtime instancing (disk-cached) ->
-    the original file with synthetic bold."""
+    weight equals its fvar default -> runtime instancing (disk-cached under
+    ~/.cache/saturn/font-cache) -> the original file with synthetic bold."""
     static = _STATIC_WEIGHTS.get(path, {}).get(wnum)
     if static and os.path.exists(static):
         return static, True
@@ -147,17 +147,19 @@ def _weighted_source(path: str, wnum: int) -> tuple[str, bool]:
     except OSError:
         return path, False
     key = f"{Path(path).stem}.{wnum}.{mtime}.{os.path.getsize(path)}"
-    cache = Path(tempfile.gettempdir()) / "saturn-fonts"
+    cache = Path.home() / ".cache" / "saturn" / "font-cache"
     inst = cache / f"{key}.ttf"
     if not inst.exists():
         data = _instance_weight(path, wnum)
         if data is None:
             return path, False
+        data_io = io.BytesIO(data)
         try:
             cache.mkdir(parents=True, exist_ok=True)
             inst.write_bytes(data)
+            return str(inst), True
         except OSError:
-            return path, True
+            return data_io, True                # usable this run, uncached
     return str(inst), True
 
 
