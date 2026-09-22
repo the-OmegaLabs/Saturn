@@ -129,8 +129,8 @@ class Button(Control):
             icon_surf = f.render(chr(int(self.icon)), True, self._fg())
             icon_w = icon_surf.get_width() / scale
         if label := self._label():
-            f = txt.get_font(_LABEL_SIZE, scale=scale, text=label)
-            label_surf = f.render(label, True, self._fg())
+            label_surf = txt.render_line(label, _LABEL_SIZE, scale=scale,
+                                         color=self._fg())
             label_w = label_surf.get_width() / scale
         elif isinstance(self.content, Control):
             label_w = self.content._rect[2]

@@ -95,8 +95,8 @@ class AlertDialog(DialogControl):
         # measure the card
         tw = th = 0.0
         if self._title_text():
-            tw, th = txt.measure(self._title_text(), 24, scale=scale,
-                                 bold=True)
+            tw = txt.line_width(self._title_text(), 24, scale=scale, bold=True)
+            th = txt.line_height(24, scale=scale, bold=True)
         elif isinstance(self.title, Control):
             tw, th = self.title._intrinsic(w, h, scale)
         cw = ch = 0.0
@@ -139,9 +139,8 @@ class AlertDialog(DialogControl):
                                        colors.Colors.SURFACE_CONTAINER_HIGH),
                     radius=28)
         if isinstance(self.title, str) and self.title:
-            f = txt.get_font(24, scale=r.scale, bold=True, text=self.title)
-            r.blit(f.render(self.title, True,
-                            colors.parse_color(colors.Colors.ON_SURFACE)),
+            r.blit(txt.render_line(self.title, 24, scale=r.scale, bold=True,
+                                   color=colors.parse_color(colors.Colors.ON_SURFACE)),
                    self._title_rect[0], self._title_rect[1])
 
     def _draw_all(self, r):
@@ -218,9 +217,8 @@ class SnackBar(DialogControl):
                                        colors.Colors.INVERSE_SURFACE),
                     radius=8)
         if isinstance(self.content, str):
-            f = txt.get_font(14, scale=r.scale, text=str(self.content))
-            r.blit(f.render(self.content, True,
-                            colors.parse_color(colors.Colors.ON_INVERSE_SURFACE)),
+            r.blit(txt.render_line(str(self.content), 14, scale=r.scale,
+                                   color=colors.parse_color(colors.Colors.ON_INVERSE_SURFACE)),
                    bx + 16, by + (bh - 20) / 2)
 
     def _interactive_rect(self):

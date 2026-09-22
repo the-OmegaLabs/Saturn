@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from .. import colors
 from ..control import Control
-from ..text import family_for, get_font, line_height, measure, wrap
+from ..text import (family_for, line_height, line_width, measure,
+                    render_line, wrap)
 from ..types import TextAlign, font_bold
 
 
@@ -36,12 +37,14 @@ class Text(Control):
     def _intrinsic(self, max_w, max_h, scale):
         kw = self._style(scale)
         if self.no_wrap:
-            w, h = measure(self.value, self.size, **kw)
+            w = line_width(self.value, self.size, **kw)
+            h = line_height(self.size, scale=scale,
+                            family=family_for(self.value, self.font_family))
         else:
             lines = wrap(self.value, max_w if max_w is not None else 10_000,
                          self.size, max_lines=self.max_lines, **kw)
-            f = get_font(self.size, **kw)
-            w = max((f.size(l)[0] / scale for l in lines), default=0.0)
+            w = max((line_width(l, self.size, **kw) for l in lines),
+                    default=0.0)
             h = line_height(self.size, scale=scale,
                             family=family_for(self.value, self.font_family)) * len(lines)
         if self._width is not None:
@@ -61,11 +64,10 @@ class Text(Control):
 
     def _draw(self, r, x, y):
         color = colors.parse_color(self.color or colors.Colors.ON_SURFACE)
-        f = get_font(self.size, **self._style(r.scale))
         align = self.text_align or TextAlign.START
         w = self._rect[2]
         for line in self._lines:
-            surf = f.render(line, True, color)
+            surf = render_line(line, self.size, color=color, **self._style(r.scale))
             lw = surf.get_width() / r.scale
             if align in (TextAlign.CENTER, TextAlign.JUSTIFY):
                 ox = (w - lw) / 2

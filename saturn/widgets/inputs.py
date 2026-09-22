@@ -73,11 +73,11 @@ class TextField(Control):
     def _caret_at(self, x):
         """Place the caret from a pointer x position."""
         scale = self.page._app.renderer.scale if self.page else 1.0
-        f = self._font(scale)
         px = x - (self._rect[0] + _FIELD_PAD)
+        vis = self._visible_text()
         acc, idx = 0.0, 0
-        for i, ch in enumerate(self._visible_text()):
-            w = f.size(ch)[0] / scale
+        for i, ch in enumerate(vis):
+            w = txt.line_width(vis[:i + 1], self.text_size, scale=scale) - acc
             if acc + w / 2 >= px:
                 idx = i
                 break
@@ -141,23 +141,24 @@ class TextField(Control):
         ty = y + 6.0 if has_label else y
         th = h - 12.0 if has_label else h
         if has_label:
-            lf = txt.get_font(10, scale=scale, text=self.label)
-            r.blit(lf.render(self.label, True, _parse(colors.Colors.PRIMARY)),
+            r.blit(txt.render_line(self.label, 10, scale=scale,
+                                   color=_parse(colors.Colors.PRIMARY)),
                    x + _FIELD_PAD, y + 6)
         f = self._font(scale)
         shown = self._visible_text()
         if shown:
-            surf = f.render(shown, True, _parse(colors.Colors.ON_SURFACE))
+            surf = txt.render_line(shown, self.text_size, scale=scale,
+                                   color=_parse(colors.Colors.ON_SURFACE))
             r.clip_push(x, y, w, h)
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
             r.clip_pop()
         elif self.hint_text:
-            surf = f.render(self.hint_text, True,
-                            _parse(colors.Colors.ON_SURFACE_VARIANT))
+            surf = txt.render_line(self.hint_text, self.text_size, scale=scale,
+                                   color=_parse(colors.Colors.ON_SURFACE_VARIANT))
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
         if self._focused:
-            prefix = f.render(shown[:self._caret], True, (0, 0, 0))
-            cx = x + _FIELD_PAD + prefix.get_width() / scale
+            cx = x + _FIELD_PAD + txt.line_width(shown[:self._caret], self.text_size,
+                                                 scale=scale)
             r.fill_rect(cx, ty + (th - self.text_size) / 2, 2, self.text_size,
                         _parse(colors.Colors.PRIMARY))
 
@@ -208,8 +209,8 @@ class _Toggle(Control):
         lx = x + bw + 8 if first_is_box else x
         self._draw_box(r, bx, cy - box / 2, box)
         if self.label:
-            f = txt.get_font(14, scale=r.scale, text=self.label)
-            surf = f.render(self.label, True, _parse(colors.Colors.ON_SURFACE))
+            surf = txt.render_line(self.label, 14, scale=r.scale,
+                                   color=_parse(colors.Colors.ON_SURFACE))
             r.blit(surf, lx, cy - surf.get_height() / (2 * r.scale))
 
     def _hit_test(self, x, y):
@@ -330,8 +331,8 @@ class Radio(Control):
             r.circle(x + 10, cy, 10, _parse(colors.Colors.ON_SURFACE_VARIANT),
                      fill=False)
         if self.label:
-            f = txt.get_font(14, scale=r.scale, text=self.label)
-            surf = f.render(self.label, True, _parse(colors.Colors.ON_SURFACE))
+            surf = txt.render_line(self.label, 14, scale=r.scale,
+                                   color=_parse(colors.Colors.ON_SURFACE))
             r.blit(surf, x + 28, cy - surf.get_height() / (2 * r.scale))
 
     def _group_value(self):
@@ -536,8 +537,7 @@ class Dropdown(Control):
         shown = self._selected_text() or self.hint_text or ""
         c = _parse(colors.Colors.ON_SURFACE if self._selected_text()
                    else colors.Colors.ON_SURFACE_VARIANT)
-        f = get_font(self.text_size, scale=r.scale, text=shown)
-        surf = f.render(shown, True, c)
+        surf = txt.render_line(shown, self.text_size, scale=r.scale, color=c)
         r.clip_push(x, y, w, h)
         r.blit(surf, x + _FIELD_PAD,
                y + (h - surf.get_height() / r.scale) / 2)
