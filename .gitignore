@@ -10,3 +10,9 @@ __pycache__/
 # scratch artifacts (test screenshots, temp scripts)
 /*.png
 /_*.py
+
+# local Chinese-language documentation
+/README.md
+/TODO.md
+/.memory/
+/flet-skill/
