@@ -3,6 +3,7 @@ GestureDetector tap events. Headless + assert-based.
 """
 import sys
 import threading
+import time
 from unittest.mock import patch
 
 sys.path.insert(0, ".")
@@ -115,12 +116,44 @@ def check_scrollbar_drag():
     y = thumb[1] + thumb[3] / 2
     page.pointer_down(x, y)
     assert page._pressed is lv and lv._scrollbar_dragging
+    assert lv._raw("_scrollbar_thickness") == 12.0
+    assert lv._raw("_scrollbar_opacity") == 0.64
     page.pointer_move(x, y + 60)
     assert lv._offset > 0
     dragged = lv._offset
     page.pointer_up(x, y + 60)
     assert not lv._scrollbar_dragging and lv._offset == dragged
     print("scrollbar drag ok")
+
+
+def check_scrollbar_material_states():
+    lv = ListView(
+        controls=[Container(Text(f"row {i}"), height=30) for i in range(30)],
+        height=120, width=200,
+    )
+    app, page = make_page(lv)
+    page.draw()
+    _track, thumb, _travel = lv._scrollbar_geometry()
+    assert lv._scrollbar_opacity == 0.0
+
+    # Material desktop behavior: an invisible 16px hit target reveals a wider
+    # thumb on hover, while the track itself remains unpainted.
+    page.pointer_move(thumb[0] + thumb[2] / 2,
+                      thumb[1] + thumb[3] / 2)
+    assert lv._scrollbar_hovered
+    assert lv._raw("_scrollbar_thickness") == 12.0
+    assert lv._raw("_scrollbar_opacity") == 0.64
+    lv._tick_animations(time.perf_counter() + 1.0)
+    assert lv._scrollbar_geometry()[1][2] == 12.0
+
+    page.pointer_move(lv._rect[0] + 10, lv._rect[1] + 10)
+    assert not lv._scrollbar_hovered and lv._scrollbar_hide_at is not None
+    now = time.perf_counter() + 1.0
+    lv._tick_animations(now)
+    assert lv._raw("_scrollbar_opacity") == 0.0
+    lv._tick_animations(now + 1.0)
+    assert lv._scrollbar_opacity == 0.0
+    print("scrollbar material states ok")
 
 
 def check_pygame_wheel_direction_and_controls_keyword():
@@ -165,6 +198,7 @@ if __name__ == "__main__":
     check_scrolled_children_paint_at_offset()
     check_listview_wheel_routing()
     check_scrollbar_drag()
+    check_scrollbar_material_states()
     check_pygame_wheel_direction_and_controls_keyword()
     check_gesture_detector()
     print("ALL SCROLLING TESTS PASS")

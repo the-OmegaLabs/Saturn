@@ -5,15 +5,23 @@ auto_scroll, scroll_to()); GestureDetector(content, on_tap, on_hover...).
 """
 from __future__ import annotations
 
+import time
+
 from .. import colors
+from .. import motion
 from ..control import Control
 from ..event import TapEvent, fire
 from .containers import _margins
 
 
 _SCROLLBAR_THICKNESS = 8.0
-_SCROLLBAR_HIT_SIZE = 14.0
+_SCROLLBAR_HOVER_THICKNESS = 12.0
+_SCROLLBAR_HIT_SIZE = 16.0
+_SCROLLBAR_MARGIN = 2.0
 _MIN_THUMB_SIZE = 32.0
+_SCROLLBAR_FADE_DELAY = 0.6
+_SCROLLBAR_IDLE_OPACITY = 0.48
+_SCROLLBAR_ACTIVE_OPACITY = 0.64
 
 
 class ListView(Control):
@@ -38,6 +46,10 @@ class ListView(Control):
         self._content_size = 0.0
         self._scrollbar_dragging = False
         self._scrollbar_drag_delta = 0.0
+        self._scrollbar_hovered = False
+        self._scrollbar_thickness = _SCROLLBAR_THICKNESS
+        self._scrollbar_opacity = 0.0
+        self._scrollbar_hide_at = None
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -96,8 +108,30 @@ class ListView(Control):
         new = max(0.0, min(self._max_offset(), self._offset + delta))
         if new != self._offset:
             self._offset = new
+            self._show_scrollbar()
             self.update()
             fire(self, "scroll", self._offset)
+
+    def _show_scrollbar(self, *, active: bool = False):
+        """Reveal the Material scrollbar for scrolling or interaction."""
+        active = active or self._scrollbar_hovered or self._scrollbar_dragging
+        self._scrollbar_hide_at = None if active else (
+            time.perf_counter() + _SCROLLBAR_FADE_DELAY)
+        self._animate_internal(
+            "_scrollbar_thickness",
+            _SCROLLBAR_HOVER_THICKNESS if active else _SCROLLBAR_THICKNESS,
+            motion.SHORT2, motion.STANDARD)
+        self._animate_internal(
+            "_scrollbar_opacity",
+            _SCROLLBAR_ACTIVE_OPACITY if active else _SCROLLBAR_IDLE_OPACITY,
+            motion.SHORT2, motion.STANDARD)
+
+    def _schedule_scrollbar_hide(self):
+        if not self._scrollbar_hovered and not self._scrollbar_dragging:
+            self._scrollbar_hide_at = (
+                time.perf_counter() + _SCROLLBAR_FADE_DELAY)
+            if self.page is not None:
+                self.page._app.mark_dirty()
 
     def _scrollbar_geometry(self):
         """Return (track, thumb, travel) in page coordinates."""
@@ -119,16 +153,17 @@ class ListView(Control):
         travel = max(0.0, extent - thumb_size)
         thumb_start = start + (
             travel * self._offset / max_offset if max_offset > 0 else 0.0)
+        thickness = self._scrollbar_thickness
         if self.horizontal:
             track = (start, y + h - _SCROLLBAR_HIT_SIZE,
                      extent, _SCROLLBAR_HIT_SIZE)
-            thumb = (thumb_start, y + h - _SCROLLBAR_THICKNESS,
-                     thumb_size, _SCROLLBAR_THICKNESS)
+            thumb = (thumb_start, y + h - _SCROLLBAR_MARGIN - thickness,
+                     thumb_size, thickness)
         else:
             track = (x + w - _SCROLLBAR_HIT_SIZE, start,
                      _SCROLLBAR_HIT_SIZE, extent)
-            thumb = (x + w - _SCROLLBAR_THICKNESS, thumb_start,
-                     _SCROLLBAR_THICKNESS, thumb_size)
+            thumb = (x + w - _SCROLLBAR_MARGIN - thickness, thumb_start,
+                     thickness, thumb_size)
         return track, thumb, travel
 
     @staticmethod
@@ -173,18 +208,25 @@ class ListView(Control):
 
     def _draw_scrollbar(self, r, ox, oy):
         geometry = self._scrollbar_geometry()
-        if geometry is None:
+        opacity = self._scrollbar_opacity
+        if geometry is None or opacity <= 0.001:
             return
         _track, thumb, _travel = geometry
         x, y, w, h = thumb
-        if self.horizontal:
-            r.fill_rect(x + ox, y + oy, w, h,
-                        colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
-                        radius=h / 2)
-        else:
-            r.fill_rect(x + ox, y + oy, w, h,
-                        colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
-                        radius=w / 2)
+        r.opacity_push(max(0.0, min(1.0, opacity)))
+        try:
+            if self.horizontal:
+                r.fill_rect(
+                    x + ox, y + oy, w, h,
+                    colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
+                    radius=h / 2)
+            else:
+                r.fill_rect(
+                    x + ox, y + oy, w, h,
+                    colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
+                    radius=w / 2)
+        finally:
+            r.opacity_pop()
 
     # -- interaction ----------------------------------------------------------
     def _hit_test(self, x, y):
@@ -201,6 +243,37 @@ class ListView(Control):
             if hit is not None:
                 return hit
         return None
+
+    def _hit_test_hover(self, x, y):
+        if not self.visible or self.disabled or not self._contains(x, y):
+            return None
+        geometry = self._scrollbar_geometry()
+        if geometry is not None and self._point_in(geometry[0], x, y):
+            return self
+        off_x = self._offset if self.horizontal else 0.0
+        off_y = self._offset if not self.horizontal else 0.0
+        for c in reversed(self.controls):
+            hit = c._hit_test_hover(x + off_x, y + off_y)
+            if hit is not None:
+                return hit
+        return None
+
+    def _set_hover(self, on: bool):
+        self._scrollbar_hovered = on
+        if on:
+            self._show_scrollbar(active=True)
+        else:
+            self._animate_internal(
+                "_scrollbar_thickness", _SCROLLBAR_THICKNESS,
+                motion.SHORT2, motion.STANDARD)
+            if self._scrollbar_dragging:
+                self._show_scrollbar(active=True)
+            else:
+                self._animate_internal(
+                    "_scrollbar_opacity", _SCROLLBAR_IDLE_OPACITY,
+                    motion.SHORT2, motion.STANDARD)
+                self._schedule_scrollbar_hide()
+        self.update()
 
     def _find_scrollable(self, x, y):
         if not self.visible or not self._contains(x, y):
@@ -230,6 +303,7 @@ class ListView(Control):
             self._scrollbar_drag_delta = thumb_size / 2
             self._scrollbar_offset_from_pointer(coordinate)
         self._scrollbar_dragging = True
+        self._show_scrollbar(active=True)
 
     def _drag(self, x, y):
         if self._scrollbar_dragging:
@@ -237,6 +311,27 @@ class ListView(Control):
 
     def _drag_end(self):
         self._scrollbar_dragging = False
+        if self._scrollbar_hovered:
+            self._show_scrollbar(active=True)
+        else:
+            self._animate_internal(
+                "_scrollbar_thickness", _SCROLLBAR_THICKNESS,
+                motion.SHORT2, motion.STANDARD)
+            self._animate_internal(
+                "_scrollbar_opacity", _SCROLLBAR_IDLE_OPACITY,
+                motion.SHORT2, motion.STANDARD)
+            self._schedule_scrollbar_hide()
+
+    def _tick_animations(self, now: float) -> bool:
+        waiting = self._scrollbar_hide_at is not None
+        if waiting and now >= self._scrollbar_hide_at:
+            self._scrollbar_hide_at = None
+            waiting = False
+            if not self._scrollbar_hovered and not self._scrollbar_dragging:
+                self._animate_internal(
+                    "_scrollbar_opacity", 0.0,
+                    motion.MEDIUM1, motion.STANDARD, now=now)
+        return super()._tick_animations(now) or waiting
 
 
 class GestureDetector(Control):
