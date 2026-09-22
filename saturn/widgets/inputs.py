@@ -29,7 +29,10 @@ class TextField(Control):
                  password: bool = False, multiline: bool = False,
                  max_lines: int | None = None, read_only: bool = False,
                  text_size: float | None = None, on_change=None, on_submit=None,
-                 on_focus=None, on_blur=None, on_click=None, **base):
+                 on_focus=None, on_blur=None, on_click=None,
+                 filled: bool = False, bgcolor=None, border_color=None,
+                 cursor_color=None, border_radius: float | None = None,
+                 text_style=None, can_reveal_password: bool = False, **base):
         super().__init__(**base)
         self.value = value
         self.label = label
@@ -44,9 +47,26 @@ class TextField(Control):
         self.on_focus = on_focus
         self.on_blur = on_blur
         self.on_click = on_click
+        self.filled = filled          # flet flag; saturn always draws filled
+        self.bgcolor = bgcolor
+        self.border_color = border_color
+        self.cursor_color = cursor_color
+        self.border_radius = border_radius
+        self.text_style = text_style
+        # ponytail: accepted for flet parity, no reveal toggle rendered yet
+        self.can_reveal_password = can_reveal_password
         self._caret = len(value)
         self._focused = False
         self._focusable = True
+
+    def _style(self):
+        """(family, value size, value color) from the flet text_style."""
+        ts = self.text_style
+        if ts is None:
+            return None, self.text_size, colors.Colors.ON_SURFACE
+        return (ts.font_family,
+                ts.size or self.text_size,
+                ts.color if ts.color is not None else colors.Colors.ON_SURFACE)
 
     # -- layout --------------------------------------------------------------
     def _intrinsic(self, max_w, max_h, scale):
@@ -67,17 +87,20 @@ class TextField(Control):
         return "•" * len(self.value) if self.password else self.value
 
     def _font(self, scale):
-        return get_font(self.text_size, scale=scale,
+        family, vsize, _ = self._style()
+        return get_font(vsize, scale=scale, family=family,
                         text=self.value or self.hint_text or self.label)
 
     def _caret_at(self, x):
         """Place the caret from a pointer x position."""
         scale = self.page._app.renderer.scale if self.page else 1.0
+        family, vsize, _ = self._style()
         px = x - (self._rect[0] + _FIELD_PAD)
         vis = self._visible_text()
         acc, idx = 0.0, 0
         for i, ch in enumerate(vis):
-            w = txt.line_width(vis[:i + 1], self.text_size, scale=scale) - acc
+            w = txt.line_width(vis[:i + 1], vsize, scale=scale,
+                               family=family) - acc
             if acc + w / 2 >= px:
                 idx = i
                 break
@@ -132,35 +155,41 @@ class TextField(Control):
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
         scale = r.scale
+        radius = self.border_radius or _RADIUS
         r.fill_rect(x, y, w, h,
-                    _parse(colors.Colors.SURFACE_CONTAINER_HIGHEST), radius=_RADIUS)
-        if self._focused:
+                    _parse(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
+                    radius=radius)
+        if self.border_color is not None:
+            r.stroke_rect(x, y, w, h, _parse(self.border_color),
+                          width=2 if self._focused else 1, radius=radius)
+        elif self._focused:
             r.stroke_rect(x, y, w, h, _parse(colors.Colors.PRIMARY),
-                          width=2, radius=_RADIUS)
+                          width=2, radius=radius)
         has_label = bool(self.label) and (self._focused or bool(self.value))
         ty = y + 6.0 if has_label else y
         th = h - 12.0 if has_label else h
+        family, vsize, vcolor = self._style()
         if has_label:
-            r.blit(txt.render_line(self.label, 10, scale=scale,
+            r.blit(txt.render_line(self.label, 10, scale=scale, family=family,
                                    color=_parse(colors.Colors.PRIMARY)),
                    x + _FIELD_PAD, y + 6)
-        f = self._font(scale)
         shown = self._visible_text()
         if shown:
-            surf = txt.render_line(shown, self.text_size, scale=scale,
-                                   color=_parse(colors.Colors.ON_SURFACE))
+            surf = txt.render_line(shown, vsize, scale=scale, family=family,
+                                   color=_parse(vcolor))
             r.clip_push(x, y, w, h)
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
             r.clip_pop()
         elif self.hint_text:
             surf = txt.render_line(self.hint_text, self.text_size, scale=scale,
+                                   family=family,
                                    color=_parse(colors.Colors.ON_SURFACE_VARIANT))
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
         if self._focused:
-            cx = x + _FIELD_PAD + txt.line_width(shown[:self._caret], self.text_size,
-                                                 scale=scale)
-            r.fill_rect(cx, ty + (th - self.text_size) / 2, 2, self.text_size,
-                        _parse(colors.Colors.PRIMARY))
+            cx = x + _FIELD_PAD + txt.line_width(shown[:self._caret], vsize,
+                                                 scale=scale, family=family)
+            r.fill_rect(cx, ty + (th - vsize) / 2, 2, vsize,
+                        _parse(self.cursor_color or colors.Colors.PRIMARY))
 
 
 class _Toggle(Control):
