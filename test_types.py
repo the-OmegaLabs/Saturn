@@ -26,7 +26,14 @@ def check_colors():
     assert p == (0xD0, 0xBC, 0xFF, 255), p
     s = ft.parse_color(ft.Colors.SURFACE)
     assert s == (0x14, 0x12, 0x18, 255), s
+    C.apply_seed("indigo")
+    assert ft.parse_color(ft.Colors.SURFACE) == (0x12, 0x13, 0x18, 255)
+    assert ft.parse_color(ft.Colors.PRIMARY) == (0xBA, 0xC3, 0xFF, 255)
     C.theme_dark = False
+    C.apply_seed("indigo")
+    assert ft.parse_color(ft.Colors.SURFACE) == (0xFB, 0xF8, 0xFF, 255)
+    assert ft.parse_color(ft.Colors.PRIMARY) == (0x51, 0x5B, 0x92, 255)
+    C.apply_seed(None)
     print("colors ok")
 
 

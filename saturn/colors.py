@@ -62,6 +62,47 @@ BASELINE_DARK = {
     "ontertiaryfixed": "FFD8E4", "ontertiaryfixedvariant": "EFB8C8",
 }
 
+# Flutter 3 / Flet 1.0 ColorScheme.fromSeed for Material indigo (#3F51B5),
+# captured from the reference renderer. Keep this exact table for the common
+# named seed while a general HCT generator remains outside Saturn's light
+# dependency budget.
+INDIGO_LIGHT = {
+    "primary": "515B92", "onprimary": "FFFFFF",
+    "primarycontainer": "DEE0FF", "onprimarycontainer": "394379",
+    "secondary": "5B5D72", "onsecondary": "FFFFFF",
+    "secondarycontainer": "E0E1F9", "onsecondarycontainer": "434659",
+    "tertiary": "77536D", "ontertiary": "FFFFFF",
+    "tertiarycontainer": "FFD7F1", "ontertiarycontainer": "5D3C55",
+    "error": "BA1A1A", "onerror": "FFFFFF",
+    "errorcontainer": "FFDAD6", "onerrorcontainer": "93000A",
+    "outline": "767680", "outlinevariant": "C7C5D0",
+    "surface": "FBF8FF", "onsurface": "1B1B21", "onsurfacevariant": "46464F",
+    "inversesurface": "303036", "oninversesurface": "F2EFF7",
+    "inverseprimary": "BAC3FF", "shadow": "000000", "scrim": "000000",
+    "surfacecontainerlowest": "FFFFFF", "surfacecontainerlow": "F5F2FA",
+    "surfacecontainer": "EFEDF4", "surfacecontainerhigh": "E9E7EF",
+    "surfacecontainerhighest": "E4E1E9", "surfacedim": "DBD9E0",
+    "surfacebright": "FBF8FF",
+}
+INDIGO_DARK = {
+    "primary": "BAC3FF", "onprimary": "222C61",
+    "primarycontainer": "394379", "onprimarycontainer": "DEE0FF",
+    "secondary": "C3C5DD", "onsecondary": "2D2F42",
+    "secondarycontainer": "434659", "onsecondarycontainer": "E0E1F9",
+    "tertiary": "E6BAD7", "ontertiary": "44263D",
+    "tertiarycontainer": "5D3C55", "ontertiarycontainer": "FFD7F1",
+    "error": "FFB4AB", "onerror": "690005",
+    "errorcontainer": "93000A", "onerrorcontainer": "FFDAD6",
+    "outline": "90909A", "outlinevariant": "46464F",
+    "surface": "121318", "onsurface": "E4E1E9", "onsurfacevariant": "C7C5D0",
+    "inversesurface": "E4E1E9", "oninversesurface": "303036",
+    "inverseprimary": "515B92", "shadow": "000000", "scrim": "000000",
+    "surfacecontainerlowest": "0D0E13", "surfacecontainerlow": "1B1B21",
+    "surfacecontainer": "1F1F25", "surfacecontainerhigh": "29292F",
+    "surfacecontainerhighest": "34343A", "surfacedim": "121318",
+    "surfacebright": "39393F",
+}
+
 # set by the active Page's theme_mode; role names resolve against it
 theme_dark: bool = False
 role_overrides: dict[str, str] = {}  # Theme(color_scheme=...) lands in M3
@@ -85,6 +126,20 @@ def system_prefers_dark() -> bool:
                 pass
         _system_dark_cache = v
     return _system_dark_cache
+
+
+def apply_seed(seed) -> None:
+    """Apply a known Flet ColorScheme.fromSeed table to semantic roles."""
+    role_overrides.clear()
+    if seed is None:
+        return
+    value = getattr(seed, "value", seed)
+    try:
+        rgba = parse_color(value)
+    except (TypeError, ValueError):
+        return
+    if rgba[:3] == (0x3F, 0x51, 0xB5):
+        role_overrides.update(INDIGO_DARK if theme_dark else INDIGO_LIGHT)
 
 
 def _hex_to_rgba(hex6: str, alpha: int = 255) -> tuple[int, int, int, int]:

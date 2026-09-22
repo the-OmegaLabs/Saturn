@@ -144,6 +144,7 @@ class Page(Control):
         colors.theme_dark = (self._theme_mode is ThemeMode.DARK
                              or (self._theme_mode is ThemeMode.SYSTEM
                                  and colors.system_prefers_dark()))
+        colors.apply_seed(getattr(self._theme, "color_scheme_seed", None))
         self.update()
 
     @property
@@ -155,6 +156,7 @@ class Page(Control):
         self._theme = t
         from . import text as _txt
         _txt.default_family = t.font_family if t is not None else None
+        colors.apply_seed(getattr(t, "color_scheme_seed", None))
         self.update()
 
     @property
