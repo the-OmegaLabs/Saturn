@@ -92,6 +92,7 @@ class TextField(Control):
         self._line_cache = {}
         self._last_value = value
         self._scroll_x = 0.0
+        self._paint_offset = (0.0, 0.0)
 
     def _style(self):
         """(family, value size, value color) from the flet text_style."""
@@ -222,7 +223,8 @@ class TextField(Control):
         """Place the caret from a pointer x position."""
         scale = self.page._app.renderer.scale if self.page else 1.0
         family, vsize, _ = self._style()
-        px = x - (self._rect[0] + _FIELD_PAD) + self._scroll_x
+        px = x - (self._rect[0] + self._paint_offset[0] + _FIELD_PAD) \
+            + self._scroll_x
         vis = self._visible_text()
         acc, idx = 0.0, 0
         for i, ch in enumerate(vis):
@@ -332,17 +334,20 @@ class TextField(Control):
                          self._composition_start + self._composition_length)
         caret_text = prefix + composition[:ime_cursor]
         text_left, viewport_w = self._text_viewport()
+        text_left += self._paint_offset[0]
         cx = text_left - self._scroll_x + txt.line_width(
             caret_text, vsize, scale=scale, family=family)
         cx = max(text_left, min(text_left + viewport_w, cx))
-        text_y = self._rect[1] + (self._rect[3] - vsize) / 2
+        text_y = (self._rect[1] + self._paint_offset[1]
+                  + (self._rect[3] - vsize) / 2)
         # SDL's Windows backend treats this as both the current composition
         # point and an exclusion area. Start at the visual caret but extend to
         # the field bottom so the candidate UI sits below, never over the next
         # line or control.
         anchor_x = cx + _IME_OFFSET_X
         anchor_y = text_y + _IME_OFFSET_Y
-        field_bottom = self._rect[1] + self._rect[3] + _IME_OFFSET_Y
+        field_bottom = (self._rect[1] + self._paint_offset[1]
+                        + self._rect[3] + _IME_OFFSET_Y)
         rect = pygame.Rect(
             round(anchor_x), round(anchor_y), 1,
             max(1, round(field_bottom - anchor_y)),
@@ -389,7 +394,8 @@ class TextField(Control):
 
     # -- drawing ------------------------------------------------------------------
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        rx, ry, w, h = self._rect
+        self._paint_offset = (x - rx, y - ry)
         scale = r.scale
         outline = self.border if isinstance(self.border, OutlineInputBorder) else None
         radius_value = (outline.border_radius if outline is not None
@@ -483,6 +489,7 @@ class TextField(Control):
         displayed = prefix + composition + suffix
         self._sync_horizontal_scroll(scale)
         text_left, viewport_w = self._text_viewport()
+        text_left += self._paint_offset[0]
         draw_x = text_left - self._scroll_x
         hint_progress = 0.0
         if displayed:
@@ -602,7 +609,7 @@ class _Toggle(Control):
         raise NotImplementedError
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         box = self._box_size()
         cy = y + h / 2
         first_is_box = self.label_position is not LabelPosition.LEFT
@@ -836,7 +843,7 @@ class Radio(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         cy = y + h / 2
         selected = self._group_value() == self.value
         if not self._selection_initialized:
@@ -967,7 +974,7 @@ class Slider(Control):
             fire(self, "change", v)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         cy = y + h / 2
         r.fill_rect(x, cy - 2, w, 4,
                     _parse(self.inactive_color or colors.Colors.SURFACE_CONTAINER_HIGHEST),
@@ -1142,6 +1149,7 @@ class Dropdown(Control):
         self._menu_timeline = 0.0
         self._menu_closing = False
         self._menu_close_deadline = None
+        self._paint_offset = (0.0, 0.0)
         self.on_click = self._toggle_menu  # internal routing
         self._hovered = False
         self._pressed = False
@@ -1229,13 +1237,20 @@ class Dropdown(Control):
 
     def _position_menu(self):
         x, y, w, h = self._rect
+        x += self._paint_offset[0]
+        y += self._paint_offset[1]
         if self._menu_surface is not None:
             self._menu_surface._place(
                 x, y + h + 4.0, w, len(self._menu) * _ITEM_H,
                 self.page._app.renderer.scale)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        rx, ry, w, h = self._rect
+        paint_offset = (x - rx, y - ry)
+        if paint_offset != self._paint_offset:
+            self._paint_offset = paint_offset
+            if self._menu_surface is not None:
+                self._position_menu()
         radius = as_border_radius(
             _RADIUS if self.border_radius is None else self.border_radius).top_left
         if self.filled or self.fill_color is not None or self.bgcolor is not None:

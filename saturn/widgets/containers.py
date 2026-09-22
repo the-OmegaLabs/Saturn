@@ -310,7 +310,7 @@ class Container(Control):
             self.content._place(px, py, pw, ph, scale)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         if self.shadow is not None:
             shadows = self.shadow if isinstance(self.shadow, list) else [self.shadow]
             for sh in shadows:
@@ -427,7 +427,7 @@ class Divider(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         cy = y + (h - self.thickness) / 2
         r.fill_rect(x + self.leading_indent, cy,
                     max(0, w - self.leading_indent - self.trailing_indent),

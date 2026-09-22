@@ -110,7 +110,7 @@ class Image(Control):
         s = self._load()
         if s is None:
             return
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         tw, th = int(w * r.scale), int(h * r.scale)
         if tw <= 0 or th <= 0:
             return
@@ -157,7 +157,7 @@ class ProgressBar(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         r.fill_rect(x, y, w, h,
                     colors.parse_color(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
                     radius=h / 2)
@@ -244,7 +244,7 @@ class ProgressRing(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         cx, cy = x + w / 2, y + h / 2
         radius = min(w, h) / 2 - self.stroke_width / 2
         r.circle(cx, cy, radius,

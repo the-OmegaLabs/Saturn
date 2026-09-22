@@ -116,7 +116,7 @@ class Button(Control):
 
     # -- drawing -----------------------------------------------------------
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         bg = self._bg()
         elevation = self._elevation_progress
         if elevation > 0 and not self.disabled:
@@ -277,7 +277,7 @@ class IconButton(Control):
         return self.icon
 
     def _draw(self, r, x, y):
-        x, y, w, h = self._rect
+        _, _, w, h = self._rect
         fg = colors.parse_color(
             self.icon_color or colors.Colors.ON_SURFACE_VARIANT)
         if self.bgcolor is not None:

@@ -64,6 +64,28 @@ def check_listview_scroll():
     print("listview ok")
 
 
+def check_scrolled_children_paint_at_offset():
+    first = Container(
+        Text("first"), height=34, bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=6)
+    second = FilledButton("second")
+    lv = ListView(first, second, spacing=4, height=40, width=200)
+    app, page = make_page(lv)
+    original_y = first._rect[1]
+    lv._wheel(20)
+    with patch.object(app.renderer, "fill_rect",
+                      wraps=app.renderer.fill_rect) as fill_rect:
+        page.draw()
+    expected_y = original_y - lv._offset
+    matching = [call.args for call in fill_rect.call_args_list
+                if len(call.args) >= 4
+                and call.args[0] == first._rect[0]
+                and call.args[2] == first._rect[2]
+                and call.args[3] == first._rect[3]]
+    assert matching and matching[0][1] == expected_y, matching
+    print("scrolled child paint offset ok")
+
+
 def check_listview_wheel_routing():
     lv = ListView(*[Text(f"row {i}") for i in range(30)], height=100, width=200)
     app, page = make_page(lv)
@@ -140,6 +162,7 @@ def check_gesture_detector():
 
 if __name__ == "__main__":
     check_listview_scroll()
+    check_scrolled_children_paint_at_offset()
     check_listview_wheel_routing()
     check_scrollbar_drag()
     check_pygame_wheel_direction_and_controls_keyword()
