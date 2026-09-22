@@ -845,6 +845,7 @@ class Slider(Control):
         self._hovered = False
         self._pressed = False
         self._label_progress = 0.0
+        self._thumb_press_progress = 0.0
         init_state_layer(self)
 
     def _intrinsic(self, max_w, max_h, scale):
@@ -903,8 +904,7 @@ class Slider(Control):
         state_color = self.thumb_color or self.active_color or colors.Colors.PRIMARY
         draw_state_layer(self, r, (thumb_x - 20, cy - 20, 40, 40),
                          state_color, 20)
-        thumb_radius = 10.0 - 2.0 * min(
-            1.0, self._state_press_alpha / 0.12)
+        thumb_radius = 10.0 - 2.0 * self._thumb_press_progress
         r.circle(thumb_x, cy, thumb_radius, _parse(state_color))
         if self.label is not None and self._label_progress > 0:
             raw = str(self.label)
@@ -940,11 +940,17 @@ class Slider(Control):
 
     def _pressed_hook(self, x, y):
         press(self, x, y)
+        self._animate_internal("_thumb_press_progress", 1.0,
+                               motion.SHORT2,
+                               motion.EMPHASIZED_DECELERATE)
         self._animate_internal("_label_progress", 1.0, motion.SHORT2,
                                motion.EMPHASIZED)
 
     def _released_hook(self, _x, _y):
         release(self)
+        self._animate_internal("_thumb_press_progress", 0.0,
+                               motion.SHORT2,
+                               motion.EMPHASIZED_ACCELERATE)
         self._animate_internal("_label_progress",
                                1.0 if self._hovered else 0.0,
                                motion.SHORT2, motion.EMPHASIZED)

@@ -222,8 +222,11 @@ def check_slider():
     page.draw()
     x0 = s._rect[0]
     page.pointer_down(x0, s._rect[1] + 20)
+    assert s._animations["_thumb_press_progress"].duration == 0.1
     page.pointer_move(x0 + s._rect[2] * 0.5, 0)
     page.pointer_up(x0 + s._rect[2] * 0.5, 0)
+    assert s._animations["_thumb_press_progress"].duration == 0.1
+    assert s._animations["_thumb_press_progress"].end_value == 0.0
     assert s.value == 50, s.value
     assert changed.wait() and ended.wait()
     print("slider ok")
