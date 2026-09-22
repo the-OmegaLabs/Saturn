@@ -87,6 +87,9 @@ class Theme:
     """flet Theme subset. font_family overrides the default UI font
     (bundled Inter) for the whole app via page.theme."""
     font_family: str | None = None
+    # ponytail: accepted for flet parity, stored only — M3 tone generation
+    # from the seed (primary/surface hues) when a port needs it
+    color_scheme_seed: str | None = None
 
 
 class BoxFit(enum.Enum):
