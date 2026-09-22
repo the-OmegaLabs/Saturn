@@ -1,6 +1,8 @@
 """Page and Window (flet 1.0 subset; dialogs/services land in later milestones)."""
 from __future__ import annotations
 
+import time
+
 import pygame
 
 from . import colors
@@ -228,6 +230,10 @@ class Page(Control):
         self.update()
 
     def update(self):
+        now = time.perf_counter()
+        for control in [*getattr(self, "controls", []),
+                        *getattr(self, "overlay", [])]:
+            control._prepare_animation_tree(now)
         self._app.mark_dirty()
 
     def run_task(self, handler, *args):
@@ -252,6 +258,12 @@ class Page(Control):
         return super()._hit_test(x, y)
 
     def draw(self):
+        now = time.perf_counter()
+        animating = False
+        for control in [*self.controls, *self.overlay]:
+            animating = control._tick_animation_tree(now) or animating
+        if animating:
+            self._app.mark_dirty()
         r = self._app.renderer
         r.clear(self.bgcolor or colors.Colors.SURFACE)
         from .widgets.containers import Column
@@ -374,6 +386,8 @@ class Page(Control):
             self._pressed._pressed = False
             if hasattr(self._pressed, "_drag_end"):
                 self._pressed._drag_end()
+            if hasattr(self._pressed, "_released_hook"):
+                self._pressed._released_hook(x, y)
             if hit is self._pressed:
                 from .event import fire
                 fire(hit, "click")

@@ -77,6 +77,11 @@ class App:
             self._window.size = client
         self._size[:] = client
         self.renderer = create_renderer(self._backend)
+        # SDL/pygame can retain the set_mode creation size after the native
+        # Window client area is adjusted for Flet's outer-size semantics.
+        # Seed every renderer from the authoritative final client size so
+        # GL's viewport/scissor and screenshot dimensions match SOFTWARE.
+        self.renderer.on_resize(*client)
         from .page import Page  # deferred: page imports app bits
         self.page = Page(self)
         from . import text as _text

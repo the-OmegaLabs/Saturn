@@ -107,6 +107,7 @@ class GLRenderer(Renderer):
     scale = 2.0
 
     def __init__(self):
+        self._init_effect_stacks()
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.BLEND)
         # the GL backbuffer follows the OS window automatically, but pygame's
@@ -134,9 +135,9 @@ class GLRenderer(Renderer):
     def _draw_rect(self, corners, center, half, radius, border_w, color,
                    border_color):
         """corners: 6 (x, y) tuples (two triangles, any winding)."""
-        r, g, b, a = parse_color(color)
+        r, g, b, a = self._effect_color(color)
         if border_color is not None:
-            br, bg, bb, ba = parse_color(border_color)
+            br, bg, bb, ba = self._effect_color(border_color)
         else:
             br = bg = bb = ba = 0.0
         color4 = (r / 255, g / 255, b / 255, a / 255)
@@ -157,6 +158,7 @@ class GLRenderer(Renderer):
                    border_color=(0, 0, 0, 0)):
         if w <= 0 or h <= 0:
             return
+        x, y = self._translate(x, y)
         # pixel-snap: half-px offsets turn every edge fuzzy under bilinear/SDF AA
         x0, y0 = round(x), round(y)
         x1, y1 = round(x + w), round(y + h)
@@ -181,6 +183,11 @@ class GLRenderer(Renderer):
 
     def line(self, x1, y1, x2, y2, color, width=1):
         # axis-aligned exact; diagonal = bounding quad (ponytail: tessellate when needed)
+        x1, y1 = self._translate(x1, y1)
+        x2, y2 = self._translate(x2, y2)
+        # _rect_call also applies the current translation, so remove it here.
+        tx, ty = self._translation_stack[-1]
+        x1, y1, x2, y2 = x1 - tx, y1 - ty, x2 - tx, y2 - ty
         x, y = min(x1, x2), min(y1, y2)
         w = abs(x2 - x1) or width
         h = abs(y2 - y1) or width
@@ -223,6 +230,8 @@ class GLRenderer(Renderer):
         return tex, raw
 
     def blit(self, surface, x, y, alpha=1.0):
+        x, y = self._translate(x, y)
+        alpha *= self.opacity
         tex, _ = self._texture(surface)
         # surface is rendered at `scale`x device px; draw at logical size so a
         # 2x glyph downsamples 1 texel-per-2-pixels (supersampled, crisp)
@@ -250,6 +259,7 @@ class GLRenderer(Renderer):
 
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):
+        x, y = self._translate(x, y)
         sw, sh = self._fb_size()
         rect = (int(x), int(sh - y - h), max(0, int(w)), max(0, int(h)))
         if self._clip_stack:

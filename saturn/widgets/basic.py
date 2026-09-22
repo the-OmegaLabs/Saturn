@@ -34,7 +34,7 @@ class Icon(Control):
         f = get_icon_font(round(self.size * r.scale))
         surf = f.render(chr(int(self.icon)), True,
                         colors.parse_color(self.color or colors.Colors.ON_SURFACE))
-        r.blit(surf, x, y, alpha=self.opacity)
+        r.blit(surf, x, y)
 
 
 class Image(Control):

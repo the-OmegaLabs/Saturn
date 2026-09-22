@@ -23,6 +23,7 @@ class SoftwareRenderer(Renderer):
     scale = SCALE
 
     def __init__(self):
+        self._init_effect_stacks()
         self.screen = pygame.display.get_surface()
         w, h = self.screen.get_size()
         self._buf = pygame.Surface((w * SCALE, h * SCALE), pygame.SRCALPHA)
@@ -50,7 +51,8 @@ class SoftwareRenderer(Renderer):
     def fill_rect(self, x, y, w, h, color, radius=0):
         if w <= 0 or h <= 0:
             return
-        c = _rgb(color)
+        x, y = self._translate(x, y)
+        c = self._effect_color(color)
         if len(c) > 3 and c[3] < 255:
             # pygame.draw REPLACES pixels (alpha included) on a SRCALPHA buf,
             # so translucent fills accumulate frame over frame — composite
@@ -69,7 +71,8 @@ class SoftwareRenderer(Renderer):
         self.fill_rect(x, y, w, h, color, radius)  # fill_rect blends now
 
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
-        c = _rgb(color)
+        x, y = self._translate(x, y)
+        c = self._effect_color(color)
         sw, sh = max(1, int(w * SCALE)), max(1, int(h * SCALE))
         line_w = max(1, int(width * SCALE))
         if len(c) > 3 and c[3] < 255:
@@ -86,21 +89,28 @@ class SoftwareRenderer(Renderer):
                          border_radius=int(radius * SCALE))
 
     def line(self, x1, y1, x2, y2, color, width=1):
-        pygame.draw.line(self._buf, _rgb(color), *self._s(x1, y1, x2, y2),
+        x1, y1 = self._translate(x1, y1)
+        x2, y2 = self._translate(x2, y2)
+        pygame.draw.line(self._buf, self._effect_color(color),
+                         *self._s(x1, y1, x2, y2),
                          width=max(1, int(width * SCALE)))
 
     def circle(self, x, y, radius, color, fill=True):
-        pygame.draw.circle(self._buf, _rgb(color), self._s(x, y),
+        x, y = self._translate(x, y)
+        pygame.draw.circle(self._buf, self._effect_color(color), self._s(x, y),
                            int(radius * SCALE), 0 if fill else max(1, SCALE))
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
+        x, y = self._translate(x, y)
         rect = pygame.Rect(0, 0, int(radius * 2 * SCALE), int(radius * 2 * SCALE))
         rect.center = self._s(x, y)
-        pygame.draw.arc(self._buf, _rgb(color), rect,
+        pygame.draw.arc(self._buf, self._effect_color(color), rect,
                         start_angle, end_angle, max(1, int(width * SCALE)))
 
     def blit(self, surface, x, y, alpha=1.0):
         """surface is already in device px (text/images render at scale)."""
+        x, y = self._translate(x, y)
+        alpha *= self.opacity
         s = surface
         if not s.get_flags() & pygame.SRCALPHA:
             s = s.convert_alpha()
@@ -110,6 +120,7 @@ class SoftwareRenderer(Renderer):
         self._buf.blit(s, self._s(x, y))
 
     def clip_push(self, x, y, w, h):
+        x, y = self._translate(x, y)
         self._clip.append((x, y, w, h))
         self._apply_clip()
 

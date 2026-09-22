@@ -150,10 +150,14 @@ class AlertDialog(DialogControl):
     def _draw_all(self, r):
         if not self.visible:
             return
-        self._draw(r, *self._rect[:2])
-        for c in self._dialog_children():
-            if isinstance(c, Control):
-                c._draw_all(r)
+        self._effects_begin(r)
+        try:
+            self._draw(r, *self._rect[:2])
+            for c in self._dialog_children():
+                if isinstance(c, Control):
+                    c._draw_all(r)
+        finally:
+            self._effects_end(r)
 
 
 class SnackBar(DialogControl):
@@ -235,9 +239,13 @@ class SnackBar(DialogControl):
     def _draw_all(self, r):
         if not self.visible:
             return
-        self._draw(r, *self._rect[:2])
-        for c in self._children():
-            c._draw_all(r)
+        self._effects_begin(r)
+        try:
+            self._draw(r, *self._rect[:2])
+            for c in self._children():
+                c._draw_all(r)
+        finally:
+            self._effects_end(r)
 
     def _on_action(self, e=None):
         fire(self, "action")

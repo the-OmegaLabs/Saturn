@@ -221,9 +221,12 @@ class _Toggle(Control):
         self.on_click = self._toggle  # internal routing
         self._hovered = False
         self._pressed = False
+        self._value_progress = 1.0 if self.value else 0.0
 
     def _toggle(self, e=None):
         self.value = not self.value
+        self._animate_internal("_value_progress", 1.0 if self.value else 0.0,
+                               200)
         self.update()
         fire(self, "change", "true" if self.value else "false")
 
@@ -271,17 +274,22 @@ class Checkbox(_Toggle):
         return 18.0
 
     def _draw_box(self, r, x, y, box):
-        if self.value:
+        progress = self._value_progress
+        if progress > 0:
+            r.opacity_push(progress)
             r.fill_rect(x, y, box, box,
                         _parse(self.active_color or colors.Colors.PRIMARY), radius=2)
             f = get_icon_font(round(14 * r.scale))
             surf = f.render(chr(int(Icons.CHECK)), True, (255, 255, 255, 255))
             r.blit(surf, x + (box - surf.get_width() / r.scale) / 2,
                    y + (box - surf.get_height() / r.scale) / 2)
-        else:
+            r.opacity_pop()
+        if progress < 1:
+            r.opacity_push(1 - progress)
             r.stroke_rect(x, y, box, box,
                           _parse(colors.Colors.ON_SURFACE_VARIANT),
                           width=2, radius=2)
+            r.opacity_pop()
 
 
 class Switch(_Toggle):
@@ -291,13 +299,18 @@ class Switch(_Toggle):
     def _draw_box(self, r, x, y, w):
         h = 20.0
         cy = y + w / 2 if False else y + h / 2  # y already top of track box
-        track_c = _parse(self.active_color or colors.Colors.PRIMARY) \
-            if self.value else _parse(colors.Colors.SURFACE_CONTAINER_HIGHEST)
+        progress = self._value_progress
+        active = _parse(self.active_color or colors.Colors.PRIMARY)
+        inactive = _parse(colors.Colors.SURFACE_CONTAINER_HIGHEST)
+        track_c = tuple(round(a + (b - a) * progress)
+                        for a, b in zip(inactive, active))
         r.fill_rect(x, cy, w, h, track_c, radius=h / 2)
-        thumb_r = 12.0
-        tx = x + w - thumb_r if self.value else x + thumb_r
-        tc = _parse(colors.Colors.ON_PRIMARY) if self.value \
-            else _parse(colors.Colors.OUTLINE)
+        thumb_r = 8.0 + 4.0 * progress
+        tx = x + 10.0 + (w - 20.0) * progress
+        on_thumb = _parse(colors.Colors.ON_PRIMARY)
+        off_thumb = _parse(colors.Colors.OUTLINE)
+        tc = tuple(round(a + (b - a) * progress)
+                   for a, b in zip(off_thumb, on_thumb))
         r.circle(tx, cy + h / 2, thumb_r, tc)
 
 

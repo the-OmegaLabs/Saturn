@@ -94,15 +94,19 @@ class ListView(Control):
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
             return
-        x, y, w, h = self._rect
-        r.clip_push(x + ox, y + oy, w, h)
-        off_x = self._offset if self.horizontal else 0.0
-        off_y = self._offset if not self.horizontal else 0.0
-        for c in self.controls:
-            if c.visible:
-                c._draw_all(r, ox - off_x, oy - off_y)
-        r.clip_pop()
-        self._draw_scrollbar(r, ox, oy)
+        self._effects_begin(r)
+        try:
+            x, y, w, h = self._rect
+            r.clip_push(x + ox, y + oy, w, h)
+            off_x = self._offset if self.horizontal else 0.0
+            off_y = self._offset if not self.horizontal else 0.0
+            for c in self.controls:
+                if c.visible:
+                    c._draw_all(r, ox - off_x, oy - off_y)
+            r.clip_pop()
+            self._draw_scrollbar(r, ox, oy)
+        finally:
+            self._effects_end(r)
 
     def _draw_scrollbar(self, r, ox, oy):
         view = self._rect[3] if not self.horizontal else self._rect[2]

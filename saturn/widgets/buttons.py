@@ -50,6 +50,7 @@ class Button(Control):
         self.url = url
         self._hovered = False
         self._pressed = False
+        self._state_alpha = 0.0
 
     # -- metrics -----------------------------------------------------------
     def _label(self) -> str:
@@ -96,11 +97,8 @@ class Button(Control):
             base = colors.parse_color(self.variant_bg)
         else:
             return None
-        if self._pressed:
-            return _blend(colors.parse_color(self._fg_raw()), base, 0.12)
-        if self._hovered:
-            return _blend(colors.parse_color(self._fg_raw()), base, 0.08)
-        return base
+        return _blend(colors.parse_color(self._fg_raw()), base,
+                      self._state_alpha) if self._state_alpha else base
 
     def _fg_raw(self):
         return self.color or self.variant_fg or colors.Colors.ON_SURFACE
@@ -146,9 +144,13 @@ class Button(Control):
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
             return
-        self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
-        if isinstance(self.content, Control):
-            self.content._draw_all(r, ox, oy)
+        self._effects_begin(r)
+        try:
+            self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
+            if isinstance(self.content, Control):
+                self.content._draw_all(r, ox, oy)
+        finally:
+            self._effects_end(r)
 
     # -- pointer hooks (page routes through here) --------------------------
     def _hit_test(self, x, y):
@@ -161,8 +163,16 @@ class Button(Control):
 
     def _set_hover(self, on: bool):
         self._hovered = on
+        self._animate_internal("_state_alpha", 0.12 if self._pressed else
+                               (0.08 if on else 0.0), 150)
         self.update()
         fire(self, "hover", "true" if on else "false")
+
+    def _pressed_hook(self, _x, _y):
+        self._animate_internal("_state_alpha", 0.12, 100)
+
+    def _released_hook(self, _x, _y):
+        self._animate_internal("_state_alpha", 0.08 if self._hovered else 0.0, 100)
 
 
 class FilledButton(Button):

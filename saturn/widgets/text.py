@@ -77,5 +77,5 @@ class Text(Control):
                 ox = w - lw
             else:
                 ox = 0.0
-            r.blit(surf, x + ox, y, alpha=self.opacity)
+            r.blit(surf, x + ox, y)
             y += self._line_h

@@ -186,7 +186,8 @@ class Container(Control):
     def __init__(self, content=None, *, padding=None, bgcolor=None,
                  border=None, border_radius=None, alignment=None,
                  gradient=None, shadow=None, ink=False,
-                 on_click=None, on_hover=None, on_long_press=None, **base):
+                 animate=None, on_click=None, on_hover=None,
+                 on_long_press=None, **base):
         super().__init__(**base)
         self.content = content
         self.padding = as_padding(padding)
@@ -197,11 +198,20 @@ class Container(Control):
         self.gradient = gradient
         self.shadow = shadow
         self.ink = ink
+        self.animate = animate
         self.on_click = on_click
         self.on_hover = on_hover
         self.on_long_press = on_long_press
         self._hovered = False
         self._pressed = False
+
+    def _animation_groups(self):
+        groups = super()._animation_groups()
+        groups["container"] = (
+            "animate",
+            ("padding", "alignment", "bgcolor", "border", "border_radius", "shadow"),
+        )
+        return groups
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -212,8 +222,9 @@ class Container(Control):
         return [self.content] if self.content is not None else []
 
     def _intrinsic(self, max_w, max_h, scale):
-        pad_w = self.padding.left + self.padding.right
-        pad_h = self.padding.top + self.padding.bottom
+        padding = as_padding(self.padding)
+        pad_w = padding.left + padding.right
+        pad_h = padding.top + padding.bottom
         if self.content is not None:
             cw, ch = self.content._intrinsic(
                 max(0.0, max_w - pad_w) if max_w is not None else None,
@@ -240,9 +251,10 @@ class Container(Control):
         m = as_padding(self.margin)
         x, y = x + m.left, y + m.top
         w, h = w - m.left - m.right, h - m.top - m.bottom
-        px, py = x + self.padding.left, y + self.padding.top
-        pw, ph = w - self.padding.left - self.padding.right, \
-            h - self.padding.top - self.padding.bottom
+        padding = as_padding(self.padding)
+        px, py = x + padding.left, y + padding.top
+        pw, ph = w - padding.left - padding.right, \
+            h - padding.top - padding.bottom
         if self.alignment is not None:
             cw, ch = self.content._intrinsic(pw, ph, scale)
             ax = (pw - cw) * (self.alignment.x + 1) / 2
@@ -274,11 +286,15 @@ class Container(Control):
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
             return
-        self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
-        if self.content is not None:
-            self.content._draw_all(r, ox, oy)
-        if self.border_radius:
-            r.clip_pop()
+        self._effects_begin(r)
+        try:
+            self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
+            if self.content is not None:
+                self.content._draw_all(r, ox, oy)
+            if self.border_radius:
+                r.clip_pop()
+        finally:
+            self._effects_end(r)
 
     def _radius(self):
         return as_border_radius(self.border_radius).top_left

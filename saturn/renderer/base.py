@@ -13,6 +13,38 @@ from abc import ABC, abstractmethod
 class Renderer(ABC):
     scale: float = 1.0  # supersampling factor (software backend sets 2)
 
+    def _init_effect_stacks(self):
+        self._opacity_stack = [1.0]
+        self._translation_stack = [(0.0, 0.0)]
+
+    def opacity_push(self, opacity: float) -> None:
+        self._opacity_stack.append(self._opacity_stack[-1] * opacity)
+
+    def opacity_pop(self) -> None:
+        if len(self._opacity_stack) > 1:
+            self._opacity_stack.pop()
+
+    @property
+    def opacity(self) -> float:
+        return self._opacity_stack[-1]
+
+    def translate_push(self, x: float, y: float) -> None:
+        px, py = self._translation_stack[-1]
+        self._translation_stack.append((px + x, py + y))
+
+    def translate_pop(self) -> None:
+        if len(self._translation_stack) > 1:
+            self._translation_stack.pop()
+
+    def _translate(self, x: float, y: float) -> tuple[float, float]:
+        tx, ty = self._translation_stack[-1]
+        return x + tx, y + ty
+
+    def _effect_color(self, color):
+        from ..colors import parse_color
+        r, g, b, a = parse_color(color)
+        return r, g, b, round(a * self.opacity)
+
     @abstractmethod
     def clear(self, color) -> None: ...
 
