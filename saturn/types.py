@@ -273,6 +273,14 @@ class BorderSide:
 
 
 @dataclass
+class OutlineInputBorder:
+    """Flet 1.0 outline border used by form-field controls."""
+    border_radius: object = 4.0
+    side: BorderSide = field(default_factory=BorderSide)
+    gap_padding: float = 4.0
+
+
+@dataclass
 class Border:
     left: BorderSide = field(default_factory=lambda: BorderSide())
     top: BorderSide = field(default_factory=lambda: BorderSide())

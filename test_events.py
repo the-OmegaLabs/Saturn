@@ -93,6 +93,17 @@ def check_hover():
     print("hover ok")
 
 
+def check_ink_hover_without_handler():
+    ink = Container(width=120, height=44, ink=True)
+    app, page = make_page(ink)
+    page.pointer_move(*center(ink))
+    assert page._hovered is ink
+    assert ink._animations["_ink_alpha"].end_value == 0.08
+    page.pointer_move(700, 500)
+    assert ink._animations["_ink_alpha"].end_value == 0.0
+    print("ink hover without handler ok")
+
+
 def check_disabled():
     app, page = make_page()
     hits = Rec()
@@ -140,6 +151,7 @@ if __name__ == "__main__":
     check_click()
     check_click_miss()
     check_hover()
+    check_ink_hover_without_handler()
     check_disabled()
     check_nested()
     check_icon_button()

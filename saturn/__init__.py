@@ -41,6 +41,7 @@ from .types import (
     MainAxisAlignment,
     Margin,
     Offset,
+    OutlineInputBorder,
     Padding,
     Rotate,
     Scale,
@@ -103,6 +104,7 @@ __all__ = [
     "BorderSide", "BoxFit", "BoxShadow", "CrossAxisAlignment", "Duration",
     "FontWeight", "KeyboardType", "LabelPosition",
     "MainAxisAlignment", "Margin", "Offset", "Padding", "ScrollMode",
+    "OutlineInputBorder",
     "Rotate", "Scale", "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
     "Tooltip", "TooltipTriggerMode",
 ]

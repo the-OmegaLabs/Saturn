@@ -228,6 +228,19 @@ class Container(Control):
         from ..event import fire
         fire(self, "hover", "true" if on else "false")
 
+    def _hit_test_hover(self, x, y):
+        """Ink containers have a visual hover state even without a handler."""
+        if not self.visible or self.disabled:
+            return None
+        for child in reversed(self._children()):
+            hit = child._hit_test_hover(x, y)
+            if hit is not None:
+                return hit
+        if ((self.ink or self.on_hover or self.tooltip)
+                and self._contains(x, y)):
+            return self
+        return None
+
     def _pressed_hook(self, _x, _y):
         if not self.ink:
             return

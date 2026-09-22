@@ -12,7 +12,7 @@ from .._gen.icons import Icons
 from ..control import Control
 from ..event import fire
 from ..text import get_font, get_icon_font
-from ..types import LabelPosition
+from ..types import LabelPosition, OutlineInputBorder, as_border_radius
 
 _FIELD_H = 48.0
 _FIELD_PAD = 12.0
@@ -32,7 +32,8 @@ class TextField(Control):
                  on_focus=None, on_blur=None, on_click=None,
                  filled: bool = False, bgcolor=None, border_color=None,
                  cursor_color=None, border_radius: float | None = None,
-                 text_style=None, can_reveal_password: bool = False, **base):
+                 border=None, text_style=None,
+                 can_reveal_password: bool = False, **base):
         super().__init__(**base)
         self.value = value
         self.label = label
@@ -52,6 +53,7 @@ class TextField(Control):
         self.border_color = border_color
         self.cursor_color = cursor_color
         self.border_radius = border_radius
+        self.border = border
         self.text_style = text_style
         self.can_reveal_password = can_reveal_password
         self._password_revealed = False
@@ -163,11 +165,21 @@ class TextField(Control):
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
         scale = r.scale
-        radius = self.border_radius or _RADIUS
+        outline = self.border if isinstance(self.border, OutlineInputBorder) else None
+        radius_value = (outline.border_radius if outline is not None
+                        else self.border_radius)
+        radius = as_border_radius(
+            _RADIUS if radius_value is None else radius_value).top_left
         r.fill_rect(x, y, w, h,
                     _parse(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
                     radius=radius)
-        if self.border_color is not None:
+        if outline is not None:
+            side = outline.side
+            if side.width > 0:
+                r.stroke_rect(x, y, w, h,
+                              _parse(side.color or colors.Colors.OUTLINE),
+                              width=side.width, radius=radius)
+        elif self.border_color is not None:
             r.stroke_rect(x, y, w, h, _parse(self.border_color),
                           width=2 if self._focused else 1, radius=radius)
         elif self._focused:

@@ -70,6 +70,17 @@ def check_textfield():
     assert submitted.wait()
     page.focus(None)
     assert not tf._focused
+
+    outline = ft.OutlineInputBorder(
+        border_radius=12,
+        side=ft.BorderSide(color=ft.Colors.RED_900),
+    )
+    modern = TextField(border=outline)
+    page.add(modern)
+    page.draw()
+    assert modern.border is outline
+    assert modern.border.border_radius == 12
+    assert modern.border.side.color == ft.Colors.RED_900
     print("textfield ok")
 
 
