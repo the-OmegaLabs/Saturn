@@ -20,10 +20,12 @@ from pathlib import Path
 import pygame
 import pygame.freetype as _freetype
 
-# bundled default UI font (SIL OFL 1.1 — see saturn/assets/OFL.txt)
-# Noto Sans SC is the default: it covers Latin + CJK with consistent metrics,
-# so mixed-script lines share one baseline. Inter is the Latin fallback.
-NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.ttf"
+# bundled UI fonts (SIL OFL 1.1 — see saturn/assets/OFL.txt)
+# DEFAULT = Inter (variable; SDL_ttf renders its default master = Regular 400).
+# CJK fallback = Noto Sans SC as a static Regular instance — the variable file
+# renders at ~Thin weight under SDL_ttf (no named-instance support), so it was
+# instanced with fonttools (wght=400). Italic = real Inter Italic for Latin.
+NOTO = Path(__file__).parent / "assets" / "NotoSansSC-Regular.ttf"
 INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.ttf"
 INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.ttf"
 
@@ -60,8 +62,8 @@ def family_for(text: str, family: str | None = None) -> str | None:
 
 def _primary_source(family: str | None, italic: bool) -> tuple:
     """(kind, identifier) for the primary font. kind: 'file' | 'sys'.
-    Default = bundled Noto Sans SC (Latin + CJK); italic prefers the real
-    Inter Italic for Latin, falling back to Noto for CJK glyphs."""
+    Default = bundled Inter (real Inter Italic for italic); CJK glyphs come
+    from the Noto Sans SC fallback link."""
     resolved = family_for("", family)
     if resolved:
         reg = registered_fonts.get(resolved)
@@ -69,14 +71,14 @@ def _primary_source(family: str | None, italic: bool) -> tuple:
             if os.path.exists(reg):
                 return ("file", reg)
             # registered but missing -> bundled default
-            return ("file", str(INTER_ITALIC if italic else NOTO))
+            return ("file", str(INTER_ITALIC if italic else INTER))
         return ("sys", resolved)
-    return ("file", str(INTER_ITALIC if italic else NOTO))
+    return ("file", str(INTER_ITALIC if italic else INTER))
 
 
 def _chain_sources(family: str | None, italic: bool) -> list[tuple]:
     """Primary font source first, then fallbacks: the other bundled fonts
-    (Noto Sans SC, Inter), then the CJK system chain. Deduped by priority."""
+    (Inter / Noto Sans SC), then the CJK system chain. Deduped by priority."""
     sources = [_primary_source(family, italic)]
     for path in (str(NOTO), str(INTER)):
         if ("file", path) not in sources:
