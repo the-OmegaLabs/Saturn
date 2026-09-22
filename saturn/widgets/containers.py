@@ -279,13 +279,25 @@ class Stack(Control):
                 continue
             w, h = k._intrinsic(max_w, max_h, scale)
             ws, hs = max(ws, w), max(hs, h)
-        return (self._width if self._width is not None else ws,
-                self._height if self._height is not None else hs)
+        w = self._width if self._width is not None else ws
+        h = self._height if self._height is not None else hs
+        # flet/Flutter: the Stack itself fits its constraints; oversized
+        # children still overflow at draw time
+        if max_w is not None:
+            w = min(w, max_w)
+        if max_h is not None:
+            h = min(h, max_h)
+        return w, h
 
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
         for k in self.controls:
             if not k.visible:
+                continue
+            if k.expand and k.left is None and k.top is None \
+                    and k.right is None and k.bottom is None:
+                # flet: an expand child of a Stack stretches to the stack
+                k._place(x, y, w, h, scale)
                 continue
             ml, mt, mr, mb = _margins(k)
             kw, kh = k._intrinsic(w, h, scale)
