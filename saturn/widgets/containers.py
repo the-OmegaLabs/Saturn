@@ -82,10 +82,6 @@ class _Multi(Control):
         ml, mt, mr, mb = _margins(k)
         w, h = k._intrinsic(
             (max_w - ml - mr) if max_w is not None else None, None, scale)
-        if k._width is not None:
-            w = k._width
-        if k._height is not None:
-            h = k._height
         return w + ml + mr, h + mt + mb
 
     # -- placing -----------------------------------------------------------
@@ -220,15 +216,21 @@ class Container(Control):
         pad_h = self.padding.top + self.padding.bottom
         if self.content is not None:
             cw, ch = self.content._intrinsic(
-                (max_w - pad_w) if max_w is not None else None, None, scale)
-            if self.content._width is not None:
-                cw = self.content._width
-            if self.content._height is not None:
-                ch = self.content._height
+                max(0.0, max_w - pad_w) if max_w is not None else None,
+                max(0.0, max_h - pad_h) if max_h is not None else None,
+                scale)
         else:
             cw = ch = 0.0
         w = self._width if self._width is not None else cw + pad_w
         h = self._height if self._height is not None else ch + pad_h
+        # Flutter's parent constraints win over a child's requested size.
+        # This is observable in Flet when, for example, a width=460 card is
+        # placed in a 330px-wide page: it shrinks to the available width
+        # instead of overflowing symmetrically outside the window.
+        if max_w is not None:
+            w = min(w, max_w)
+        if max_h is not None:
+            h = min(h, max_h)
         return w, h
 
     def _place(self, x, y, w, h, scale):
@@ -243,8 +245,6 @@ class Container(Control):
             h - self.padding.top - self.padding.bottom
         if self.alignment is not None:
             cw, ch = self.content._intrinsic(pw, ph, scale)
-            cw = self.content._width if self.content._width is not None else cw
-            ch = self.content._height if self.content._height is not None else ch
             ax = (pw - cw) * (self.alignment.x + 1) / 2
             ay = (ph - ch) * (self.alignment.y + 1) / 2
             self.content._place(px + ax, py + ay, cw, ch, scale)

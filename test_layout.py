@@ -107,6 +107,20 @@ def check_container():
     tw = c.content._rect[2]
     assert approx(c.content._rect[0], 10 + (180 - tw) / 2), c.content._rect
 
+    # Parent constraints override an oversized explicit child size, as in
+    # Flutter/Flet. Loose Columns still receive the available inner height.
+    col = Column(Text("inside", size=20))
+    c = Container(col, width=460, padding=20)
+    w, h = c._intrinsic(330, 200, SCALE)
+    assert approx(w, 330) and approx(h, 200), (w, h)
+    outer = Container(c, alignment=ft.Alignment.CENTER)
+    lay(outer, w=330, h=200)
+    assert c._rect == (0, 0, 330, 200), c._rect
+    child = Container(width=360, height=52)
+    col = Column(child, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+    lay(col, w=266, h=100)
+    assert child._rect == (0, 0, 266, 52), child._rect
+
 
 def check_stack():
     base = Container(bgcolor=ft.Colors.SURFACE_CONTAINER, width=100, height=50)
