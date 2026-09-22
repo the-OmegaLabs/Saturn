@@ -1,5 +1,7 @@
 """Window/Page size semantics self-check."""
+import os
 import sys
+from unittest.mock import patch
 
 sys.path.insert(0, ".")
 
@@ -79,9 +81,30 @@ def check_default_window_icon_contract():
     assert window.icon == "custom.ico"
 
 
+def check_native_ime_ui_enabled_before_pygame_init():
+    app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
+    calls = []
+    previous = os.environ.pop("SDL_IME_SHOW_UI", None)
+    try:
+        with patch("pygame.init", side_effect=lambda: calls.append(
+                os.environ.get("SDL_IME_SHOW_UI"))), \
+                patch("pygame.Window", side_effect=RuntimeError("stop")):
+            try:
+                app.start()
+            except RuntimeError as error:
+                assert str(error) == "stop"
+        assert calls == ["1"]
+    finally:
+        if previous is None:
+            os.environ.pop("SDL_IME_SHOW_UI", None)
+        else:
+            os.environ["SDL_IME_SHOW_UI"] = previous
+
+
 if __name__ == "__main__":
     check_outer_to_client_conversion()
     check_live_resize_frame()
     check_refresh_rate_detection()
     check_default_window_icon_contract()
+    check_native_ime_ui_enabled_before_pygame_init()
     print("ALL WINDOW TESTS PASS")

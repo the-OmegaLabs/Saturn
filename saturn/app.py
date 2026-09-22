@@ -114,6 +114,9 @@ class App:
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
+        # SDL2 suppresses native IME UI by default. Enable the operating
+        # system candidate list before initializing the video subsystem.
+        os.environ.setdefault("SDL_IME_SHOW_UI", "1")
         pygame.init()
         if self._backend is Render.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)

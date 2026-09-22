@@ -397,9 +397,9 @@ class Page(Control):
         if control is not None:
             control._focused = True
             if not getattr(control, "read_only", False):
-                pygame.key.start_text_input()
                 if hasattr(control, "_update_ime_rect"):
                     control._update_ime_rect()
+                pygame.key.start_text_input()
             else:
                 pygame.key.stop_text_input()
             fire(control, "focus")
