@@ -91,6 +91,16 @@ def check_column():
     assert approx(t1._rect[0], (300 - t1._rect[2]) / 2), t1._rect
 
 
+def check_flet_text_line_boxes():
+    # Measured against Flet 1.0's Flutter renderer. Empty Text still owns one
+    # line; layout height is not the tight pygame glyph bitmap height.
+    expected = {10: 14, 11: 16, 12: 17, 13: 19, 14: 20,
+                15: 21, 18: 26, 20: 29, 24: 34, 28: 40, 30: 43}
+    for size, height in expected.items():
+        assert Text("Ag", size=size)._intrinsic(200, 200, SCALE)[1] == height
+    assert Text("", size=12)._intrinsic(200, 200, SCALE)[1] == 17
+
+
 def check_container():
     t = Text("hi", size=20)
     tw, th = t._intrinsic(800, 600, SCALE)
@@ -168,6 +178,7 @@ if __name__ == "__main__":
     check_expand()
     check_cross_alignment()
     check_column()
+    check_flet_text_line_boxes()
     check_container()
     check_stack()
     check_nested()

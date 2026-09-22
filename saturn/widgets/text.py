@@ -44,7 +44,7 @@ class Text(Control):
                             family=family_for(self.value, self.font_family))
         else:
             lines = wrap(self.value, max_w if max_w is not None else 10_000,
-                         self.size, max_lines=self.max_lines, **kw)
+                         self.size, max_lines=self.max_lines, **kw) or [""]
             w = max((line_width(l, self.size, **kw) for l in lines),
                     default=0.0)
             h = line_height(self.size, scale=scale,
@@ -59,7 +59,7 @@ class Text(Control):
         kw = self._style(scale)
         if not self.no_wrap:
             self._lines = wrap(self.value, w, self.size,
-                               max_lines=self.max_lines, **kw)
+                               max_lines=self.max_lines, **kw) or [""]
             self._line_h = line_height(self.size, scale=scale,
                                        family=self._style(scale)["family"])
         self._rect = (x, y, w, h)

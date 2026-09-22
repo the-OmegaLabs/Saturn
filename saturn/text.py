@@ -434,9 +434,10 @@ def measure(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
 def line_height(size: float, *, scale: float = 1.0, bold: bool = False,
                 italic: bool = False, family: str | None = None,
                 text: str | None = None, weight: int | None = None) -> float:
-    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
-    f = _render_font(_primary_link(family, wnum, italic), max(1, round(size * scale)))
-    return f.size("Ag")[1] / scale
+    # Flutter's default text line box is 10/7 of the logical font size. It
+    # is deliberately independent of rasterizer metrics: a 30px Text is a
+    # 43px layout box in Flet even when the rendered glyph bitmap is shorter.
+    return float(max(1, round(size * 10 / 7)))
 
 
 def wrap(text: str, max_width: float, size: float, *, scale: float = 1.0,
