@@ -263,6 +263,11 @@ class Container(Control):
         if self.border is not None and self.border.left.color is not None:
             r.stroke_rect(x, y, w, h, colors.parse_color(self.border.left.color),
                           width=self.border.left.width, radius=self._radius())
+        if self.ink and self._pressed:
+            r.fill_rect(x, y, w, h,
+                        colors.parse_color(colors.Colors.with_opacity(
+                            0.10, colors.Colors.ON_SURFACE)),
+                        radius=self._radius())
         if self.border_radius:
             r.clip_push(x, y, w, h)
 
