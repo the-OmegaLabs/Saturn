@@ -83,6 +83,11 @@ def check_snackbar():
     snack = SnackBar("Saved!", action="Undo", duration=300,
                      on_action=acted, on_dismiss=gone)
     page.show_dialog(snack)
+    assert snack._animations["_reveal"].end_value == 1.0
+    now = time.perf_counter()
+    snack._animations["_reveal"].started = now - 0.125
+    snack._tick_animations(now)
+    assert 0 < snack._reveal < 1, snack._reveal
     page.draw()
     assert page.overlay == [snack]
     bx, by, bw, bh = snack._bar_rect

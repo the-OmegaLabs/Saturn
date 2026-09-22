@@ -214,6 +214,8 @@ class Page(Control):
         dialog._attach(self, None)
         dialog.open = True
         self.overlay.append(dialog)
+        if hasattr(dialog, "_shown"):
+            dialog._shown()
         if hasattr(dialog, "_start_timer"):
             dialog._start_timer(self)
         self.update()
@@ -224,10 +226,16 @@ class Page(Control):
             if not self.overlay:
                 return
             dialog = self.overlay[-1]
+        if (hasattr(dialog, "_begin_dismiss")
+                and dialog._begin_dismiss(self)):
+            return
+        self._finish_pop_dialog(dialog)
+
+    def _finish_pop_dialog(self, dialog):
         if dialog in self.overlay:
             self.overlay.remove(dialog)
-        dialog._closed()
-        self.update()
+            dialog._closed()
+            self.update()
 
     def update(self):
         now = time.perf_counter()
@@ -403,11 +411,17 @@ class Page(Control):
             return
         from .event import fire
         if prev is not None:
-            prev._hovered = False
-            fire(prev, "hover", "false")
+            if hasattr(prev, "_set_hover"):
+                prev._set_hover(False)
+            else:
+                prev._hovered = False
+                fire(prev, "hover", "false")
         if target is not None:
-            target._hovered = True
-            fire(target, "hover", "true")
+            if hasattr(target, "_set_hover"):
+                target._set_hover(True)
+            else:
+                target._hovered = True
+                fire(target, "hover", "true")
         self._hovered = target
         if prev is not None or target is not None:
             self.update()

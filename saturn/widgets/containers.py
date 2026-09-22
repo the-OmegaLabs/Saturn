@@ -12,6 +12,8 @@ Stack children position via their own left/top/right/bottom.
 """
 from __future__ import annotations
 
+import time
+
 from .. import colors
 from ..control import Control
 from ..types import (CrossAxisAlignment, MainAxisAlignment,
@@ -204,6 +206,9 @@ class Container(Control):
         self.on_long_press = on_long_press
         self._hovered = False
         self._pressed = False
+        self._ink_alpha = 0.0
+        self._ink_press_started = 0.0
+        self._ink_release_deadline = None
 
     def _animation_groups(self):
         groups = super()._animation_groups()
@@ -212,6 +217,44 @@ class Container(Control):
             ("padding", "alignment", "bgcolor", "border", "border_radius", "shadow"),
         )
         return groups
+
+    def _set_hover(self, on: bool):
+        self._hovered = on
+        if self.ink:
+            self._animate_internal(
+                "_ink_alpha", 0.12 if self._pressed else (0.08 if on else 0.0),
+                150)
+        self.update()
+        from ..event import fire
+        fire(self, "hover", "true" if on else "false")
+
+    def _pressed_hook(self, _x, _y):
+        if not self.ink:
+            return
+        self._ink_press_started = time.perf_counter()
+        self._ink_release_deadline = None
+        self._animate_internal("_ink_alpha", 0.12, 100)
+
+    def _released_hook(self, _x, _y):
+        if not self.ink:
+            return
+        now = time.perf_counter()
+        # Down/up can be drained in the same SDL event pump. Preserve a short
+        # state-layer pulse instead of cancelling it before the first frame.
+        minimum_end = self._ink_press_started + 0.08
+        if now < minimum_end:
+            self._ink_release_deadline = minimum_end
+        else:
+            self._animate_internal(
+                "_ink_alpha", 0.08 if self._hovered else 0.0, 180, now=now)
+
+    def _tick_animations(self, now: float) -> bool:
+        if (self._ink_release_deadline is not None
+                and now >= self._ink_release_deadline):
+            self._ink_release_deadline = None
+            self._animate_internal(
+                "_ink_alpha", 0.08 if self._hovered else 0.0, 180, now=now)
+        return super()._tick_animations(now) or self._ink_release_deadline is not None
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -275,10 +318,10 @@ class Container(Control):
         if self.border is not None and self.border.left.color is not None:
             r.stroke_rect(x, y, w, h, colors.parse_color(self.border.left.color),
                           width=self.border.left.width, radius=self._radius())
-        if self.ink and self._pressed:
+        if self.ink and self._ink_alpha > 0:
+            ink = colors.parse_color(colors.Colors.ON_SURFACE)
             r.fill_rect(x, y, w, h,
-                        colors.parse_color(colors.Colors.with_opacity(
-                            0.10, colors.Colors.ON_SURFACE)),
+                        (ink[0], ink[1], ink[2], round(255 * self._ink_alpha)),
                         radius=self._radius())
         if self.border_radius:
             r.clip_push(x, y, w, h)

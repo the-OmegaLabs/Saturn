@@ -201,9 +201,10 @@ class Control:
         return active
 
     def _animate_internal(self, name: str, target, duration_ms: float,
-                          curve=AnimationCurve.FAST_OUT_SLOWIN):
+                          curve=AnimationCurve.FAST_OUT_SLOWIN,
+                          now: float | None = None):
         """Start a built-in Material state transition on a private value."""
-        now = time.perf_counter()
+        now = time.perf_counter() if now is None else now
         with self._animation_lock:
             animations = object.__getattribute__(self, "_animations")
             overrides = object.__getattribute__(self, "_animation_overrides")

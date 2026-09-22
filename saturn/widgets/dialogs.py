@@ -13,6 +13,7 @@ from .. import colors
 from .. import text as txt
 from ..control import Control
 from ..event import fire
+from ..types import AnimationCurve
 from .containers import Container
 from .text import Text
 
@@ -173,6 +174,9 @@ class SnackBar(DialogControl):
         self.duration = duration
         self.on_action = on_action
         self._timer = None
+        self._dismiss_timer = None
+        self._dismissing = False
+        self._reveal = 0.0
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -239,6 +243,7 @@ class SnackBar(DialogControl):
     def _draw_all(self, r):
         if not self.visible:
             return
+        r.translate_push(0, (1.0 - self._reveal) * 48.0)
         self._effects_begin(r)
         try:
             self._draw(r, *self._rect[:2])
@@ -246,6 +251,33 @@ class SnackBar(DialogControl):
                 c._draw_all(r)
         finally:
             self._effects_end(r)
+            r.translate_pop()
+
+    def _shown(self):
+        self._dismissing = False
+        self._reveal = 0.0
+        self._animation_targets["_reveal"] = 0.0
+        self._animate_internal("_reveal", 1.0, 250,
+                               AnimationCurve.FAST_OUT_SLOWIN)
+
+    def _begin_dismiss(self, page):
+        if self._dismissing:
+            return True
+        self._dismissing = True
+        self._animate_internal("_reveal", 0.0, 200,
+                               AnimationCurve.FAST_OUT_SLOWIN)
+        self._dismiss_timer = threading.Timer(
+            0.2, lambda: page._finish_pop_dialog(self))
+        self._dismiss_timer.daemon = True
+        self._dismiss_timer.start()
+        return True
+
+    def _closed(self):
+        if self._timer is not None:
+            self._timer.cancel()
+        if self._dismiss_timer is not None:
+            self._dismiss_timer.cancel()
+        super()._closed()
 
     def _on_action(self, e=None):
         fire(self, "action")

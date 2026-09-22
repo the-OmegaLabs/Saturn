@@ -135,6 +135,19 @@ def check_material_state_transitions():
         control._tick_animations(0.2)
         assert control._value_progress == 1
 
+    ink = Container(width=100, height=40, ink=True)
+    ink._attach(page)
+    ink._pressed = True
+    ink._pressed_hook(10, 10)
+    assert ink._animations["_ink_alpha"].end_value == 0.12
+    ink._pressed = False
+    ink._released_hook(10, 10)
+    assert ink._ink_release_deadline is not None, "quick taps need a visible pulse"
+    deadline = ink._ink_release_deadline
+    ink._tick_animations(deadline)
+    assert ink._ink_release_deadline is None
+    assert ink._animations["_ink_alpha"].end_value == 0.0
+
 
 def check_worker_ui_thread_safety():
     c = Control(opacity=1, animate_opacity=10)
