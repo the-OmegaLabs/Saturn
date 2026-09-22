@@ -33,7 +33,7 @@ class Application:
                 ),
                 bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                 padding=10, border_radius=12,
-                border=ft.Border.all(ft.Colors.OUTLINE, 1),
+                border=ft.Border.all(1, ft.Colors.OUTLINE),
             ),
             ft.Row(
                 ft.Container(

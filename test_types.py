@@ -52,7 +52,7 @@ def check_types():
     assert ft.types.as_padding(None).left == 0
     r = ft.types.as_border_radius(8)
     assert r.top_left == 8 and r.bottom_right == 8
-    b = ft.Border.all(ft.Colors.RED, 2)
+    b = ft.Border.all(2, ft.Colors.RED)
     assert b.left.width == 2 and b.top.color is ft.Colors.RED
     assert ft.Alignment.CENTER == ft.Alignment(0, 0)
     assert ft.Alignment.BOTTOM_RIGHT.x == 1 and ft.Alignment.BOTTOM_RIGHT.y == 1

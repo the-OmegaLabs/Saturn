@@ -201,8 +201,9 @@ class Border:
     bottom: BorderSide = field(default_factory=lambda: BorderSide())
 
     @classmethod
-    def all(cls, color=None, width: float = 1.0):
-        side = BorderSide(width, color)
+    def all(cls, width: float | None = None, color=None):
+        # flet order: Border.all(width, color)
+        side = BorderSide(width if width is not None else 1.0, color)
         return cls(side, side, side, side)
 
     @classmethod
