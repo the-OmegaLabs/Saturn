@@ -11,14 +11,24 @@ from ..event import TapEvent, fire
 from .containers import _margins
 
 
+_SCROLLBAR_THICKNESS = 8.0
+_SCROLLBAR_HIT_SIZE = 14.0
+_MIN_THUMB_SIZE = 32.0
+
+
 class ListView(Control):
-    def __init__(self, *controls, horizontal: bool = False, spacing: float = 0,
+    def __init__(self, *items, controls=None, horizontal: bool = False,
+                 spacing: float = 0,
                  padding=None, auto_scroll: bool = False, on_scroll=None,
                  **base):
-        if len(controls) == 1 and isinstance(controls[0], list):
-            controls = tuple(controls[0])
+        if controls is not None:
+            if items:
+                raise TypeError("controls cannot be combined with positional children")
+            items = tuple(controls)
+        elif len(items) == 1 and isinstance(items[0], list):
+            items = tuple(items[0])
         super().__init__(**base)
-        self.controls = list(controls)
+        self.controls = list(items)
         self.horizontal = horizontal
         self.spacing = spacing
         self.padding = padding  # resolved lazily via as_padding
@@ -26,6 +36,8 @@ class ListView(Control):
         self.on_scroll = on_scroll
         self._offset = 0.0
         self._content_size = 0.0
+        self._scrollbar_dragging = False
+        self._scrollbar_drag_delta = 0.0
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
@@ -87,6 +99,57 @@ class ListView(Control):
             self.update()
             fire(self, "scroll", self._offset)
 
+    def _scrollbar_geometry(self):
+        """Return (track, thumb, travel) in page coordinates."""
+        x, y, w, h = self._rect
+        p = self._pad()
+        if self.horizontal:
+            start = x + p.left
+            extent = max(0.0, w - p.left - p.right)
+            view = extent
+        else:
+            start = y + p.top
+            extent = max(0.0, h - p.top - p.bottom)
+            view = extent
+        max_offset = self._max_offset()
+        if max_offset <= 0.0 or view <= 0.0 or self._content_size <= 0.0:
+            return None
+        thumb_size = min(
+            extent, max(_MIN_THUMB_SIZE, extent * view / self._content_size))
+        travel = max(0.0, extent - thumb_size)
+        thumb_start = start + (
+            travel * self._offset / max_offset if max_offset > 0 else 0.0)
+        if self.horizontal:
+            track = (start, y + h - _SCROLLBAR_HIT_SIZE,
+                     extent, _SCROLLBAR_HIT_SIZE)
+            thumb = (thumb_start, y + h - _SCROLLBAR_THICKNESS,
+                     thumb_size, _SCROLLBAR_THICKNESS)
+        else:
+            track = (x + w - _SCROLLBAR_HIT_SIZE, start,
+                     _SCROLLBAR_HIT_SIZE, extent)
+            thumb = (x + w - _SCROLLBAR_THICKNESS, thumb_start,
+                     _SCROLLBAR_THICKNESS, thumb_size)
+        return track, thumb, travel
+
+    @staticmethod
+    def _point_in(rect, x, y):
+        rx, ry, rw, rh = rect
+        return rx <= x < rx + rw and ry <= y < ry + rh
+
+    def _scrollbar_offset_from_pointer(self, coordinate):
+        geometry = self._scrollbar_geometry()
+        if geometry is None:
+            return
+        track, _thumb, travel = geometry
+        track_start = track[0] if self.horizontal else track[1]
+        thumb_start = coordinate - self._scrollbar_drag_delta
+        fraction = (thumb_start - track_start) / travel if travel > 0 else 0.0
+        new = max(0.0, min(self._max_offset(), fraction * self._max_offset()))
+        if new != self._offset:
+            self._offset = new
+            self.update()
+            fire(self, "scroll", self._offset)
+
     def scroll_to(self, offset: float = 0, delta: float | None = None):
         self._scroll_by(delta if delta is not None
                         else offset - self._offset)
@@ -109,27 +172,28 @@ class ListView(Control):
             self._effects_end(r)
 
     def _draw_scrollbar(self, r, ox, oy):
-        view = self._rect[3] if not self.horizontal else self._rect[2]
-        if self._content_size <= view or view <= 0:
+        geometry = self._scrollbar_geometry()
+        if geometry is None:
             return
-        k = view / self._content_size
-        bar = max(24.0, view * k)
-        pos = (self._offset / self._content_size) * view
-        x, y, w, h = self._rect
+        _track, thumb, _travel = geometry
+        x, y, w, h = thumb
         if self.horizontal:
-            r.fill_rect(x + ox + pos, y + oy + h - 4, bar, 3,
-                        colors.parse_color(colors.Colors.OUTLINE_VARIANT),
-                        radius=1.5)
+            r.fill_rect(x + ox, y + oy, w, h,
+                        colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
+                        radius=h / 2)
         else:
-            r.fill_rect(x + ox + w - 4, y + oy + pos, 3, bar,
-                        colors.parse_color(colors.Colors.OUTLINE_VARIANT),
-                        radius=1.5)
+            r.fill_rect(x + ox, y + oy, w, h,
+                        colors.parse_color(colors.Colors.ON_SURFACE_VARIANT),
+                        radius=w / 2)
 
     # -- interaction ----------------------------------------------------------
     def _hit_test(self, x, y):
         # the viewport itself handles wheel; taps pass through to children
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
+        geometry = self._scrollbar_geometry()
+        if geometry is not None and self._point_in(geometry[0], x, y):
+            return self
         off_x = self._offset if self.horizontal else 0.0
         off_y = self._offset if not self.horizontal else 0.0
         for c in reversed(self.controls):
@@ -141,14 +205,38 @@ class ListView(Control):
     def _find_scrollable(self, x, y):
         if not self.visible or not self._contains(x, y):
             return None
+        off_x = self._offset if self.horizontal else 0.0
+        off_y = self._offset if not self.horizontal else 0.0
         for c in reversed(self.controls):
-            found = c._find_scrollable(x, y)
+            found = c._find_scrollable(x + off_x, y + off_y)
             if found is not None:
                 return found
         return self
 
     def _wheel(self, delta):
         self._scroll_by(delta)
+
+    def _drag_start(self, x, y):
+        geometry = self._scrollbar_geometry()
+        if geometry is None or not self._point_in(geometry[0], x, y):
+            return
+        _track, thumb, _travel = geometry
+        coordinate = x if self.horizontal else y
+        thumb_start = thumb[0] if self.horizontal else thumb[1]
+        thumb_size = thumb[2] if self.horizontal else thumb[3]
+        if self._point_in(thumb, x, y):
+            self._scrollbar_drag_delta = coordinate - thumb_start
+        else:
+            self._scrollbar_drag_delta = thumb_size / 2
+            self._scrollbar_offset_from_pointer(coordinate)
+        self._scrollbar_dragging = True
+
+    def _drag(self, x, y):
+        if self._scrollbar_dragging:
+            self._scrollbar_offset_from_pointer(x if self.horizontal else y)
+
+    def _drag_end(self):
+        self._scrollbar_dragging = False
 
 
 class GestureDetector(Control):

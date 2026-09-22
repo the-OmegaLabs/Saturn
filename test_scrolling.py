@@ -3,10 +3,14 @@ GestureDetector tap events. Headless + assert-based.
 """
 import sys
 import threading
+from unittest.mock import patch
 
 sys.path.insert(0, ".")
 
+import pygame
+
 import saturn as ft
+from saturn.widgets.containers import Container
 from saturn.widgets.buttons import FilledButton
 from saturn.widgets.scrolling import GestureDetector, ListView
 from saturn.widgets.text import Text
@@ -70,7 +74,51 @@ def check_listview_wheel_routing():
     assert lv._offset == 0
     page._wheel(40, 100, 50)
     assert lv._offset == 40, lv._offset
+    assert app._dirty.is_set(), "wheel scroll did not request a redraw"
     print("wheel routing ok")
+
+
+def check_scrollbar_drag():
+    lv = ListView(
+        controls=[Container(Text(f"row {i}"), height=30) for i in range(30)],
+        height=120, width=200,
+    )
+    app, page = make_page(lv)
+    page.draw()
+    geometry = lv._scrollbar_geometry()
+    assert geometry is not None
+    track, thumb, _travel = geometry
+    assert thumb[2] == 8.0, thumb
+    x = thumb[0] + thumb[2] / 2
+    y = thumb[1] + thumb[3] / 2
+    page.pointer_down(x, y)
+    assert page._pressed is lv and lv._scrollbar_dragging
+    page.pointer_move(x, y + 60)
+    assert lv._offset > 0
+    dragged = lv._offset
+    page.pointer_up(x, y + 60)
+    assert not lv._scrollbar_dragging and lv._offset == dragged
+    print("scrollbar drag ok")
+
+
+def check_pygame_wheel_direction_and_controls_keyword():
+    lv = ListView(
+        controls=[Container(Text(f"row {i}"), height=30) for i in range(20)],
+        height=100, width=200,
+    )
+    app, page = make_page(lv)
+    page.draw()
+    x, y = int(lv._rect[0] + 5), int(lv._rect[1] + 5)
+    page._wheel(-(-1) * 40, x, y)
+    assert lv._offset == 40, lv._offset
+    page._wheel(-(1) * 40, x, y)
+    assert lv._offset == 0, lv._offset
+    # Match the actual event conversion as well as direct wheel routing.
+    with patch("pygame.mouse.get_pos", return_value=(x, y)):
+        page.handle_event(pygame.event.Event(
+            pygame.MOUSEWHEEL, {"y": -1, "x": 0}))
+    assert lv._offset == 40, lv._offset
+    print("pygame wheel direction ok")
 
 
 def check_gesture_detector():
@@ -93,5 +141,7 @@ def check_gesture_detector():
 if __name__ == "__main__":
     check_listview_scroll()
     check_listview_wheel_routing()
+    check_scrollbar_drag()
+    check_pygame_wheel_direction_and_controls_keyword()
     check_gesture_detector()
     print("ALL SCROLLING TESTS PASS")

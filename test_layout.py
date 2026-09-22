@@ -30,7 +30,8 @@ def check_row_basic():
     lay(row, w=800, h=100)
     assert row._rect == (0, 0, 800, 100), row._rect  # fills width unless tight
     w1 = t1._rect[2]
-    assert t1._rect[:2] == (0, 0), t1._rect
+    assert approx(t1._rect[0], 0), t1._rect
+    assert approx(t1._rect[1], (100 - t1._rect[3]) / 2), t1._rect
     assert approx(t2._rect[0], w1 + 10), (t1._rect, t2._rect)  # START + spacing
     assert approx(t1._rect[1], t2._rect[1], 0.01)
     # tight row shrinks to content: parent asks _intrinsic, then places it there

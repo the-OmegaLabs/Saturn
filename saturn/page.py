@@ -150,6 +150,7 @@ class Page(Control):
         self._pressed = None
         self._hovered = None
         self._focused = None
+        self._pointer_pos = None
 
     # -- flet API ---------------------------------------------------------
     @property
@@ -353,7 +354,10 @@ class Page(Control):
             self._dispatch(self.on_resize)
             return
         if e.type == pygame.MOUSEWHEEL:
-            self._wheel(e.y * 40)
+            # pygame reports wheel-up as positive; content offsets increase
+            # toward later items, so down-scrolling needs the opposite sign.
+            pointer = self._pointer_pos or pygame.mouse.get_pos()
+            self._wheel(-e.y * 40, *pointer)
             return
         if e.type == pygame.TEXTINPUT:
             if self._focused is not None:
@@ -415,6 +419,7 @@ class Page(Control):
 
     # -- pointer plumbing (called from the UI loop) ------------------------
     def pointer_down(self, x, y):
+        self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
         if hit is not None and getattr(hit, "_focusable", False):
             self.focus(hit)
@@ -432,6 +437,7 @@ class Page(Control):
             self.update()
 
     def pointer_up(self, x, y):
+        self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
         if self._pressed is not None:
             self._pressed._pressed = False
@@ -446,6 +452,7 @@ class Page(Control):
             self.update()
 
     def pointer_move(self, x, y):
+        self._pointer_pos = (x, y)
         if self._pressed is not None and hasattr(self._pressed, "_drag"):
             self._pressed._drag(x, y)
         target = self._hit_test_hover(x, y)

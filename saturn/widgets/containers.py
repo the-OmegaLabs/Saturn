@@ -30,15 +30,22 @@ class _Multi(Control):
 
     vertical = False  # Row
 
-    def __init__(self, *controls, alignment=MainAxisAlignment.START,
+    def __init__(self, *items, controls=None,
+                 alignment=MainAxisAlignment.START,
                  vertical_alignment=None, horizontal_alignment=None,
                  spacing: float = 10, tight: bool = False, **base):
-        if len(controls) == 1 and isinstance(controls[0], list):
-            controls = tuple(controls[0])  # flet: Row([a, b]) == Row(a, b)
+        if controls is not None:
+            if items:
+                raise TypeError("controls cannot be combined with positional children")
+            items = tuple(controls)
+        elif len(items) == 1 and isinstance(items[0], list):
+            items = tuple(items[0])  # legacy Saturn shorthand
         super().__init__(**base)
-        self.controls = list(controls)
+        self.controls = list(items)
         self.alignment = alignment
-        self.vertical_alignment = vertical_alignment or CrossAxisAlignment.START
+        self.vertical_alignment = vertical_alignment or (
+            CrossAxisAlignment.START if self.vertical
+            else CrossAxisAlignment.CENTER)
         self.horizontal_alignment = horizontal_alignment or CrossAxisAlignment.START
         self.spacing = spacing
         self.tight = tight
@@ -338,11 +345,15 @@ class Container(Control):
 
 
 class Stack(Control):
-    def __init__(self, *controls, **base):
-        if len(controls) == 1 and isinstance(controls[0], list):
-            controls = tuple(controls[0])
+    def __init__(self, *items, controls=None, **base):
+        if controls is not None:
+            if items:
+                raise TypeError("controls cannot be combined with positional children")
+            items = tuple(controls)
+        elif len(items) == 1 and isinstance(items[0], list):
+            items = tuple(items[0])
         super().__init__(**base)
-        self.controls = list(controls)
+        self.controls = list(items)
 
     def _attach(self, page, parent=None):
         super()._attach(page, parent)
