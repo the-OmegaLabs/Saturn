@@ -101,3 +101,16 @@ def parse_color(value) -> tuple[int, int, int, int]:
         a = int(s[0:2], 16)
         return (int(s[2:4], 16), int(s[4:6], 16), int(s[6:8], 16), a)
     raise ValueError(f"cannot parse color: {value!r}")
+
+
+def with_opacity(opacity: float, color) -> str:
+    """flet Colors.with_opacity: `color` at the given opacity, as #AARRGGBB
+    (parse_color reads it back)."""
+    r, g, b, _ = parse_color(color)
+    a = round(max(0.0, min(1.0, opacity)) * 255)
+    return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
+
+
+# Colors is generated ("do not edit"); flet exposes with_opacity on it, so
+# attach here. Enum classes accept new non-member attributes.
+Colors.with_opacity = staticmethod(with_opacity)
