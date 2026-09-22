@@ -6,6 +6,7 @@ sys.path.insert(0, ".")
 import pygame
 
 from saturn.app import App, Render, _system_refresh_rate
+from saturn.page import Window
 
 
 def check_outer_to_client_conversion():
@@ -70,8 +71,17 @@ def check_refresh_rate_detection():
         pygame.display.get_desktop_refresh_rates = desktops
 
 
+def check_default_window_icon_contract():
+    app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
+    window = Window(app)
+    assert window.icon is None
+    app._window_icon = "custom.ico"
+    assert window.icon == "custom.ico"
+
+
 if __name__ == "__main__":
     check_outer_to_client_conversion()
     check_live_resize_frame()
     check_refresh_rate_detection()
+    check_default_window_icon_contract()
     print("ALL WINDOW TESTS PASS")

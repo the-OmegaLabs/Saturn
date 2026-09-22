@@ -51,6 +51,30 @@ def _system_refresh_rate() -> int:
     return 60
 
 
+def _set_windows_default_icon(hwnd: int) -> bool:
+    """Apply Windows' shared generic application icon to an HWND."""
+    if sys.platform != "win32" or not hwnd:
+        return False
+    try:
+        user32 = ctypes.windll.user32
+        user32.LoadIconW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        user32.LoadIconW.restype = ctypes.c_void_p
+        user32.SendMessageW.argtypes = [
+            ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t,
+        ]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        # IDI_APPLICATION is a shared system resource and must not be freed.
+        icon = user32.LoadIconW(None, ctypes.c_void_p(32512))
+        if not icon:
+            return False
+        wm_seticon = 0x0080
+        user32.SendMessageW(hwnd, wm_seticon, 0, icon)  # ICON_SMALL
+        user32.SendMessageW(hwnd, wm_seticon, 1, icon)  # ICON_BIG
+        return True
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
 class App:
     def __init__(self, main, backend: Render, width: int, height: int, title: str):
         self._main = main
@@ -76,6 +100,7 @@ class App:
         self._last_live_resize_frame = 0.0
         self._last_resize_dispatched_size = None
         self._refresh_rate = 60
+        self._window_icon = None
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -95,6 +120,7 @@ class App:
         self._refresh_rate = _system_refresh_rate()
         pygame.display.set_caption(self._title)
         self._window = pygame.Window.from_display_module()
+        self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
         client = self.client_size_for_outer(*self._outer_size)
         if tuple(self._window.size) != client:
@@ -178,6 +204,13 @@ class App:
     def post(self, fn):
         """Run a callable on the UI thread (required for SDL display calls)."""
         self._ui_q.put(fn)
+
+    def _apply_default_window_icon(self):
+        try:
+            hwnd = pygame.display.get_wm_info().get("window", 0)
+        except pygame.error:
+            hwnd = 0
+        return _set_windows_default_icon(hwnd)
 
     def _resize_frame(self, width: int, height: int, *, present: bool,
                       dispatch: bool = False):

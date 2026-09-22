@@ -41,6 +41,22 @@ class Window:
         self._app._title = v
         self._app.post(lambda: pygame.display.set_caption(v))
 
+    @property
+    def icon(self):
+        return self._app._window_icon
+
+    @icon.setter
+    def icon(self, path):
+        self._app._window_icon = path
+
+        def _set_icon():
+            if path:
+                pygame.display.set_icon(pygame.image.load(path))
+            else:
+                self._app._apply_default_window_icon()
+
+        self._app.post(_set_icon)
+
     # flet Window booleans; all SDL calls marshaled to the UI thread
     @property
     def maximized(self) -> bool:
