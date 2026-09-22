@@ -24,6 +24,7 @@ class DialogControl(Control):
     """Base: fills the page as an overlay; card area is interactive."""
 
     _overlay_fill = True
+    _barrier = True  # clicks outside the card dismiss and are swallowed
 
     def __init__(self, *, open: bool = False, modal: bool = False,
                  on_dismiss=None, **base):
@@ -44,10 +45,13 @@ class DialogControl(Control):
         if cx <= x < cx + cw and cy <= y < cy + ch:
             hit = super()._hit_test(x, y)
             return hit if hit is not None and hit is not self else self
-        # barrier click: dismiss (unless modal) and swallow the event
-        if not self.modal:
-            self._dismiss()
-        return self
+        # barrier click: dismiss (unless modal) and swallow the event;
+        # non-barrier dialogs (SnackBar) let the page handle it
+        if self._barrier:
+            if not self.modal:
+                self._dismiss()
+            return self
+        return None
 
     def _hit_test_hover(self, x, y):
         return None
@@ -153,6 +157,9 @@ class AlertDialog(DialogControl):
 
 
 class SnackBar(DialogControl):
+    # flet: a SnackBar is a notice, not a modal barrier — page stays live
+    _barrier = False
+
     def __init__(self, content, *, action=None, bgcolor=None, duration: int = 4000,
                  on_action=None, open=False, on_dismiss=None, **base):
         super().__init__(open=open, on_dismiss=on_dismiss, **base)
