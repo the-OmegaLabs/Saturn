@@ -1,5 +1,6 @@
 """Implicit-animation and renderer-effect self-check."""
 import sys
+import threading
 
 sys.path.insert(0, ".")
 
@@ -135,10 +136,35 @@ def check_material_state_transitions():
         assert control._value_progress == 1
 
 
+def check_worker_ui_thread_safety():
+    c = Control(opacity=1, animate_opacity=10)
+    c._attach(_Page())
+    errors = []
+
+    def update_worker():
+        try:
+            for i in range(1000):
+                c.opacity = i % 2
+                c._prepare_animations(i / 1000)
+        except Exception as exc:  # pragma: no cover - assertion captures races
+            errors.append(exc)
+
+    thread = threading.Thread(target=update_worker)
+    thread.start()
+    try:
+        for i in range(1000):
+            c._tick_animations(i / 1000)
+    except Exception as exc:
+        errors.append(exc)
+    thread.join()
+    assert not errors, errors
+
+
 if __name__ == "__main__":
     check_animation_values_and_curves()
     check_opacity_and_interruption()
     check_size_position_and_container_color()
     check_renderer_opacity_and_translation()
     check_material_state_transitions()
+    check_worker_ui_thread_safety()
     print("ALL ANIMATION TESTS PASS")

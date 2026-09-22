@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import threading
 import time
 from dataclasses import dataclass
 
@@ -39,6 +40,7 @@ class Control:
         object.__setattr__(self, "_animation_overrides", {})
         object.__setattr__(self, "_animation_targets", {})
         object.__setattr__(self, "_animations", {})
+        object.__setattr__(self, "_animation_lock", threading.RLock())
         object.__setattr__(self, "_animation_seeded", False)
         self.visible = visible
         self.disabled = disabled
@@ -130,86 +132,92 @@ class Control:
         return object.__getattribute__(self, "__dict__").get(name)
 
     def _seed_animation_targets(self):
-        targets = object.__getattribute__(self, "_animation_targets")
-        for _group, (_config, names) in self._animation_groups().items():
-            for name in names:
-                targets[name] = copy.deepcopy(self._raw(name))
-        self._animation_seeded = True
+        with self._animation_lock:
+            targets = object.__getattribute__(self, "_animation_targets")
+            for _group, (_config, names) in self._animation_groups().items():
+                for name in names:
+                    targets[name] = copy.deepcopy(self._raw(name))
+            self._animation_seeded = True
 
     def _prepare_animations(self, now: float):
-        if not self._animation_seeded:
-            self._seed_animation_targets()
-            return
-        targets = object.__getattribute__(self, "_animation_targets")
-        animations = object.__getattribute__(self, "_animations")
-        overrides = object.__getattribute__(self, "_animation_overrides")
-        for group, (config_name, names) in self._animation_groups().items():
-            config = self._raw(config_name)
-            spec = animation_spec(config) if config else None
-            for name in names:
-                target = copy.deepcopy(self._raw(name))
-                previous = targets.get(name, target)
-                if target == previous:
-                    continue
-                current = self._sample(name, now)
-                targets[name] = copy.deepcopy(target)
-                if spec is None or spec[0] <= 0:
-                    animations.pop(name, None)
-                    overrides.pop(name, None)
-                    continue
-                duration, curve = spec
-                overrides[name] = copy.deepcopy(current)
-                animations[name] = _Tween(current, target, now, duration, curve, group)
+        with self._animation_lock:
+            if not self._animation_seeded:
+                self._seed_animation_targets()
+                return
+            targets = object.__getattribute__(self, "_animation_targets")
+            animations = object.__getattribute__(self, "_animations")
+            overrides = object.__getattribute__(self, "_animation_overrides")
+            for group, (config_name, names) in self._animation_groups().items():
+                config = self._raw(config_name)
+                spec = animation_spec(config) if config else None
+                for name in names:
+                    target = copy.deepcopy(self._raw(name))
+                    previous = targets.get(name, target)
+                    if target == previous:
+                        continue
+                    current = self._sample(name, now)
+                    targets[name] = copy.deepcopy(target)
+                    if spec is None or spec[0] <= 0:
+                        animations.pop(name, None)
+                        overrides.pop(name, None)
+                        continue
+                    duration, curve = spec
+                    overrides[name] = copy.deepcopy(current)
+                    animations[name] = _Tween(current, target, now, duration, curve, group)
 
     def _sample(self, name: str, now: float):
-        tween = object.__getattribute__(self, "_animations").get(name)
-        if tween is None:
-            overrides = object.__getattribute__(self, "_animation_overrides")
-            return copy.deepcopy(overrides.get(name, self._animation_targets.get(
-                name, self._raw(name))))
-        p = (now - tween.started) / tween.duration
-        return interpolate(tween.start_value, tween.end_value,
-                           ease(tween.curve, p), name)
+        with self._animation_lock:
+            tween = object.__getattribute__(self, "_animations").get(name)
+            if tween is None:
+                overrides = object.__getattribute__(self, "_animation_overrides")
+                return copy.deepcopy(overrides.get(name, self._animation_targets.get(
+                    name, self._raw(name))))
+            p = (now - tween.started) / tween.duration
+            return interpolate(tween.start_value, tween.end_value,
+                               ease(tween.curve, p), name)
 
     def _tick_animations(self, now: float) -> bool:
-        animations = object.__getattribute__(self, "_animations")
-        overrides = object.__getattribute__(self, "_animation_overrides")
-        completed = set()
-        for name, tween in list(animations.items()):
-            p = (now - tween.started) / tween.duration
-            if p >= 1:
-                animations.pop(name, None)
-                overrides.pop(name, None)
-                completed.add(tween.group)
-            else:
-                overrides[name] = interpolate(
-                    tween.start_value, tween.end_value,
-                    ease(tween.curve, p), name)
+        with self._animation_lock:
+            animations = object.__getattribute__(self, "_animations")
+            overrides = object.__getattribute__(self, "_animation_overrides")
+            completed = set()
+            for name, tween in list(animations.items()):
+                p = (now - tween.started) / tween.duration
+                if p >= 1:
+                    animations.pop(name, None)
+                    overrides.pop(name, None)
+                    completed.add(tween.group)
+                else:
+                    overrides[name] = interpolate(
+                        tween.start_value, tween.end_value,
+                        ease(tween.curve, p), name)
+            active_groups = {a.group for a in animations.values()}
+            active = bool(animations)
         if completed and self.page is not None:
             from .event import fire
-            active_groups = {a.group for a in animations.values()}
             for group in completed - active_groups:
                 if group:
                     fire(self, "animation_end", group)
-        return bool(animations)
+        return active
 
     def _animate_internal(self, name: str, target, duration_ms: float,
                           curve=AnimationCurve.FAST_OUT_SLOWIN):
         """Start a built-in Material state transition on a private value."""
         now = time.perf_counter()
-        animations = object.__getattribute__(self, "_animations")
-        overrides = object.__getattribute__(self, "_animation_overrides")
-        current = self._sample(name, now) if name in animations else copy.deepcopy(
-            overrides.get(name, self._raw(name)))
-        object.__getattribute__(self, "__dict__")[name] = copy.deepcopy(target)
-        self._animation_targets[name] = copy.deepcopy(target)
-        duration = max(0.0, float(duration_ms) / 1000.0)
-        if duration == 0 or current == target:
-            animations.pop(name, None)
-            overrides.pop(name, None)
-            return
-        overrides[name] = copy.deepcopy(current)
-        animations[name] = _Tween(current, target, now, duration, curve, "")
+        with self._animation_lock:
+            animations = object.__getattribute__(self, "_animations")
+            overrides = object.__getattribute__(self, "_animation_overrides")
+            current = self._sample(name, now) if name in animations else copy.deepcopy(
+                overrides.get(name, self._raw(name)))
+            object.__getattribute__(self, "__dict__")[name] = copy.deepcopy(target)
+            self._animation_targets[name] = copy.deepcopy(target)
+            duration = max(0.0, float(duration_ms) / 1000.0)
+            if duration == 0 or current == target:
+                animations.pop(name, None)
+                overrides.pop(name, None)
+                return
+            overrides[name] = copy.deepcopy(current)
+            animations[name] = _Tween(current, target, now, duration, curve, "")
         if self.page is not None:
             self.page._app.mark_dirty()
 
