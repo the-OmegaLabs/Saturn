@@ -47,7 +47,8 @@ def check_alert():
     assert page.overlay == [dlg] and dlg.open
     # card is centered
     cx, cy, cw, ch = dlg._card_rect
-    assert abs(cx + cw / 2 - 400) < 2 and abs(cy + ch / 2 - 300) < 2, dlg._card_rect
+    assert abs(cx + cw / 2 - page.width / 2) < 2, dlg._card_rect
+    assert abs(cy + ch / 2 - page.height / 2) < 2, dlg._card_rect
     # click the Delete action button
     btn = dlg.actions[1]
     page.pointer_down(btn._rect[0] + 5, btn._rect[1] + 5)
@@ -85,7 +86,7 @@ def check_snackbar():
     page.draw()
     assert page.overlay == [snack]
     bx, by, bw, bh = snack._bar_rect
-    assert by + bh <= 600, snack._bar_rect  # pinned to the bottom
+    assert (bx, by, bw, bh) == (0, page.height - 48, page.width, 48), snack._bar_rect
     # click action
     page.pointer_down(bx + bw - 40, by + bh / 2)
     page.pointer_up(bx + bw - 40, by + bh / 2)

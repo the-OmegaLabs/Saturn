@@ -203,18 +203,19 @@ class SnackBar(DialogControl):
                 self.action, on_click=self._on_action)
             action_w = self._action_control._intrinsic(w, h, scale)[0] + 16
             self._action_control._attach(self.page, self)
-        margin = 16.0
-        bar_w = min(w - 2 * margin, cw + action_w + 32)
+        # Flet's default SnackBarBehavior is FIXED: a full-width, square
+        # bar flush with the bottom edge. Floating/margined styling requires
+        # explicit behavior/margin properties and is not the default.
+        bar_w = w
         bar_h = 48.0
-        self._bar_rect = (x + (w - bar_w) / 2, y + h - bar_h - margin,
-                          bar_w, bar_h)
+        self._bar_rect = (x, y + h - bar_h, bar_w, bar_h)
         if isinstance(self.content, Control):
-            self.content._place(self._bar_rect[0] + 16,
+            self.content._place(self._bar_rect[0] + 24,
                                 self._bar_rect[1] + (bar_h - ch) / 2, cw, ch, scale)
         if self.action:
             ab = self._action_control
             aw, ah = ab._intrinsic(bar_w, bar_h, scale)
-            ab._place(self._bar_rect[0] + bar_w - aw - 12,
+            ab._place(self._bar_rect[0] + bar_w - aw - 24,
                       self._bar_rect[1] + (bar_h - ah) / 2, aw, ah, scale)
 
     def _draw(self, r, x, y):
@@ -222,11 +223,11 @@ class SnackBar(DialogControl):
         r.fill_rect(bx, by, bw, bh,
                     colors.parse_color(self.bgcolor or
                                        colors.Colors.INVERSE_SURFACE),
-                    radius=8)
+                    radius=0)
         if isinstance(self.content, str):
             r.blit(txt.render_line(str(self.content), 14, scale=r.scale,
                                    color=colors.parse_color(colors.Colors.ON_INVERSE_SURFACE)),
-                   bx + 16, by + (bh - 20) / 2)
+                   bx + 24, by + (bh - 20) / 2)
 
     def _interactive_rect(self):
         return self._bar_rect
