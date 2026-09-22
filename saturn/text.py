@@ -36,6 +36,17 @@ NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.ttf"
 CJK_FAMILY = "microsoftyahei,msyh,pingfangsc,hiraginosansgb,notosanscjk,wqymicrohei,simhei"
 _CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
 
+# pre-instanced hot-path weights shipped with the framework: zero instancing
+# on a cold start for 400/700 text (Inter@400 needs none — its fvar default
+# IS 400; Noto's default master is 100/Thin and MUST be instanced or static)
+_STATIC_WEIGHTS: dict[str, dict[int, str]] = {
+    str(INTER): {700: str(INTER.parent / "Inter-Bold.ttf")},
+    str(NOTO): {400: str(NOTO.parent / "NotoSansSC-Regular.ttf"),
+                700: str(NOTO.parent / "NotoSansSC-Bold.ttf")},
+}
+
+_fvar_cache: dict[str, float | None] = {}  # path -> default wght (None: static)
+
 # set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
 default_family: str | None = None
 # aliases registered via page.fonts = {"name": path} (flet API)
@@ -96,9 +107,41 @@ def _instance_weight(path: str, wght: int) -> bytes | None:
         return None
 
 
+def _fvar_default_wght(path: str) -> float | None:
+    """Default wght of a variable font; None when static (cached)."""
+    key = f"{path}:{int(os.path.getmtime(path)) if os.path.exists(path) else 0}"
+    if key in _fvar_cache:
+        return _fvar_cache[key]
+    value: float | None = None
+    try:
+        from fontTools.ttLib import TTFont
+
+        font = TTFont(path, lazy=True)
+        if "fvar" in font:
+            for axis in font["fvar"].axes:
+                if axis.axisTag == "wght":
+                    value = axis.defaultValue
+                    break
+        font.close()
+    except Exception:
+        value = None
+    _fvar_cache[key] = value
+    return value
+
+
 def _weighted_source(path: str, wnum: int) -> tuple[str, bool]:
-    """(path-to-load, is_variable). Variable files are instanced at `wnum`
-    once and cached on disk; non-variable files load as-is."""
+    """(path-to-load, real-weight-achieved).
+    Order: shipped static -> variable loaded directly when the requested
+    weight equals its fvar default -> runtime instancing (disk-cached) ->
+    the original file with synthetic bold."""
+    static = _STATIC_WEIGHTS.get(path, {}).get(wnum)
+    if static and os.path.exists(static):
+        return static, True
+    default_wght = _fvar_default_wght(path)
+    if default_wght is None:
+        return path, False                      # static font: synthetic bold
+    if int(default_wght) == wnum:
+        return path, True                       # var file at its default weight
     try:
         mtime = int(os.path.getmtime(path))
     except OSError:
