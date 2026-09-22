@@ -45,6 +45,8 @@ from .types import (
     ThemeMode,
     TextOverflow,
     TextStyle,
+    Tooltip,
+    TooltipTriggerMode,
 )
 from .widgets import (
     AlertDialog,
@@ -96,6 +98,7 @@ __all__ = [
     "CrossAxisAlignment", "FontWeight", "KeyboardType", "LabelPosition",
     "MainAxisAlignment", "Margin", "Offset", "Padding", "ScrollMode",
     "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
+    "Tooltip", "TooltipTriggerMode",
 ]
 __version__ = "0.0.1"
 

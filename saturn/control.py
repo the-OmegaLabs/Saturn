@@ -124,7 +124,7 @@ class Control:
             hit = c._hit_test_hover(x, y)
             if hit is not None:
                 return hit
-        if getattr(self, "on_hover", None) and self._contains(x, y):
+        if (getattr(self, "on_hover", None) or self.tooltip) and self._contains(x, y):
             return self
         return None
 
