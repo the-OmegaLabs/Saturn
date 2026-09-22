@@ -63,11 +63,13 @@ void main() {
         d = -1.0;  // geometry-only quad, no SDF
     } else {
         d = sd_round(v_local, v_half, radius);
-        if (bw > 0.0 && d > -bw) {
-            c = v_border_color;
-        }
     }
-    float alpha = 1.0 - smoothstep(-1.0, 1.0, d);
+    float aa = max(fwidth(d), 0.001);
+    if (bw > 0.0) {
+        float border_mix = smoothstep(-bw - aa, -bw + aa, d);
+        c = mix(v_color, v_border_color, border_mix);
+    }
+    float alpha = 1.0 - smoothstep(-aa, aa, d);
     if (c.a * alpha <= 0.0) discard;
     frag = vec4(c.rgb, c.a * alpha);
 }
@@ -106,6 +108,7 @@ class GLRenderer(Renderer):
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
     scale = 2.0
+    _ssaa = 2
 
     def __init__(self, window):
         self._init_effect_stacks()
@@ -123,6 +126,9 @@ class GLRenderer(Renderer):
         self._prog_tex["u_tex"].value = 0
         self._tex_cache: dict = {}  # surface digest -> texture
         self._clip_stack: list = []
+        self._frame_color = None
+        self._frame_target = None
+        self._create_frame_target()
 
     def _query_size(self):
         try:
@@ -133,6 +139,28 @@ class GLRenderer(Renderer):
     # -- helpers -----------------------------------------------------------
     def _fb_size(self):
         return (float(self._size[0]), float(self._size[1]))
+
+    def _create_frame_target(self):
+        if self._frame_target is not None:
+            self._frame_target.release()
+        if self._frame_color is not None:
+            self._frame_color.release()
+        w = max(1, int(self._size[0]) * self._ssaa)
+        h = max(1, int(self._size[1]) * self._ssaa)
+        self._frame_color = self.ctx.texture((w, h), 4)
+        self._frame_color.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        self._frame_color.repeat_x = False
+        self._frame_color.repeat_y = False
+        self._frame_target = self.ctx.framebuffer(
+            color_attachments=[self._frame_color])
+        self._use_frame_target()
+
+    def _use_frame_target(self):
+        self._frame_target.use()
+        self.ctx.viewport = (0, 0,
+                             max(1, int(self._size[0]) * self._ssaa),
+                             max(1, int(self._size[1]) * self._ssaa))
+        self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
 
     def _draw_rect(self, corners, center, half, radius, border_w, color,
                    border_color):
@@ -161,13 +189,22 @@ class GLRenderer(Renderer):
         if w <= 0 or h <= 0:
             return
         x, y = self._translate(x, y)
-        # pixel-snap: half-px offsets turn every edge fuzzy under bilinear/SDF AA
-        x0, y0 = round(x), round(y)
-        x1, y1 = round(x + w), round(y + h)
+        # Snap to the supersampled grid. This preserves stable edges while
+        # allowing half-pixel motion instead of visibly jumping whole pixels.
+        x0 = round(x * self._ssaa) / self._ssaa
+        y0 = round(y * self._ssaa) / self._ssaa
+        x1 = round((x + w) * self._ssaa) / self._ssaa
+        y1 = round((y + h) * self._ssaa) / self._ssaa
         w, h = x1 - x0, y1 - y0
         cx, cy = x0 + w / 2, y0 + h / 2
         hw, hh = w / 2, h / 2
-        corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y0), (x1, y1), (x0, y1)]
+        # SDF coverage extends half a device pixel outside the nominal shape.
+        # Keep that fringe inside the rasterized geometry instead of clipping
+        # it at the quad boundary.
+        pad = 1.0 / self._ssaa if radius >= 0 else 0.0
+        corners = [(x0 - pad, y0 - pad), (x1 + pad, y0 - pad),
+                   (x1 + pad, y1 + pad), (x0 - pad, y0 - pad),
+                   (x1 + pad, y1 + pad), (x0 - pad, y1 + pad)]
         self._draw_rect(corners, (cx, cy), (hw, hh), float(radius), float(border_w),
                         color, border_color)
 
@@ -201,12 +238,12 @@ class GLRenderer(Renderer):
 
     def circle(self, x, y, radius, color, fill=True):
         if fill:
-            self._rect_call(round(x - radius), round(y - radius),
-                            round(radius * 2), round(radius * 2),
+            self._rect_call(x - radius, y - radius,
+                            radius * 2, radius * 2,
                             color, radius=radius)
         else:
-            self._rect_call(round(x - radius), round(y - radius),
-                            round(radius * 2), round(radius * 2),
+            self._rect_call(x - radius, y - radius,
+                            radius * 2, radius * 2,
                             (0, 0, 0, 0), radius=radius, border_w=max(1.0, radius / 8),
                             border_color=color)
 
@@ -241,6 +278,8 @@ class GLRenderer(Renderer):
         if tex is None:
             tex = self.ctx.texture(surface.get_size(), 4, raw)
             tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            tex.repeat_x = False
+            tex.repeat_y = False
             self._tex_cache[digest] = tex
             # ponytail: unbounded texture cache; LRU if long sessions leak
             if len(self._tex_cache) > 600:
@@ -254,15 +293,20 @@ class GLRenderer(Renderer):
                          surface.get_width() / s,
                          surface.get_height() / s, alpha)
 
-    def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
-        x, y = self._translate(x, y)
-        alpha *= self.opacity
-        tex, _ = self._texture(surface)
-        x0, y0 = round(x), round(y)
-        x1, y1 = x0 + round(width), y0 + round(height)
-        # tobytes row 0 (glyph top) lands at v=0 -> v=0 at quad top
-        verts = [(x0, y0, 0.0, 0.0), (x1, y0, 1.0, 0.0), (x1, y1, 1.0, 1.0),
-                 (x0, y0, 0.0, 0.0), (x1, y1, 1.0, 1.0), (x0, y1, 0.0, 1.0)]
+    def _draw_texture(self, tex, x, y, width, height, alpha=1.0, *,
+                      framebuffer_texture=False):
+        x0 = round(x * self._ssaa) / self._ssaa
+        y0 = round(y * self._ssaa) / self._ssaa
+        x1 = x0 + round(width * self._ssaa) / self._ssaa
+        y1 = y0 + round(height * self._ssaa) / self._ssaa
+        # pygame byte row 0 maps to v=0 and is intentionally placed at the
+        # quad top. A framebuffer texture uses OpenGL's bottom-up orientation,
+        # so its V coordinates are reversed during the final resolve.
+        top_v, bottom_v = ((1.0, 0.0) if framebuffer_texture
+                           else (0.0, 1.0))
+        verts = [(x0, y0, 0.0, top_v), (x1, y0, 1.0, top_v),
+                 (x1, y1, 1.0, bottom_v), (x0, y0, 0.0, top_v),
+                 (x1, y1, 1.0, bottom_v), (x0, y1, 0.0, bottom_v)]
         data = []
         for vx, vy, u, v in verts:
             data += [vx, vy, u, v, 1.0, 1.0, 1.0, alpha]
@@ -274,6 +318,12 @@ class GLRenderer(Renderer):
         vao.release()
         vbo.release()
 
+    def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
+        x, y = self._translate(x, y)
+        alpha *= self.opacity
+        tex, _ = self._texture(surface)
+        self._draw_texture(tex, x, y, width, height, alpha)
+
     def overlay_rect(self, x, y, w, h, color, radius=0):
         self._rect_call(x, y, w, h, color, radius=radius)  # blend handles alpha
 
@@ -281,7 +331,9 @@ class GLRenderer(Renderer):
     def clip_push(self, x, y, w, h):
         x, y = self._translate(x, y)
         sw, sh = self._fb_size()
-        rect = (int(x), int(sh - y - h), max(0, int(w)), max(0, int(h)))
+        ssaa = self._ssaa
+        rect = (int(x * ssaa), int((sh - y - h) * ssaa),
+                max(0, int(w * ssaa)), max(0, int(h * ssaa)))
         if self._clip_stack:
             px0, py0, pw, ph = self._clip_stack[-1]
             ex0, ey0 = max(px0, rect[0]), max(py0, rect[1])
@@ -302,19 +354,29 @@ class GLRenderer(Renderer):
         w, h = int(self._size[0]), int(self._size[1])
         if w <= 0 or h <= 0:
             return pygame.Surface((1, 1), pygame.SRCALPHA)
-        data = self.ctx.screen.read(components=3, viewport=(0, 0, w, h))
-        stride = w * 3
-        rows = [data[i * stride:(i + 1) * stride] for i in range(h)]
-        return pygame.image.frombuffer(b"".join(reversed(rows)), (w, h), "RGB")
+        rw, rh = w * self._ssaa, h * self._ssaa
+        data = self._frame_target.read(components=3, viewport=(0, 0, rw, rh))
+        stride = rw * 3
+        rows = [data[i * stride:(i + 1) * stride] for i in range(rh)]
+        full = pygame.image.frombytes(b"".join(reversed(rows)), (rw, rh), "RGB")
+        return pygame.transform.smoothscale(full, (w, h))
+
+    def _resolve_to_window(self):
+        self.ctx.screen.use()
+        self.ctx.viewport = (0, 0, int(self._size[0]), int(self._size[1]))
+        self.ctx.scissor = None
+        self._draw_texture(self._frame_color, 0, 0, self._size[0], self._size[1],
+                           framebuffer_texture=True)
 
     def flip(self):
+        self._resolve_to_window()
         if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
-            # read BEFORE the swap: after SwapWindow the back buffer is stale
             pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
         self.window.flip()
+        self._use_frame_target()
 
     def on_resize(self, width, height):
         self._size = (int(width), int(height))
-        self.ctx.viewport = (0, 0, int(width), int(height))
         self._prog["u_size"].value = (float(width), float(height))
         self._prog_tex["u_size"].value = (float(width), float(height))
+        self._create_frame_target()
