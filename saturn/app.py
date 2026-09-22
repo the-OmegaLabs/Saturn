@@ -66,6 +66,9 @@ class App:
         autoclose = os.environ.get("SATURN_AUTOCLOSE")  # test hook
         if autoclose:
             threading.Timer(float(autoclose), self.close).start()
+        shot = os.environ.get("SATURN_SHOT")  # test hook: save a frame
+        if shot:
+            threading.Timer(2.0, lambda: _swallow(self.screenshot, shot)).start()
         threading.Thread(target=self.call, args=(self._main, self.page),
                          daemon=True, name="saturn-main").start()
         self._dirty.set()
@@ -164,7 +167,7 @@ def _swallow(fn, *args):
         traceback.print_exc()
 
 
-def run(main, *, backend: Render = Render.SOFTWARE, width: int = 800,
+def run(main, *, backend: Render | None = None, width: int = 800,
         height: int = 600, title: str = "saturn", **_flet_ignored):
     """Open a window, run `main(page)` and block until the window closes.
 
@@ -174,6 +177,8 @@ def run(main, *, backend: Render = Render.SOFTWARE, width: int = 800,
     """
     if backend is Render.VULKAN:
         raise NotImplementedError("Render.VULKAN is a placeholder; use SOFTWARE or OPENGL")
+    if backend is None:  # test hook: pick renderer from the environment
+        backend = Render(os.environ.get("SATURN_BACKEND", "software").lower())
     app = App(main, backend, width, height, title)
     app.start()
     app.run_until_closed()
