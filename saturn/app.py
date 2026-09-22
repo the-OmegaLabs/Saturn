@@ -50,6 +50,28 @@ def _system_refresh_rate() -> int:
     return 60
 
 
+def _system_pixel_ratio() -> float:
+    """Return the primary Windows display density in logical-pixel units."""
+    if sys.platform != "win32":
+        return 1.0
+    try:
+        dpi = int(ctypes.windll.user32.GetDpiForSystem())
+        return max(1.0, dpi / 96.0) if dpi > 0 else 1.0
+    except (AttributeError, OSError, TypeError, ValueError):
+        return 1.0
+
+
+def _window_pixel_ratio(hwnd: int) -> float:
+    """Return the live per-monitor density for a native window."""
+    if sys.platform != "win32" or not hwnd:
+        return 1.0
+    try:
+        dpi = int(ctypes.windll.user32.GetDpiForWindow(hwnd))
+        return max(1.0, dpi / 96.0) if dpi > 0 else 1.0
+    except (AttributeError, OSError, TypeError, ValueError):
+        return _system_pixel_ratio()
+
+
 def _set_windows_default_icon(hwnd: int) -> bool:
     """Apply Windows' shared generic application icon to an HWND."""
     if sys.platform != "win32" or not hwnd:
@@ -111,36 +133,50 @@ class App:
         self._last_resize_dispatched_size = None
         self._refresh_rate = 60
         self._window_icon = None
+        self._pixel_ratio = 1.0
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
         # SDL2 suppresses native IME UI by default. Enable the operating
         # system candidate list before initializing the video subsystem.
         os.environ.setdefault("SDL_IME_SHOW_UI", "1")
+        # SDL must opt into Per-Monitor V2 before video initialization. This
+        # disables Windows' blurry bitmap scaling when a window moves between
+        # displays with different densities.
+        os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
         pygame.init()
         if self._backend is Render.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
+        self._pixel_ratio = _system_pixel_ratio()
+        creation_size = self.physical_size_for_logical(*self._size)
         self._window = pygame.Window(
             title=self._title,
-            size=tuple(self._size),
+            size=creation_size,
             resizable=True,
             opengl=self._backend is Render.OPENGL,
+            allow_high_dpi=True,
         )
+        self._pixel_ratio = _window_pixel_ratio(self._window.handle)
         if self._backend is Render.OPENGL:
             _set_gl_swap_interval(1)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
         client = self.client_size_for_outer(*self._outer_size)
-        if tuple(self._window.size) != client:
-            self._window.size = client
+        pixel_client = self.physical_size_for_logical(*client)
+        if tuple(self._window.size) != pixel_client:
+            self._window.size = pixel_client
         self._size[:] = client
-        self.renderer = create_renderer(self._backend, self._window)
+        self.renderer = create_renderer(
+            self._backend, self._window,
+            logical_size=client, pixel_ratio=self._pixel_ratio)
         # SDL/pygame can retain the set_mode creation size after the native
         # Window client area is adjusted for Flet's outer-size semantics.
         # Seed every renderer from the authoritative final client size so
         # GL's viewport/scissor and screenshot dimensions match SOFTWARE.
-        self.renderer.on_resize(*client)
+        self.renderer.on_resize(
+            *client, pixel_size=pixel_client,
+            pixel_ratio=self._pixel_ratio)
         from .page import Page  # deferred: page imports app bits
         self.page = Page(self)
         from . import text as _text
@@ -177,12 +213,16 @@ class App:
                     self._closed.set()
                 elif e.type == pygame.WINDOWRESIZED:
                     self._resize_frame(e.x, e.y, present=False, dispatch=True)
+                elif e.type == pygame.WINDOWDISPLAYCHANGED:
+                    self._refresh_pixel_ratio()
+                    self._resize_frame(
+                        *self._window.size, present=False, dispatch=True)
                 elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-                    self.page.pointer_down(*e.pos)
+                    self.page.pointer_down(*self.logical_point(*e.pos))
                 elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
-                    self.page.pointer_up(*e.pos)
+                    self.page.pointer_up(*self.logical_point(*e.pos))
                 elif e.type == pygame.MOUSEMOTION:
-                    self.page.pointer_move(*e.pos)
+                    self.page.pointer_move(*self.logical_point(*e.pos))
                 elif e.type in (pygame.KEYDOWN, pygame.KEYUP, pygame.TEXTINPUT,
                                 pygame.TEXTEDITING, pygame.MOUSEWHEEL):
                     self.page.handle_event(e)
@@ -217,7 +257,12 @@ class App:
 
     def set_text_input_rect(self, rect: pygame.Rect):
         """Position SDL text input using a caret-relative exclusion area."""
-        pygame.key.set_text_input_rect(rect)
+        ratio = self._pixel_ratio
+        pygame.key.set_text_input_rect(pygame.Rect(
+            round(rect.x * ratio), round(rect.y * ratio),
+            max(1, round(rect.width * ratio)),
+            max(1, round(rect.height * ratio)),
+        ))
 
     def _apply_default_window_icon(self):
         return _set_windows_default_icon(self._window.handle)
@@ -229,12 +274,18 @@ class App:
         ``present=True`` is used by the SDL event watch while Win32 owns the
         modal move/size loop and Saturn's normal event loop cannot advance.
         """
-        width, height = max(1, int(width)), max(1, int(height))
+        pixel_width = max(1, int(width))
+        pixel_height = max(1, int(height))
+        self._refresh_pixel_ratio()
+        width = max(1, round(pixel_width / self._pixel_ratio))
+        height = max(1, round(pixel_height / self._pixel_ratio))
         self._size[:] = [width, height]
         self._outer_size[0] = width + self._frame_size[0]
         self._outer_size[1] = height + self._frame_size[1]
         if self.renderer is not None:
-            self.renderer.on_resize(width, height)
+            self.renderer.on_resize(
+                width, height, pixel_size=(pixel_width, pixel_height),
+                pixel_ratio=self._pixel_ratio)
         size = (width, height)
         if (dispatch and self.page is not None
                 and size != self._last_resize_dispatched_size):
@@ -352,6 +403,29 @@ class App:
     def refresh_rate(self):
         return self._refresh_rate
 
+    @property
+    def pixel_ratio(self):
+        return self._pixel_ratio
+
+    def physical_size_for_logical(self, width, height):
+        ratio = self._pixel_ratio
+        return (max(1, round(float(width) * ratio)),
+                max(1, round(float(height) * ratio)))
+
+    def logical_point(self, x, y):
+        ratio = self._pixel_ratio
+        return (float(x) / ratio, float(y) / ratio)
+
+    def _refresh_pixel_ratio(self):
+        if not hasattr(self, "_window"):
+            return False
+        ratio = _window_pixel_ratio(self._window.handle)
+        if abs(ratio - self._pixel_ratio) < 0.001:
+            return False
+        self._pixel_ratio = ratio
+        self._frame_size = self._measure_frame_size()
+        return True
+
     def client_size_for_outer(self, width, height):
         return (max(1, int(width) - self._frame_size[0]),
                 max(1, int(height) - self._frame_size[1]))
@@ -376,8 +450,12 @@ class App:
                 return (0, 0)
             if not user32.GetClientRect(hwnd, ctypes.byref(client)):
                 return (0, 0)
-            return ((outer.right - outer.left) - (client.right - client.left),
-                    (outer.bottom - outer.top) - (client.bottom - client.top))
+            frame_w = ((outer.right - outer.left)
+                       - (client.right - client.left))
+            frame_h = ((outer.bottom - outer.top)
+                       - (client.bottom - client.top))
+            return (round(frame_w / self._pixel_ratio),
+                    round(frame_h / self._pixel_ratio))
         except (KeyError, OSError):
             return (0, 0)
 

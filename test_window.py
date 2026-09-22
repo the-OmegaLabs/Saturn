@@ -8,7 +8,8 @@ sys.path.insert(0, ".")
 
 import pygame
 
-from saturn.app import App, Render, _system_refresh_rate
+from saturn.app import (App, Render, _system_pixel_ratio,
+                        _system_refresh_rate, _window_pixel_ratio)
 from saturn.page import Page, Window
 from saturn.types import ThemeMode
 
@@ -26,7 +27,7 @@ def check_live_resize_frame():
             self.resizes = []
             self.flips = 0
 
-        def on_resize(self, width, height):
+        def on_resize(self, width, height, **_kwargs):
             self.resizes.append((width, height))
 
         def flip(self):
@@ -75,6 +76,24 @@ def check_refresh_rate_detection():
         pygame.display.get_desktop_refresh_rates = desktops
 
 
+def check_high_dpi_coordinate_conversion():
+    app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
+    app._pixel_ratio = 1.5
+    app._frame_size = (11, 26)
+    assert app.physical_size_for_logical(320, 200) == (480, 300)
+    assert app.logical_point(480, 300) == (320.0, 200.0)
+    assert app.client_size_for_outer(800, 600) == (789, 574)
+
+    with patch("saturn.app.sys.platform", "win32"), \
+            patch("saturn.app.ctypes.windll.user32.GetDpiForSystem",
+                  return_value=144):
+        assert _system_pixel_ratio() == 1.5
+    with patch("saturn.app.sys.platform", "win32"), \
+            patch("saturn.app.ctypes.windll.user32.GetDpiForWindow",
+                  return_value=192):
+        assert _window_pixel_ratio(42) == 2.0
+
+
 def check_default_window_icon_contract():
     app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
     window = Window(app)
@@ -116,20 +135,30 @@ def check_native_ime_ui_enabled_before_pygame_init():
     app = App(lambda page: None, Render.SOFTWARE, 800, 600, "test")
     calls = []
     previous = os.environ.pop("SDL_IME_SHOW_UI", None)
+    previous_dpi = os.environ.pop("SDL_WINDOWS_DPI_AWARENESS", None)
     try:
-        with patch("pygame.init", side_effect=lambda: calls.append(
-                os.environ.get("SDL_IME_SHOW_UI"))), \
-                patch("pygame.Window", side_effect=RuntimeError("stop")):
+        def window(**kwargs):
+            calls.append((os.environ.get("SDL_IME_SHOW_UI"),
+                          os.environ.get("SDL_WINDOWS_DPI_AWARENESS"),
+                          kwargs["allow_high_dpi"]))
+            raise RuntimeError("stop")
+
+        with patch("pygame.init"), \
+                patch("pygame.Window", side_effect=window):
             try:
                 app.start()
             except RuntimeError as error:
                 assert str(error) == "stop"
-        assert calls == ["1"]
+        assert calls == [("1", "permonitorv2", True)]
     finally:
         if previous is None:
             os.environ.pop("SDL_IME_SHOW_UI", None)
         else:
             os.environ["SDL_IME_SHOW_UI"] = previous
+        if previous_dpi is None:
+            os.environ.pop("SDL_WINDOWS_DPI_AWARENESS", None)
+        else:
+            os.environ["SDL_WINDOWS_DPI_AWARENESS"] = previous_dpi
 
 
 def check_ime_input_rect_forwarded_to_sdl():
@@ -138,12 +167,17 @@ def check_ime_input_rect_forwarded_to_sdl():
     with patch("pygame.key.set_text_input_rect") as sdl_position:
         app.set_text_input_rect(rect)
     sdl_position.assert_called_once_with(rect)
+    app._pixel_ratio = 1.5
+    with patch("pygame.key.set_text_input_rect") as sdl_position:
+        app.set_text_input_rect(rect)
+    sdl_position.assert_called_once_with(pygame.Rect(96, 120, 2, 72))
 
 
 if __name__ == "__main__":
     check_outer_to_client_conversion()
     check_live_resize_frame()
     check_refresh_rate_detection()
+    check_high_dpi_coordinate_conversion()
     check_default_window_icon_contract()
     check_title_bar_tracks_page_theme()
     check_windows_dark_title_bar_dwm_contract()

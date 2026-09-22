@@ -29,26 +29,39 @@ def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
 
 
 class SoftwareRenderer(Renderer):
-    scale = SCALE
-
-    def __init__(self, window=None):
+    def __init__(self, window=None, *, logical_size=None,
+                 pixel_ratio: float = 1.0):
         self._init_effect_stacks()
         self.window = window
+        self.pixel_ratio = max(1.0, float(pixel_ratio))
+        self._aa_scale = 1 if self.pixel_ratio >= 1.5 else SCALE
+        self.scale = self._aa_scale * self.pixel_ratio
         self.screen = (window.get_surface() if window is not None
                        else pygame.display.get_surface())
         w, h = self.screen.get_size()
-        self._buf = pygame.Surface((w * SCALE, h * SCALE), pygame.SRCALPHA)
+        self._buf = pygame.Surface(
+            (w * self._aa_scale, h * self._aa_scale), pygame.SRCALPHA)
         self._clip: list[tuple] = []
         self._apply_clip()
 
-    def on_resize(self, width, height):
+    def on_resize(self, width, height, *, pixel_size=None,
+                  pixel_ratio: float | None = None):
+        if pixel_ratio is not None:
+            self.pixel_ratio = max(1.0, float(pixel_ratio))
+            self._aa_scale = 1 if self.pixel_ratio >= 1.5 else SCALE
+            self.scale = self._aa_scale * self.pixel_ratio
         self.screen = (self.window.get_surface() if self.window is not None
                        else pygame.display.get_surface())
-        self._buf = pygame.Surface((width * SCALE, height * SCALE), pygame.SRCALPHA)
+        pixel_width, pixel_height = (
+            tuple(pixel_size) if pixel_size is not None
+            else self.screen.get_size())
+        self._buf = pygame.Surface(
+            (max(1, int(pixel_width)) * self._aa_scale,
+             max(1, int(pixel_height)) * self._aa_scale), pygame.SRCALPHA)
         self._apply_clip()
 
     def _s(self, *vals):
-        return [v * SCALE for v in vals]
+        return [v * self.scale for v in vals]
 
     def _apply_clip(self):
         rect = None
@@ -69,15 +82,17 @@ class SoftwareRenderer(Renderer):
             # pygame.draw REPLACES pixels (alpha included) on a SRCALPHA buf,
             # so translucent fills accumulate frame over frame — composite
             # through a temp surface instead
-            tmp = pygame.Surface((max(1, int(w * SCALE)), max(1, int(h * SCALE))),
+            tmp = pygame.Surface((max(1, int(w * self.scale)),
+                                  max(1, int(h * self.scale))),
                                  pygame.SRCALPHA)
             pygame.draw.rect(tmp, c, tmp.get_rect(),
-                             border_radius=int(radius * SCALE))
+                             border_radius=int(radius * self.scale))
             self._buf.blit(tmp, self._s(x, y))
             return
         pygame.draw.rect(self._buf, c,
-                         (*self._s(x, y)[:2], int(w * SCALE), int(h * SCALE)),
-                         border_radius=int(radius * SCALE))
+                         (*self._s(x, y)[:2], int(w * self.scale),
+                          int(h * self.scale)),
+                         border_radius=int(radius * self.scale))
 
     def overlay_rect(self, x, y, w, h, color, radius=0):
         self.fill_rect(x, y, w, h, color, radius)  # fill_rect blends now
@@ -85,15 +100,16 @@ class SoftwareRenderer(Renderer):
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
         x, y = self._translate(x, y)
         c = self._effect_color(color)
-        sw, sh = max(1, int(w * SCALE)), max(1, int(h * SCALE))
-        line_w = max(1, int(width * SCALE))
+        sw, sh = (max(1, int(w * self.scale)),
+                  max(1, int(h * self.scale)))
+        line_w = max(1, int(width * self.scale))
         if len(c) > 3 and c[3] < 255:
             # Like fill_rect, pygame.draw replaces destination alpha on an
             # SRCALPHA surface. Draw translucent strokes into a temporary
             # layer so they blend over the already-opaque frame like GL.
             tmp = pygame.Surface((sw, sh), pygame.SRCALPHA)
             pygame.draw.rect(tmp, c, tmp.get_rect(), width=line_w,
-                             border_radius=int(radius * SCALE))
+                             border_radius=int(radius * self.scale))
             self._buf.blit(tmp, self._s(x, y))
             return
         pygame.draw.rect(self._buf, c,
@@ -105,29 +121,32 @@ class SoftwareRenderer(Renderer):
         x2, y2 = self._translate(x2, y2)
         pygame.draw.line(self._buf, self._effect_color(color),
                          *self._s(x1, y1, x2, y2),
-                         width=max(1, int(width * SCALE)))
+                         width=max(1, int(width * self.scale)))
 
     def circle(self, x, y, radius, color, fill=True):
         x, y = self._translate(x, y)
         c = self._effect_color(color)
-        rr = max(1, int(radius * SCALE))
+        rr = max(1, int(radius * self.scale))
         if len(c) > 3 and c[3] < 255:
             size = rr * 2 + 4
             tmp = pygame.Surface((size, size), pygame.SRCALPHA)
             pygame.draw.circle(tmp, c, (size // 2, size // 2), rr,
-                               0 if fill else max(1, SCALE))
-            self._buf.blit(tmp, (round(x * SCALE) - size // 2,
-                                 round(y * SCALE) - size // 2))
+                               0 if fill else max(1, round(self.scale)))
+            self._buf.blit(tmp, (round(x * self.scale) - size // 2,
+                                 round(y * self.scale) - size // 2))
             return
         pygame.draw.circle(self._buf, c, self._s(x, y), rr,
-                           0 if fill else max(1, SCALE))
+                           0 if fill else max(1, round(self.scale)))
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
         x, y = self._translate(x, y)
-        rect = pygame.Rect(0, 0, int(radius * 2 * SCALE), int(radius * 2 * SCALE))
+        rect = pygame.Rect(
+            0, 0, int(radius * 2 * self.scale),
+            int(radius * 2 * self.scale))
         rect.center = self._s(x, y)
         pygame.draw.arc(self._buf, self._effect_color(color), rect,
-                        start_angle, end_angle, max(1, int(width * SCALE)))
+                        start_angle, end_angle,
+                        max(1, int(width * self.scale)))
 
     def blit(self, surface, x, y, alpha=1.0):
         """surface is already in device px (text/images render at scale)."""
@@ -144,8 +163,8 @@ class SoftwareRenderer(Renderer):
         """Draw a cached device-pixel surface at a logical target size."""
         x, y = self._translate(x, y)
         alpha *= self.opacity
-        target = (max(1, round(width * SCALE)),
-                  max(1, round(height * SCALE)))
+        target = (max(1, round(width * self.scale)),
+                  max(1, round(height * self.scale)))
         s = surface if surface.get_size() == target else \
             pygame.transform.smoothscale(surface, target)
         s = _as_alpha_surface(s)

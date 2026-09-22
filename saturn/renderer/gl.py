@@ -107,18 +107,24 @@ void main() {
 class GLRenderer(Renderer):
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
-    scale = 2.0
     _ssaa = 2
 
-    def __init__(self, window):
+    def __init__(self, window, *, logical_size=None,
+                 pixel_ratio: float = 1.0):
         self._init_effect_stacks()
         self.window = window
+        self.pixel_ratio = max(1.0, float(pixel_ratio))
+        self._ssaa = 1 if self.pixel_ratio >= 1.5 else 2
+        self.scale = self._ssaa * self.pixel_ratio
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.BLEND)
         # the GL backbuffer follows the OS window automatically, but pygame's
         # get_surface() and moderngl's ctx.screen both cache the CREATION size —
         # never trust them; on_resize is the source of truth
-        self._size = self._query_size()
+        self._pixel_size = self._query_size()
+        self._size = (tuple(logical_size) if logical_size is not None else
+                      tuple(round(v / self.pixel_ratio)
+                            for v in self._pixel_size))
         self._prog = self.ctx.program(vertex_shader=RECT_VS, fragment_shader=RECT_FS)
         self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
         self._prog["u_size"].value = self._fb_size()
@@ -145,8 +151,8 @@ class GLRenderer(Renderer):
             self._frame_target.release()
         if self._frame_color is not None:
             self._frame_color.release()
-        w = max(1, int(self._size[0]) * self._ssaa)
-        h = max(1, int(self._size[1]) * self._ssaa)
+        w = max(1, int(self._pixel_size[0]) * self._ssaa)
+        h = max(1, int(self._pixel_size[1]) * self._ssaa)
         self._frame_color = self.ctx.texture((w, h), 4)
         self._frame_color.filter = (moderngl.LINEAR, moderngl.LINEAR)
         self._frame_color.repeat_x = False
@@ -158,8 +164,8 @@ class GLRenderer(Renderer):
     def _use_frame_target(self):
         self._frame_target.use()
         self.ctx.viewport = (0, 0,
-                             max(1, int(self._size[0]) * self._ssaa),
-                             max(1, int(self._size[1]) * self._ssaa))
+                             max(1, int(self._pixel_size[0]) * self._ssaa),
+                             max(1, int(self._pixel_size[1]) * self._ssaa))
         self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
 
     def _draw_rect(self, corners, center, half, radius, border_w, color,
@@ -191,17 +197,18 @@ class GLRenderer(Renderer):
         x, y = self._translate(x, y)
         # Snap to the supersampled grid. This preserves stable edges while
         # allowing half-pixel motion instead of visibly jumping whole pixels.
-        x0 = round(x * self._ssaa) / self._ssaa
-        y0 = round(y * self._ssaa) / self._ssaa
-        x1 = round((x + w) * self._ssaa) / self._ssaa
-        y1 = round((y + h) * self._ssaa) / self._ssaa
+        device_scale = self.scale
+        x0 = round(x * device_scale) / device_scale
+        y0 = round(y * device_scale) / device_scale
+        x1 = round((x + w) * device_scale) / device_scale
+        y1 = round((y + h) * device_scale) / device_scale
         w, h = x1 - x0, y1 - y0
         cx, cy = x0 + w / 2, y0 + h / 2
         hw, hh = w / 2, h / 2
         # SDF coverage extends half a device pixel outside the nominal shape.
         # Keep that fringe inside the rasterized geometry instead of clipping
         # it at the quad boundary.
-        pad = 1.0 / self._ssaa if radius >= 0 else 0.0
+        pad = 1.0 / device_scale if radius >= 0 else 0.0
         corners = [(x0 - pad, y0 - pad), (x1 + pad, y0 - pad),
                    (x1 + pad, y1 + pad), (x0 - pad, y0 - pad),
                    (x1 + pad, y1 + pad), (x0 - pad, y1 + pad)]
@@ -295,10 +302,11 @@ class GLRenderer(Renderer):
 
     def _draw_texture(self, tex, x, y, width, height, alpha=1.0, *,
                       framebuffer_texture=False):
-        x0 = round(x * self._ssaa) / self._ssaa
-        y0 = round(y * self._ssaa) / self._ssaa
-        x1 = x0 + round(width * self._ssaa) / self._ssaa
-        y1 = y0 + round(height * self._ssaa) / self._ssaa
+        device_scale = self.scale
+        x0 = round(x * device_scale) / device_scale
+        y0 = round(y * device_scale) / device_scale
+        x1 = x0 + round(width * device_scale) / device_scale
+        y1 = y0 + round(height * device_scale) / device_scale
         # pygame byte row 0 maps to v=0 and is intentionally placed at the
         # quad top. A framebuffer texture uses OpenGL's bottom-up orientation,
         # so its V coordinates are reversed during the final resolve.
@@ -330,10 +338,12 @@ class GLRenderer(Renderer):
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):
         x, y = self._translate(x, y)
-        sw, sh = self._fb_size()
-        ssaa = self._ssaa
-        rect = (int(x * ssaa), int((sh - y - h) * ssaa),
-                max(0, int(w * ssaa)), max(0, int(h * ssaa)))
+        _sw, sh = self._fb_size()
+        device_scale = self.scale
+        rect = (int(x * device_scale),
+                int((sh - y - h) * device_scale),
+                max(0, int(w * device_scale)),
+                max(0, int(h * device_scale)))
         if self._clip_stack:
             px0, py0, pw, ph = self._clip_stack[-1]
             ex0, ey0 = max(px0, rect[0]), max(py0, rect[1])
@@ -351,7 +361,7 @@ class GLRenderer(Renderer):
     # -- present -------------------------------------------------------------
     def screenshot(self):
         """Current framebuffer contents (must run on the UI thread, pre-swap)."""
-        w, h = int(self._size[0]), int(self._size[1])
+        w, h = int(self._pixel_size[0]), int(self._pixel_size[1])
         if w <= 0 or h <= 0:
             return pygame.Surface((1, 1), pygame.SRCALPHA)
         rw, rh = w * self._ssaa, h * self._ssaa
@@ -363,7 +373,8 @@ class GLRenderer(Renderer):
 
     def _resolve_to_window(self):
         self.ctx.screen.use()
-        self.ctx.viewport = (0, 0, int(self._size[0]), int(self._size[1]))
+        self.ctx.viewport = (
+            0, 0, int(self._pixel_size[0]), int(self._pixel_size[1]))
         self.ctx.scissor = None
         self._draw_texture(self._frame_color, 0, 0, self._size[0], self._size[1],
                            framebuffer_texture=True)
@@ -375,8 +386,16 @@ class GLRenderer(Renderer):
         self.window.flip()
         self._use_frame_target()
 
-    def on_resize(self, width, height):
+    def on_resize(self, width, height, *, pixel_size=None,
+                  pixel_ratio: float | None = None):
+        if pixel_ratio is not None:
+            self.pixel_ratio = max(1.0, float(pixel_ratio))
+            self._ssaa = 1 if self.pixel_ratio >= 1.5 else 2
+            self.scale = self._ssaa * self.pixel_ratio
         self._size = (int(width), int(height))
+        self._pixel_size = (tuple(int(v) for v in pixel_size)
+                            if pixel_size is not None
+                            else self._query_size())
         self._prog["u_size"].value = (float(width), float(height))
         self._prog_tex["u_size"].value = (float(width), float(height))
         self._create_frame_target()

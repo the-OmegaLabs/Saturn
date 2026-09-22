@@ -61,9 +61,24 @@ def check_translucent_circle_composites():
     pygame.display.quit()
 
 
+def check_high_dpi_software_coordinates():
+    pygame.init()
+    pygame.display.set_mode((300, 180))
+    renderer = SoftwareRenderer(pixel_ratio=1.5,
+                                logical_size=(200, 120))
+    assert renderer.scale == 1.5
+    assert renderer._buf.get_size() == (300, 180)
+    renderer.clear((0, 0, 0, 255))
+    renderer.fill_rect(10, 10, 20, 10, (255, 255, 255, 255))
+    assert tuple(renderer._buf.get_at((15, 15))) == (255, 255, 255, 255)
+    assert renderer.screenshot().get_size() == (300, 180)
+    pygame.display.quit()
+
+
 if __name__ == "__main__":
     check_image_load_without_display_surface()
     check_translucent_stroke_composites()
     check_scaled_blit()
     check_translucent_circle_composites()
+    check_high_dpi_software_coordinates()
     print("ALL RENDERER TESTS PASS")

@@ -132,10 +132,14 @@ class Window:
         # with the SDL size change on the UI thread. Manual resizes still
         # come through the WINDOWRESIZED event.
         client_w, client_h = self._app.client_size_for_outer(w, h)
+        pixel_client = self._app.physical_size_for_logical(
+            client_w, client_h)
 
         def _do():
-            self._app._window.size = (client_w, client_h)
-            self._app.renderer.on_resize(client_w, client_h)
+            self._app._window.size = pixel_client
+            self._app.renderer.on_resize(
+                client_w, client_h, pixel_size=pixel_client,
+                pixel_ratio=self._app.pixel_ratio)
         self._app._outer_size[:] = [w, h]
         self._app._size[:] = [client_w, client_h]
         self._app.post(_do)
@@ -153,7 +157,8 @@ class Window:
         def _do():
             sw, sh = pygame.display.get_desktop_sizes()[0]
             w, h = self._app.outer_size
-            self._app._window.position = ((sw - w) // 2, (sh - h) // 2)
+            pw, ph = self._app.physical_size_for_logical(w, h)
+            self._app._window.position = ((sw - pw) // 2, (sh - ph) // 2)
         self._app.post(_do)
 
 
@@ -420,7 +425,7 @@ class Page(Control):
 
     def _wheel(self, delta, x=None, y=None):
         if x is None or y is None:
-            x, y = pygame.mouse.get_pos()
+            x, y = self._app.logical_point(*pygame.mouse.get_pos())
         lv = self._find_scrollable(x, y)
         if lv is not None:
             lv._wheel(delta)

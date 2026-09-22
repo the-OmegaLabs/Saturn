@@ -83,7 +83,8 @@ class Renderer(ABC):
     @abstractmethod
     def flip(self) -> None: ...
 
-    def on_resize(self, width, height) -> None: ...
+    def on_resize(self, width, height, *, pixel_size=None,
+                  pixel_ratio: float | None = None) -> None: ...
 
     def screenshot(self):
         """RGBA pygame surface of the current frame at logical window size.
