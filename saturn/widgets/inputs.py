@@ -53,8 +53,8 @@ class TextField(Control):
         self.cursor_color = cursor_color
         self.border_radius = border_radius
         self.text_style = text_style
-        # ponytail: accepted for flet parity, no reveal toggle rendered yet
         self.can_reveal_password = can_reveal_password
+        self._password_revealed = False
         self._caret = len(value)
         self._focused = False
         self._focusable = True
@@ -84,7 +84,15 @@ class TextField(Control):
 
     # -- text helpers ----------------------------------------------------------
     def _visible_text(self) -> str:
-        return "•" * len(self.value) if self.password else self.value
+        return ("•" * len(self.value)
+                if self.password and not self._password_revealed else self.value)
+
+    def _pressed_hook(self, x, y):
+        if self.password and self.can_reveal_password:
+            rx, _, rw, _ = self._rect
+            if x >= rx + rw - 48:
+                self._password_revealed = not self._password_revealed
+                self.update()
 
     def _font(self, scale):
         family, vsize, _ = self._style()
@@ -185,6 +193,13 @@ class TextField(Control):
                                    family=family,
                                    color=_parse(colors.Colors.ON_SURFACE_VARIANT))
             r.blit(surf, x + _FIELD_PAD, ty + (th - surf.get_height() / scale) / 2)
+        if self.password and self.can_reveal_password:
+            icon = Icons.VISIBILITY_OFF if self._password_revealed else Icons.VISIBILITY
+            af = get_icon_font(round(24 * scale))
+            eye = af.render(chr(int(icon)), True,
+                            _parse(colors.Colors.ON_SURFACE_VARIANT))
+            r.blit(eye, x + w - 32,
+                   y + (h - eye.get_height() / scale) / 2)
         if self._focused:
             cx = x + _FIELD_PAD + txt.line_width(shown[:self._caret], vsize,
                                                  scale=scale, family=family)

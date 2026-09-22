@@ -75,9 +75,17 @@ def check_textfield():
 
 def check_password_and_hint():
     app, page = make_page()
-    tf = TextField("secret", password=True, hint_text="enter pwd")
+    tf = TextField("secret", password=True, can_reveal_password=True,
+                   hint_text="enter pwd")
     page.add(tf)
     page.draw()
+    assert tf._visible_text() == "••••••"
+    x, y, w, h = tf._rect
+    page.pointer_down(x + w - 12, y + h / 2)
+    page.pointer_up(x + w - 12, y + h / 2)
+    assert tf._visible_text() == "secret"
+    page.pointer_down(x + w - 12, y + h / 2)
+    page.pointer_up(x + w - 12, y + h / 2)
     assert tf._visible_text() == "••••••"
     print("password ok")
 
