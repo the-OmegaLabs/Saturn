@@ -3,17 +3,22 @@
 All public sizes/widths are logical px; the renderer's scale factor is applied
 internally so glyphs stay crisp under the 2x supersampled software backend.
 
+Weights: pygame's font stack exposes no variable-font axes, so any font file
+(bundled or user-registered) that carries a `wght` axis is instantiated at
+the requested weight ON DEMAND with fonttools and cached on disk — real
+W_100..W_900 for every font. Non-variable files fall back to synthetic bold.
+
 Glyph fallback: a line is segmented into runs — each run renders with the
-first font in the chain that actually covers its characters (bundled Inter
-first, then the CJK system chain), and the runs are concatenated into one
-surface. Coverage probing uses pygame.freetype (pygame.font exposes no
-per-glyph metrics); `caveat: freetype.SysFont and SysFont may resolve
-slightly differently, worst case a glyph stays tofu`.
+first font in the chain that actually covers its characters — and runs are
+baseline-aligned into one surface. Coverage probing uses pygame.freetype
+(pygame.font has no per-glyph metrics).
 """
 from __future__ import annotations
 
+import io
 import os
 import re
+import tempfile
 import warnings
 from pathlib import Path
 
@@ -21,29 +26,26 @@ import pygame
 import pygame.freetype as _freetype
 
 # bundled UI fonts (SIL OFL 1.1 — see saturn/assets/OFL.txt)
-# DEFAULT = Inter (variable; SDL_ttf renders its default master = Regular 400).
-# CJK fallback = Noto Sans SC as a static Regular instance — the variable file
-# renders at ~Thin weight under SDL_ttf (no named-instance support), so it was
-# instanced with fonttools (wght=400). Italic = real Inter Italic for Latin.
-NOTO = Path(__file__).parent / "assets" / "NotoSansSC-Regular.ttf"
+# DEFAULT = Inter (variable; real weights via runtime instancing). CJK
+# fallback = Noto Sans SC (variable, same mechanism). Italic = real Inter Italic.
 INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.ttf"
 INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.ttf"
+NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.ttf"
 
-# CJK-capable system fonts (Inter has no CJK glyphs; windows/mac/linux picklist)
+# CJK-capable system fonts (extra fallback chain; windows/mac/linux picklist)
 CJK_FAMILY = "microsoftyahei,msyh,pingfangsc,hiraginosansgb,notosanscjk,wqymicrohei,simhei"
 _CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
-
-_font_cache: dict = {}
-_icon_cache: dict = {}
-ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
 
 # set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
 default_family: str | None = None
 # aliases registered via page.fonts = {"name": path} (flet API)
 registered_fonts: dict[str, str] = {}
 
+_font_cache: dict = {}
+_icon_cache: dict = {}
 _probe_cache: dict[tuple, _freetype.Font] = {}
 _cover_cache: dict[tuple, bool] = {}
+ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf"
 
 
 def register_fonts(fonts: dict[str, str]):
@@ -51,66 +53,127 @@ def register_fonts(fonts: dict[str, str]):
     _cover_cache.clear()
 
 
+def weight_num(weight) -> int:
+    """FontWeight enum / 'bold' / int -> numeric weight (100..900)."""
+    if weight is None:
+        return 400
+    if isinstance(weight, int):
+        return min(900, max(100, weight))
+    v = getattr(weight, "value", weight)
+    v = str(v)
+    if v.startswith("w") and v[1:].isdigit():
+        return min(900, max(100, int(v[1:])))
+    return {"normal": 400, "bold": 700}.get(v, 400)
+
+
 def family_for(text: str, family: str | None = None) -> str | None:
     """Resolve the PRIMARY family: explicit family wins, then the theme
-    default (page.theme); None = bundled Inter. Glyph-level fallback to the
-    CJK chain is handled by the segmentation in render_line/line_width."""
+    default (page.theme); None = bundled Inter. Glyph-level fallback to Noto
+    and the CJK chain is handled by segmentation in render_line/line_width."""
     if family:
         return family
     return default_family
 
 
-def _primary_source(family: str | None, italic: bool) -> tuple:
-    """(kind, identifier) for the primary font. kind: 'file' | 'sys'.
-    Default = bundled Inter (real Inter Italic for italic); CJK glyphs come
-    from the Noto Sans SC fallback link."""
-    resolved = family_for("", family)
+# -- variable-font instancing --------------------------------------------------
+def _instance_weight(path: str, wght: int) -> bytes | None:
+    """TTF bytes with every axis pinned to its default except wght.
+    None when the file is not variable (or instancing fails)."""
+    try:
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib import instancer
+
+        font = TTFont(path, lazy=True)
+        if "fvar" not in font:
+            return None
+        axes = {a.axisTag: a.defaultValue for a in font["fvar"].axes}
+        axes["wght"] = wght
+        instancer.instantiateVariableFont(font, axes, inplace=True)
+        buf = io.BytesIO()
+        font.save(buf)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+def _weighted_source(path: str, wnum: int) -> tuple[str, bool]:
+    """(path-to-load, is_variable). Variable files are instanced at `wnum`
+    once and cached on disk; non-variable files load as-is."""
+    try:
+        mtime = int(os.path.getmtime(path))
+    except OSError:
+        return path, False
+    key = f"{Path(path).stem}.{wnum}.{mtime}.{os.path.getsize(path)}"
+    cache = Path(tempfile.gettempdir()) / "saturn-fonts"
+    inst = cache / f"{key}.ttf"
+    if not inst.exists():
+        data = _instance_weight(path, wnum)
+        if data is None:
+            return path, False
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            inst.write_bytes(data)
+        except OSError:
+            return path, True
+    return str(inst), True
+
+
+# -- chain (per-glyph fallback) --------------------------------------------------
+def _primary_link(family: str | None, wnum: int, italic: bool) -> tuple:
+    resolved = family_for(family)
     if resolved:
         reg = registered_fonts.get(resolved)
         if reg is not None:
             if os.path.exists(reg):
-                return ("file", reg)
-            # registered but missing -> bundled default
-            return ("file", str(INTER_ITALIC if italic else INTER))
-        return ("sys", resolved)
-    return ("file", str(INTER_ITALIC if italic else INTER))
+                return ("file", reg, wnum, italic)
+            return _default_link(wnum, italic)
+        return ("sys", resolved, wnum, italic)
+    return _default_link(wnum, italic)
 
 
-def _chain_sources(family: str | None, italic: bool) -> list[tuple]:
-    """Primary font source first, then fallbacks: the other bundled fonts
-    (Inter / Noto Sans SC), then the CJK system chain. Deduped by priority."""
-    sources = [_primary_source(family, italic)]
+def _default_link(wnum: int, italic: bool) -> tuple:
+    if italic:
+        return ("file", str(INTER_ITALIC), wnum, True)
+    return ("file", str(INTER), wnum, False)
+
+
+def _chain(family: str | None, wnum: int, italic: bool) -> list[tuple]:
+    """Primary link first, then fallbacks: the other bundled fonts (Inter /
+    Inter-Italic / Noto), then the CJK system chain. Deduped by priority."""
+    links = [_primary_link(family, wnum, italic)]
     for path in (str(NOTO), str(INTER)):
-        if ("file", path) not in sources:
-            sources.append(("file", path))
-    sources += [("sys", n.strip()) for n in CJK_FAMILY.split(",") if n.strip()]
+        links.append(("file", path, wnum, False))
+    links += [("sys", n.strip(), wnum, False)
+              for n in CJK_FAMILY.split(",") if n.strip()]
     out, seen = [], set()
-    for s in sources:
-        if s not in seen:
-            seen.add(s)
-            out.append(s)
+    for link in links:
+        key = (link[0], link[1], link[3])
+        if key not in seen:
+            seen.add(key)
+            out.append(link)
     return out
 
 
-def _probe(source: tuple) -> _freetype.Font:
-    f = _probe_cache.get(source)
+def _probe(link: tuple) -> _freetype.Font:
+    key = (link[0], link[1])
+    f = _probe_cache.get(key)
     if f is None:
         if not _freetype.get_init():
             _freetype.init()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            f = _freetype.Font(source[1], 16) if source[0] == "file" \
-                else _freetype.SysFont(source[1], 16)
-        _probe_cache[source] = f
+            f = _freetype.Font(link[1], 16) if link[0] == "file" \
+                else _freetype.SysFont(link[1], 16)
+        _probe_cache[key] = f
     return f
 
 
-def _covers(source: tuple, ch: str) -> bool:
-    key = (source, ch)
+def _covers(link: tuple, ch: str) -> bool:
+    key = (link[0], link[1], ch)
     v = _cover_cache.get(key)
     if v is None:
         try:
-            m = _probe(source).get_metrics(ch)
+            m = _probe(link).get_metrics(ch)
             v = m is not None and m[0] is not None
         except Exception:
             v = False
@@ -118,46 +181,63 @@ def _covers(source: tuple, ch: str) -> bool:
     return v
 
 
-def _render_font(source: tuple, px: int, bold: bool, italic: bool) -> pygame.font.Font:
+def _render_font(link: tuple, px: int) -> pygame.font.Font:
+    kind, ident, wnum, italic = link
     if not pygame.font.get_init():
         pygame.font.init()
-    key = (source, px, bold, italic)
+    key = (kind, ident, wnum, italic, px)
     f = _font_cache.get(key)
     if f is None:
-        if source[0] == "file":
-            f = pygame.font.Font(source[1], px)
-            f.set_bold(bold)
-            f.set_italic(italic)
+        if kind == "file":
+            path, is_var = _weighted_source(ident, wnum)
+            f = pygame.font.Font(path, px)
+            # real weight already instanced; synthetic bold only for
+            # non-variable files that cannot express the requested weight
+            f.set_bold((not is_var) and wnum >= 550)
+            f.set_italic(italic and not is_var or (is_var and italic
+                                                   and ident == str(INTER_ITALIC)))
         else:
-            # the chain intentionally tries platform-specific names that may be
-            # absent; pygame warns per miss — silence it, a later link matches
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                f = pygame.font.SysFont(source[1], px, bold=bold, italic=italic)
+                f = pygame.font.SysFont(ident, px, bold=wnum >= 550,
+                                        italic=italic)
         _font_cache[key] = f
     return f
 
 
 def get_font(size: float, scale: float = 1.0, bold: bool = False,
              italic: bool = False, family: str | None = None,
-             text: str | None = None) -> pygame.font.Font:
+             text: str | None = None, weight: int | None = None) -> pygame.font.Font:
     """The primary font for the given style (chain head)."""
-    return _render_font(_primary_source(family, italic),
-                        max(1, round(size * scale)), bold, italic)
+    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
+    return _render_font(_primary_link(family, wnum, italic),
+                        max(1, round(size * scale)))
 
 
-def _segment(text: str, px: int, bold: bool, italic: bool,
+def get_icon_font(px_size: int) -> pygame.font.Font:
+    """Material Symbols font (default instance: outlined, wght 400)."""
+    if not pygame.font.get_init():
+        pygame.font.init()
+    f = _icon_cache.get(px_size)
+    if f is None:
+        f = pygame.font.Font(str(ICON_FONT_PATH), px_size)
+        _icon_cache[px_size] = f
+    return f
+
+
+# -- segmentation + rendering -----------------------------------------------------
+def _segment(text: str, px: int, wnum: int, italic: bool,
              family: str | None) -> list[tuple[pygame.font.Font, str]]:
     """Split text into (font, substring) runs by glyph coverage."""
     if not text:
         return []
-    sources = _chain_sources(family, italic)
-    fonts = {s: _render_font(s, px, bold, italic) for s in sources}
+    links = _chain(family, wnum, italic)
+    fonts = {id(l): _render_font(l, px) for l in links}
     runs: list[tuple[pygame.font.Font, str]] = []
     cur_font, cur = None, ""
     for ch in text:
-        src = next((s for s in sources if _covers(s, ch)), sources[0])
-        f = fonts[src]
+        link = next((l for l in links if _covers(l, ch)), links[0])
+        f = fonts[id(link)]
         if cur_font is None or f is cur_font:
             cur_font, cur = f, cur + ch
         else:
@@ -168,14 +248,15 @@ def _segment(text: str, px: int, bold: bool, italic: bool,
     return runs
 
 
-def render_line(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
+def render_line(text: str, size: float, *, scale: float = 1.0,
+                weight: int | None = None, bold: bool = False,
                 italic: bool = False, family: str | None = None,
                 color=(0, 0, 0, 255)) -> pygame.Surface:
     """Render one line with per-glyph fallback, concatenated into a surface.
-    Runs are aligned by BASELINE (ascent difference), not top edge — mixed
-    fonts share one visual baseline."""
+    Runs are aligned by BASELINE (ascent difference), not top edge."""
+    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
     px = max(1, round(size * scale))
-    runs = _segment(text, px, bold, italic, family)
+    runs = _segment(text, px, wnum, italic, family)
     if not runs:
         return pygame.Surface((0, 0), pygame.SRCALPHA)
     surfs = [f.render(part, True, color) for f, part in runs]
@@ -194,51 +275,45 @@ def render_line(text: str, size: float, *, scale: float = 1.0, bold: bool = Fals
     return out
 
 
-def line_width(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
+def line_width(text: str, size: float, *, scale: float = 1.0,
+               weight: int | None = None, bold: bool = False,
                italic: bool = False, family: str | None = None) -> float:
     """Width of a line in logical px under per-glyph fallback."""
+    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
     px = max(1, round(size * scale))
-    total = sum(f.size(part)[0] for f, part in _segment(text, px, bold, italic, family))
+    total = sum(f.size(part)[0] for f, part in _segment(text, px, wnum, italic, family))
     return total / scale
 
 
-def get_icon_font(px_size: int) -> pygame.font.Font:
-    """Material Symbols font (default instance: outlined, wght 400)."""
-    if not pygame.font.get_init():
-        pygame.font.init()
-    f = _icon_cache.get(px_size)
-    if f is None:
-        f = pygame.font.Font(str(ICON_FONT_PATH), px_size)
-        _icon_cache[px_size] = f
-    return f
-
-
 def measure(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
-            italic: bool = False, family: str | None = None) -> tuple[float, float]:
+            italic: bool = False, family: str | None = None,
+            weight: int | None = None) -> tuple[float, float]:
     """Single-font size (kept for exact height metrics); use line_width for
     fallback-aware width."""
-    f = get_font(size, scale, bold, italic, family, text=text)
+    f = get_font(size, scale, bold, italic, family, text=text, weight=weight)
     w, h = f.size(text)
     return w / scale, h / scale
 
 
 def line_height(size: float, *, scale: float = 1.0, bold: bool = False,
                 italic: bool = False, family: str | None = None,
-                text: str | None = None) -> float:
-    f = get_font(size, scale, bold, italic, family, text=text)
+                text: str | None = None, weight: int | None = None) -> float:
+    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
+    f = _render_font(_primary_link(family, wnum, italic), max(1, round(size * scale)))
     return f.size("Ag")[1] / scale
 
 
 def wrap(text: str, max_width: float, size: float, *, scale: float = 1.0,
          bold: bool = False, italic: bool = False, family: str | None = None,
-         max_lines: int | None = None) -> list[str]:
+         max_lines: int | None = None, weight: int | None = None) -> list[str]:
     """Word-wrap into lines fitting max_width (logical px). Honors \n breaks;
     char-splits words longer than a line; adds an ellipsis when truncated."""
     if not text:
         return []
+    wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
 
     def width(s: str) -> float:
-        return line_width(s, size, scale=scale, bold=bold, italic=italic,
+        return line_width(s, size, scale=scale, weight=wnum, italic=italic,
                           family=family)
 
     lines: list[str] = []

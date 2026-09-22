@@ -5,7 +5,8 @@ from .. import colors
 from ..control import Control
 from ..text import (family_for, line_height, line_width, measure,
                     render_line, wrap)
-from ..types import TextAlign, font_bold
+from ..text import weight_num
+from ..types import TextAlign
 
 
 class Text(Control):
@@ -30,7 +31,8 @@ class Text(Control):
 
     # -- style helpers -----------------------------------------------------
     def _style(self, scale: float):
-        return dict(scale=scale, bold=font_bold(self.weight), italic=self.italic,
+        return dict(scale=scale, weight=weight_num(self.weight),
+                    italic=self.italic,
                     family=family_for(self.value, self.font_family))
 
     # -- layout hooks (flex engine drives these) ---------------------------

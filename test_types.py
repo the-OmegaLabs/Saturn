@@ -56,7 +56,10 @@ def check_types():
     assert b.left.width == 2 and b.top.color is ft.Colors.RED
     assert ft.Alignment.CENTER == ft.Alignment(0, 0)
     assert ft.Alignment.BOTTOM_RIGHT.x == 1 and ft.Alignment.BOTTOM_RIGHT.y == 1
-    assert ft.types.font_bold(ft.FontWeight.W_600) and not ft.types.font_bold(ft.FontWeight.NORMAL)
+    assert ft.text.weight_num(ft.FontWeight.W_600) == 600
+    assert ft.text.weight_num(ft.FontWeight.BOLD) == 700
+    assert ft.text.weight_num(ft.FontWeight.NORMAL) == 400
+    assert ft.text.weight_num('w900') == 900
     print("types ok")
 
 

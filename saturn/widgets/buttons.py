@@ -9,7 +9,7 @@ from .. import colors, text as txt
 from ..control import Control
 from ..event import fire
 from ..text import get_icon_font
-from ..types import font_bold
+from ..text import weight_num
 
 # M3 button metrics
 _HEIGHT = 40.0
@@ -59,7 +59,7 @@ class Button(Control):
         w, h = 0.0, _HEIGHT
         if label := self._label():
             lw, lh = txt.measure(label, _LABEL_SIZE, scale=scale,
-                                 bold=font_bold(None))
+                                 weight=400)
             w += lw
             h = max(h, lh + 20)
         elif isinstance(self.content, Control):
