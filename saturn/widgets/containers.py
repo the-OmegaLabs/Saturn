@@ -168,6 +168,24 @@ class Column(_Multi):
     vertical = True
 
 
+def _draw_shadow(r, x, y, w, h, sh, radius):
+    """Box shadow as stacked translucent fills (no blur primitive); goes
+    through fill_rect so every renderer composites it identically."""
+    blur = max(0.0, float(sh.blur_radius))
+    spread = float(sh.spread_radius or 0.0)
+    off = sh.offset
+    c = colors.parse_color(sh.color)
+    if c[3] <= 0 or (blur <= 0 and spread <= 0 and not off.x and not off.y):
+        return
+    steps = 4
+    for j in range(steps, 0, -1):          # outermost first
+        grow = spread + blur * j / steps
+        r.fill_rect(x - grow + off.x, y - grow + off.y,
+                    w + 2 * grow, h + 2 * grow,
+                    (c[0], c[1], c[2], round(c[3] / (j + 1))),
+                    radius=radius + grow)
+
+
 class Container(Control):
     def __init__(self, content=None, *, padding=None, bgcolor=None,
                  border=None, border_radius=None, alignment=None,
@@ -235,6 +253,10 @@ class Container(Control):
 
     def _draw(self, r, x, y):
         x, y, w, h = self._rect
+        if self.shadow is not None:
+            shadows = self.shadow if isinstance(self.shadow, list) else [self.shadow]
+            for sh in shadows:
+                _draw_shadow(r, x, y, w, h, sh, self._radius())
         if self.bgcolor is not None:
             r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor),
                         radius=self._radius())
