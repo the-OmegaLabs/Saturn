@@ -44,6 +44,10 @@ _STATIC_WEIGHTS: dict[str, dict[int, str]] = {
                 700: str(NOTO.parent / "NotoSansSC-Bold.ttf")},
 }
 
+# instancing a big CJK variable font takes seconds; for fonts above this size
+# snap un-shipped weights to the nearest shipped static instead
+_SNAP_TO_STATIC_LIMIT = 5 * 1024 * 1024
+
 _fvar_cache: dict[str, float | None] = {}  # path -> default wght (None: static)
 
 # set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
@@ -107,21 +111,39 @@ def _instance_weight(path: str, wght: int) -> bytes | None:
 
 
 def _fvar_default_wght(path: str) -> float | None:
-    """Default wght of a variable font; None when static (cached)."""
+    """Default wght of a variable font; None when static (cached).
+    Raw sfnt/fvar binary parse — deliberately avoids importing fontTools on
+    the cold start path (fontTools only loads for actual instancing)."""
     key = f"{path}:{int(os.path.getmtime(path)) if os.path.exists(path) else 0}"
     if key in _fvar_cache:
         return _fvar_cache[key]
     value: float | None = None
     try:
-        from fontTools.ttLib import TTFont
+        import struct
 
-        font = TTFont(path, lazy=True)
-        if "fvar" in font:
-            for axis in font["fvar"].axes:
-                if axis.axisTag == "wght":
-                    value = axis.defaultValue
-                    break
-        font.close()
+        with open(path, "rb") as fh:
+            header = fh.read(12)
+            if len(header) >= 12 and header[3:4] in (b"\x00", b"O", b"t"):  # sfnt
+                num_tables = int.from_bytes(header[4:6], "big")
+                for _ in range(num_tables):
+                    rec = fh.read(16)
+                    if len(rec) < 16:
+                        break
+                    if rec[:4] == b"fvar":
+                        off = int.from_bytes(rec[8:12], "big")
+                        fh.seek(off)
+                        fvar_hdr = fh.read(16)
+                        axes_off = int.from_bytes(fvar_hdr[4:6], "big")
+                        axis_count = int.from_bytes(fvar_hdr[12:14], "big")
+                        fh.seek(off + axes_off)
+                        for _ in range(axis_count):
+                            rec = fh.read(20)
+                            if len(rec) < 20:
+                                break
+                            if rec[:4] == b"wght":
+                                value = int.from_bytes(rec[8:12], "big") / 65536.0
+                                break
+                        break
     except Exception:
         value = None
     _fvar_cache[key] = value
@@ -137,6 +159,18 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
     static = _STATIC_WEIGHTS.get(path, {}).get(wnum)
     if static and os.path.exists(static):
         return static, True
+    table = _STATIC_WEIGHTS.get(path, {})
+    try:
+        big_font = os.path.getsize(path) > _SNAP_TO_STATIC_LIMIT
+    except OSError:
+        return path, False
+    if big_font and table:
+        # instancing a multi-MB CJK font costs seconds; snap to the nearest
+        # shipped static instead (ponytail: exact weights via instancing if
+        # someone actually needs them)
+        near = min(table, key=lambda w: abs(w - wnum))
+        if os.path.exists(table[near]):
+            return table[near], True
     default_wght = _fvar_default_wght(path)
     if default_wght is None:
         return path, False                      # static font: synthetic bold
