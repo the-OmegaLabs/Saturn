@@ -5,6 +5,7 @@ internally so glyphs stay crisp under the 2x supersampled software backend.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -24,6 +25,12 @@ ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsOutlined.ttf
 
 # set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
 default_family: str | None = None
+# aliases registered via page.fonts = {"name": path} (flet API)
+registered_fonts: dict[str, str] = {}
+
+
+def register_fonts(fonts: dict[str, str]):
+    registered_fonts.update(fonts)
 
 
 def family_for(text: str, family: str | None = None) -> str | None:
@@ -46,7 +53,22 @@ def get_font(size: float, scale: float = 1.0, bold: bool = False,
         pygame.font.init()
     resolved = family_for(text, family)
     px = max(1, round(size * scale))
-    if resolved is None:
+
+    # page.fonts registration wins (flet-style alias -> file); a missing file
+    # falls through to the bundled Inter so bad paths never break rendering
+    reg_path = registered_fonts.get(resolved) if resolved else None
+    if reg_path is not None and os.path.exists(reg_path):
+        key = (f"@reg:{resolved}", px, bold, italic)
+        f = _font_cache.get(key)
+        if f is None:
+            f = pygame.font.Font(reg_path, px)
+            f.set_bold(bold)
+            f.set_italic(italic)
+            _font_cache[key] = f
+        return f
+
+    if resolved is None or (reg_path is not None and not os.path.exists(reg_path)):
+        # bundled Inter (also the fallback for registered-but-missing fonts)
         key = ("@inter-italic" if italic else "@inter", px, bold)
         f = _font_cache.get(key)
         if f is None:

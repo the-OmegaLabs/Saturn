@@ -93,6 +93,7 @@ class Page(Control):
         self._theme_mode = ThemeMode.SYSTEM
         self.theme = None       # ft.Theme(font_family=...) overrides default font
         self.dark_theme = None
+        self._fonts: dict[str, str] = {}  # flet page.fonts: alias -> file path
         self.vertical_alignment = MainAxisAlignment.START    # flet BasePage
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
@@ -133,6 +134,16 @@ class Page(Control):
         from . import text as _txt
         _txt.default_family = t.font_family if t is not None else None
         self.update()
+
+    @property
+    def fonts(self) -> dict[str, str]:
+        return self._fonts
+
+    @fonts.setter
+    def fonts(self, fonts: dict[str, str]):
+        self._fonts = dict(fonts or {})
+        from . import text as _txt
+        _txt.register_fonts(self._fonts)
 
     @property
     def title(self) -> str:
