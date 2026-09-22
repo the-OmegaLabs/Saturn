@@ -116,7 +116,7 @@ def check_scrollbar_drag():
     y = thumb[1] + thumb[3] / 2
     page.pointer_down(x, y)
     assert page._pressed is lv and lv._scrollbar_dragging
-    assert lv._raw("_scrollbar_thickness") == 12.0
+    assert lv._raw("_scrollbar_thickness") == 10.0
     assert lv._raw("_scrollbar_opacity") == 0.64
     page.pointer_move(x, y + 60)
     assert lv._offset > 0
@@ -141,10 +141,10 @@ def check_scrollbar_material_states():
     page.pointer_move(thumb[0] + thumb[2] / 2,
                       thumb[1] + thumb[3] / 2)
     assert lv._scrollbar_hovered
-    assert lv._raw("_scrollbar_thickness") == 12.0
+    assert lv._raw("_scrollbar_thickness") == 10.0
     assert lv._raw("_scrollbar_opacity") == 0.64
     lv._tick_animations(time.perf_counter() + 1.0)
-    assert lv._scrollbar_geometry()[1][2] == 12.0
+    assert lv._scrollbar_geometry()[1][2] == 10.0
 
     page.pointer_move(lv._rect[0] + 10, lv._rect[1] + 10)
     assert not lv._scrollbar_hovered and lv._scrollbar_hide_at is not None
