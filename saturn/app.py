@@ -145,6 +145,9 @@ class App:
         # displays with different densities.
         os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
         pygame.init()
+        # pygame disables key repeat by default. SDL owns the held-key timer
+        # and stops it on key release; text entry still uses TEXTINPUT events.
+        pygame.key.set_repeat(400, 35)
         if self._backend is Render.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
         self._pixel_ratio = _system_pixel_ratio()
