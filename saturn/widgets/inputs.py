@@ -659,7 +659,9 @@ class TextField(Control):
                 r.clip_push(x, y, w, h / 2)
                 r.fill_rect(x, y, w, h, field_bg, radius=radius)
                 r.clip_pop()
-                r.fill_rect(x, y + h / 2, w, h / 2, field_bg)
+                r.clip_push(x, y + h / 2, w, h / 2)
+                r.fill_rect(x, y, w, h, field_bg)
+                r.clip_pop()
             else:
                 r.fill_rect(x, y, w, h, field_bg, radius=radius)
         border_width = 0.0
