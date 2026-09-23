@@ -301,13 +301,20 @@ Button = _ConcreteButton
 
 
 class IconButton(Control):
-    def __init__(self, icon, *, icon_size: float = 24, icon_color=None,
+    def __init__(self, icon, *, icon_size: float | None = None, icon_color=None,
                  selected_icon=None, selected=False, bgcolor=None,
                  hover_color=None, tooltip=None, on_click=None, on_hover=None,
-                 **base):
+                 expressive=False, size=None, shape="round", **base):
         super().__init__(tooltip=tooltip, **base)
+        self.expressive = bool(expressive or size is not None)
+        self.button_size = (size or "small").replace("_", "").lower()
+        if self.button_size not in _EXPRESSIVE_SIZES or shape not in ("round", "square"):
+            raise ValueError("invalid expressive icon button size or shape")
+        self.button_shape = shape
         self.icon = icon
-        self.icon_size = icon_size
+        default_icon = {"xsmall": 20, "small": 24, "medium": 24,
+                        "large": 32, "xlarge": 40}[self.button_size]
+        self.icon_size = icon_size if icon_size is not None else default_icon
         self.icon_color = icon_color
         self.selected_icon = selected_icon
         self.selected = selected
@@ -317,11 +324,15 @@ class IconButton(Control):
         self.on_hover = on_hover
         self._hovered = False
         self._pressed = False
+        self._shape_progress = 0.0
+        self._selected_progress = float(bool(selected))
+        self._last_selected = bool(selected)
         init_state_layer(self)
 
     def _intrinsic(self, max_w, max_h, scale):
-        s = self._width if self._width is not None else 40.0
-        h = self._height if self._height is not None else 40.0
+        side = _EXPRESSIVE_SIZES[self.button_size][0] if self.expressive else 40.0
+        s = self._width if self._width is not None else side
+        h = self._height if self._height is not None else side
         return s, h
 
     def _place(self, x, y, w, h, scale):
@@ -334,18 +345,27 @@ class IconButton(Control):
 
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
-        fg = colors.parse_color(
-            self.icon_color or colors.Colors.ON_SURFACE_VARIANT)
+        radius = min(w, h) / 2
+        if self.expressive:
+            square, pressed = _EXPRESSIVE_SIZES[self.button_size][-2:]
+            normal, selected = ((radius, square) if self.button_shape == "round"
+                                else (square, radius))
+            radius = normal + (selected - normal) * self._selected_progress
+            radius += (pressed - radius) * self._shape_progress
+        role = (colors.Colors.ON_SURFACE if self.disabled else self.icon_color or
+                (colors.Colors.PRIMARY if self.selected else colors.Colors.ON_SURFACE_VARIANT))
+        fg = colors.parse_color(role)
         if self.bgcolor is not None:
             r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor),
-                        radius=min(w, h) / 2)
-        state_color = (self.hover_color or self.icon_color or
-                       colors.Colors.ON_SURFACE_VARIANT)
-        draw_state_layer(self, r, (x, y, w, h), state_color, min(w, h) / 2)
+                        radius=radius)
+        state_color = self.hover_color or role
+        if not self.disabled:
+            draw_state_layer(self, r, (x, y, w, h), state_color, radius)
         surf = render_icon_cached(
             self._current_icon(), round(self.icon_size * r.scale), fg)
         r.blit(surf, x + (w - surf.get_width() / r.scale) / 2,
-               y + (h - surf.get_height() / r.scale) / 2)
+               y + (h - surf.get_height() / r.scale) / 2,
+               alpha=.38 if self.disabled else 1.0)
 
     def _hit_test(self, x, y):
         if not self.visible or self.disabled:
@@ -363,10 +383,28 @@ class IconButton(Control):
     def _pressed_hook(self, x, y):
         press(self, x, y, ripple_duration=motion.SHORT4,
               press_duration=75)
+        if self.expressive:
+            self._animate_internal("_shape_progress", 1.0, motion.SHORT2,
+                                   motion.EMPHASIZED)
 
     def _released_hook(self, _x, _y):
         release(self, minimum_ms=0, fade_duration=motion.SHORT2)
+        if self.expressive:
+            self._animate_internal("_shape_progress", 0.0, motion.SHORT2,
+                                   motion.EMPHASIZED)
+
+    def _prepare_animations(self, now):
+        super()._prepare_animations(now)
+        if bool(self.selected) != self._last_selected:
+            self._last_selected = bool(self.selected)
+            self._animate_internal("_selected_progress", float(bool(self.selected)),
+                                   motion.SHORT3, motion.EMPHASIZED, now=now)
 
     def _tick_animations(self, now: float) -> bool:
         waiting = tick_state_layer(self, now)
         return super()._tick_animations(now) or waiting
+
+
+class ExpressiveIconButton(IconButton):
+    def __init__(self, icon, *, size="small", **kwargs):
+        super().__init__(icon, size=size, **kwargs)
