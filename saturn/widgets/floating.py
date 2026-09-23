@@ -58,7 +58,7 @@ class FloatingToolbar(Control):
         return result
 
     def _intrinsic(self, max_w, max_h, scale):
-        entries = self._measure(scale)
+        entries = [entry for entry in self._measure(scale) if entry[3] > 0]
         main = 16 + sum(((h if self.vertical else w)+4)*p for _, w, h, p in entries)
         if entries:
             main -= 4 * entries[-1][3]
@@ -225,6 +225,24 @@ class _FabMenuOverlay(Control):
             self.owner.close()
             return True
         return False
+
+    def _tick_animations(self,now):
+        node = self.owner
+        active = True
+        while node is not self.page and node is not None:
+            active = active and node.visible and not node.disabled
+            if node.parent is self.page:
+                active = active and node in self.page.controls
+                break
+            node = node.parent
+        if not active or node is None:
+            if self in self.page.overlay:
+                self.page.overlay.remove(self)
+            self.owner._overlay = None
+            self.owner.expanded = self.owner._last_expanded = False
+            self.owner._animate_internal('_reveal',0.0,0)
+            return False
+        return super()._tick_animations(now)
 
 
 class FloatingActionButtonMenu(Control):

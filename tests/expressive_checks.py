@@ -66,7 +66,7 @@ def check_floating():
     expanded = toolbar._intrinsic(None,None,1)
     toolbar._reveal = 0
     collapsed = toolbar._intrinsic(None,None,1)
-    assert collapsed[0] < expanded[0] and collapsed[1] == 64
+    assert collapsed == (56,64) and collapsed[0] < expanded[0]
     toolbar._place(0,0,*collapsed,1)
     assert toolbar._hit_test(20,32) is b
     r = renderer()
@@ -92,6 +92,9 @@ def check_floating():
     menu.toggle()
     page.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_ESCAPE))
     assert not menu.expanded
+    page.remove(menu)
+    menu._overlay._tick_animations(time.perf_counter())
+    assert not page.overlay and menu._overlay is None
 
 
 if __name__ == '__main__':
