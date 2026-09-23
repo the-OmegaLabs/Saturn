@@ -20,6 +20,10 @@ All examples use a 960 × 800 window and a dark theme, with the classic transpar
 
 ![Full control demo](../.static/shots/demo.png)
 
+The same example captured with Vulkan (`python examples/demo.py --backend vulkan`):
+
+![Full control demo on Vulkan](../.static/shots/demo-vulkan.png)
+
 ### Layout and text
 
 [Layout example](../examples/layout_demo.py) · [Row](./api/Row.md) · [Column](./api/Column.md) · [Stack](./api/Stack.md)

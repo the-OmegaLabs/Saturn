@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import math
 import time
 from pathlib import Path
@@ -13,7 +14,7 @@ from .. import colors
 from .. import motion
 from ..animation import _cubic_bezier, ease
 from ..control import Control
-from ..text import get_icon_font
+from ..text import render_icon_cached
 from ..types import AnimationCurve, BoxFit
 
 ASSETS = Path(__file__).parent.parent / "assets"
@@ -62,10 +63,10 @@ class Icon(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
-        f = get_icon_font(round(self.size * r.scale))
-        surf = f.render(chr(int(self.icon)), True,
-                        colors.parse_color(self.color or colors.Colors.ON_SURFACE))
-        r.blit(surf, x, y)
+        surf = render_icon_cached(
+            self.icon, round(self.size * r.scale),
+            colors.parse_color(self.color or colors.Colors.ON_SURFACE))
+        r.blit_cached(surf, x, y)
 
 
 class Image(Control):
@@ -78,8 +79,10 @@ class Image(Control):
         self.color = color
         self._surface = None
         self._loaded_key = None
-        self._tinted_key = None
-        self._tinted_surface = None
+        self._svg_data = None
+        self._is_svg = False
+        self._prepared_key = None
+        self._prepared_surface = None
 
     def _load(self):
         if self.src is None:
@@ -87,17 +90,45 @@ class Image(Control):
         key = self.src if isinstance(self.src, (str, bytes)) else id(self.src)
         if key == self._loaded_key:
             return self._surface
+        data = None
         if isinstance(self.src, bytes):
-            s = pygame.image.load(self.src)
+            data = self.src
         elif isinstance(self.src, str) and self.src.startswith("data:"):
             b64 = self.src.split(",", 1)[1]
-            s = pygame.image.load(base64.b64decode(b64))
+            data = base64.b64decode(b64)
+        self._is_svg = (str(self.src).lower().endswith(".svg") if data is None
+                        else b"<svg" in data[:2048].lower())
+        if data is not None:
+            s = pygame.image.load(io.BytesIO(data),
+                                  ".svg" if self._is_svg else "")
         else:
             s = pygame.image.load(self.src)
         self._surface = _as_alpha_surface(s)
         self._loaded_key = key
-        self._tinted_key = None
+        self._svg_data = data if self._is_svg else None
+        self._prepared_key = None
         return self._surface
+
+    def _prepare(self, source, width, height, tint):
+        key = (self._loaded_key, width, height, tint)
+        if key != self._prepared_key:
+            if self._is_svg:
+                svg = (io.BytesIO(self._svg_data) if self._svg_data is not None
+                       else self.src)
+                prepared = _as_alpha_surface(
+                    pygame.image.load_sized_svg(svg, (width, height)))
+            elif source.get_size() == (width, height):
+                prepared = source
+            else:
+                # Minify once before the GPU upload: one bilinear texture
+                # sample cannot adequately filter a large bitmap to an icon.
+                prepared = pygame.transform.smoothscale(source, (width, height))
+            if tint is not None:
+                prepared = prepared.copy()
+                prepared.fill(tint, special_flags=pygame.BLEND_RGBA_MULT)
+            self._prepared_surface = prepared
+            self._prepared_key = key
+        return self._prepared_surface
 
     def _intrinsic(self, max_w, max_h, scale):
         s = self._load()
@@ -115,26 +146,24 @@ class Image(Control):
         s = self._load()
         if s is None:
             return
-        if self.color is not None:
-            rgba = colors.parse_color(self.color)
-            key = (self._loaded_key, rgba)
-            if key != self._tinted_key:
-                self._tinted_surface = s.copy()
-                self._tinted_surface.fill(rgba, special_flags=pygame.BLEND_RGBA_MULT)
-                self._tinted_key = key
-            s = self._tinted_surface
+        tint = colors.parse_color(self.color) if self.color is not None else None
         _, _, w, h = self._rect
-        tw, th = int(w * r.scale), int(h * r.scale)
+        tw, th = round(w * r.scale), round(h * r.scale)
         if tw <= 0 or th <= 0:
             return
         sw, sh = s.get_size()
         if self.fit is BoxFit.CONTAIN and sw and sh:
             k = min(tw / sw, th / sh)
-            dw, dh = int(sw * k), int(sh * k)
-            s2 = pygame.transform.smoothscale(s, (dw, dh))
-            r.blit(s2, x + (w - dw / r.scale) / 2, y + (h - dh / r.scale) / 2)
+            dw, dh = max(1, round(sw * k)), max(1, round(sh * k))
+            dx, dy = x + (w - dw / r.scale) / 2, y + (h - dh / r.scale) / 2
         else:
-            r.blit(pygame.transform.smoothscale(s, (tw, th)), x, y)
+            dw, dh = tw, th
+            dx, dy = x, y
+        prepared = self._prepare(s, dw, dh, tint)
+        if getattr(r, "native_texture_scaling", False):
+            r.blit_cached_scaled(prepared, dx, dy, dw / r.scale, dh / r.scale)
+        else:
+            r.blit(prepared, dx, dy)
 
 
 class Card(Container):

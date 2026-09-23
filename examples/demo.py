@@ -1,10 +1,10 @@
 """Full Saturn demo showing the core controls together.
 
 Run with:
-    .venv/Scripts/python.exe examples/demo.py                     # SOFTWARE
-    .venv/Scripts/python.exe examples/demo.py --backend opengl    # OPENGL
+    .venv/Scripts/python.exe examples/demo.py                     # OPENGL
+    .venv/Scripts/python.exe examples/demo.py --backend vulkan    # VULKAN
 """
-import sys
+import argparse
 
 import saturn
 from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header, demo_panel
@@ -95,7 +95,14 @@ class Application:
 
 
 if __name__ == "__main__":
-    backend = saturn.Render.OPENGL if "--backend" in sys.argv and "opengl" in sys.argv \
-        else saturn.Render.SOFTWARE
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", choices=("opengl", "vulkan", "software"),
+                        default="opengl")
+    name = parser.parse_args().backend
+    backend = {
+        "opengl": saturn.Renderer.OPENGL,
+        "vulkan": saturn.Renderer.VULKAN,
+        "software": saturn.Renderer.SOFTWARE,
+    }[name]
     app = saturn.run(main=Application().create_window, backend=backend,
                  width=DEMO_WIDTH, height=DEMO_HEIGHT)
