@@ -1,26 +1,43 @@
 # OutlinedToggleButton
 
-Saturn 的 OutlinedToggleButton 公开 API。
+描边样式的切换按钮。
 
 [← API 索引](./README.md)
 
 源码：[`saturn/widgets/toggle_button.py`](../../saturn/widgets/toggle_button.py)（第 76 行）。
 
-**基类：** [ToggleButton](./ToggleButton.md)
+## 效果图
 
-## 构造
+![OutlinedToggleButton 控件的深色主题效果](../images/controls/OutlinedToggleButton.png)
+
+## 示例代码
+
+以下代码可从仓库根目录运行，呈现上图中的控件。
 
 ```python
-ft.OutlinedToggleButton(content=None, **kwargs)
+import saturn
+
+
+def main(page: saturn.Page):
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
+    page.padding = 40
+    page.add(saturn.OutlinedToggleButton("Filter", checked=True))
+    page.update()
+
+
+saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-### 参数
+**基类：** [ToggleButton](./ToggleButton.md)
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `content` | `—` | `None` |
-| `kwargs` | `—` | `额外关键字参数` |
+## 构造参数
 
----
+```python
+saturn.OutlinedToggleButton(content=None, **kwargs)
+```
 
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `content` | `—` | `None` | 要显示的文本或子控件。 |
+| `**kwargs` | `—` | `额外关键字参数` | 传给父类构造函数的关键字参数。 |

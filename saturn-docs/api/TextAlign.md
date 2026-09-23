@@ -1,6 +1,6 @@
 # TextAlign
 
-Saturn 的 TextAlign 公开 API。
+选择文本在可用宽度内的水平对齐方式。
 
 [← API 索引](./README.md)
 
@@ -19,6 +19,4 @@ Saturn 的 TextAlign 公开 API。
 | `START` | `start` |
 | `END` | `end` |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+在代码中通过成员名称使用，例如 `saturn.TextAlign.LEFT`。

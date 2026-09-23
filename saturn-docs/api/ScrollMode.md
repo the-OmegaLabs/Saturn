@@ -1,6 +1,6 @@
 # ScrollMode
 
-Saturn 的 ScrollMode 公开 API。
+选择滚动行为模式。
 
 [← API 索引](./README.md)
 
@@ -17,6 +17,4 @@ Saturn 的 ScrollMode 公开 API。
 | `HIDDEN` | `hidden` |
 | `ALWAYS` | `always` |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+在代码中通过成员名称使用，例如 `saturn.ScrollMode.NONE`。

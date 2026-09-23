@@ -1,6 +1,6 @@
 # LabelPosition
 
-Saturn 的 LabelPosition 公开 API。
+设置选择控件标签相对主体的位置。
 
 [← API 索引](./README.md)
 
@@ -15,6 +15,4 @@ Saturn 的 LabelPosition 公开 API。
 | `RIGHT` | `right` |
 | `LEFT` | `left` |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+在代码中通过成员名称使用，例如 `saturn.LabelPosition.RIGHT`。

@@ -11,9 +11,12 @@ import dataclasses
 import enum
 import inspect
 import re
+import textwrap
 from pathlib import Path
 
-import saturn as ft
+import saturn
+from control_examples import EXAMPLES
+from parameter_descriptions import describe
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,25 +50,128 @@ DESCRIPTIONS = {
     "Card": "带有表面和阴影的内容容器。",
     "ListView": "可滚动的控件列表。",
     "GestureDetector": "接收指针和手势事件。",
+    "Divider": "在相邻内容之间绘制一条分隔线。",
+    "ListItem": "展示一行带标题、辅助文字和前后插槽的列表内容。",
     "Button": "可响应点击的基础按钮。",
+    "ElevatedButton": "带有轻微阴影的按钮，适合普通操作。",
+    "FilledButton": "使用主题主色填充的高强调按钮。",
+    "FilledTonalButton": "使用柔和容器色填充的按钮。",
+    "OutlinedButton": "使用描边强调边界的按钮。",
+    "TextButton": "以文字呈现的低强调按钮。",
+    "IconButton": "以图标呈现的紧凑操作按钮。",
     "ExpressiveButton": "支持尺寸和形状变化的 Material Expressive 按钮。",
+    "ExpressiveIconButton": "支持 Expressive 尺寸和形状变化的图标按钮。",
+    "SplitButton": "把主操作和副操作分开的按钮。",
+    "ButtonGroup": "把多个按钮作为一个交互组排列。",
+    "ToggleButton": "可在选中与未选中状态间切换的按钮。",
+    "ElevatedToggleButton": "带有抬升表面的切换按钮。",
+    "FilledTonalToggleButton": "柔和填充样式的切换按钮。",
+    "OutlinedToggleButton": "描边样式的切换按钮。",
+    "FloatingActionButton": "用于突出页面主要操作的浮动按钮。",
+    "SmallFloatingActionButton": "小尺寸浮动操作按钮。",
+    "MediumFloatingActionButton": "中尺寸浮动操作按钮。",
+    "LargeFloatingActionButton": "大尺寸浮动操作按钮。",
+    "ExtendedFloatingActionButton": "同时显示图标与文字的浮动操作按钮。",
+    "FloatingToolbar": "以胶囊形表面容纳一组操作的浮动工具栏。",
+    "HorizontalFloatingToolbar": "横向排列操作的浮动工具栏。",
+    "VerticalFloatingToolbar": "纵向排列操作的浮动工具栏。",
+    "FloatingActionButtonMenu": "从浮动按钮展开多项操作的菜单。",
+    "FloatingActionButtonMenuItem": "浮动操作菜单中的一个可点击项目。",
     "TextField": "可编辑的文本输入框。",
+    "Checkbox": "允许独立勾选或取消勾选的输入控件。",
+    "Switch": "用于开关状态的滑动切换控件。",
+    "Radio": "一组互斥选项中的单个单选按钮。",
+    "RadioGroup": "管理多个 Radio 的单选值。",
     "Dropdown": "从选项列表中选择一个值。",
+    "Slider": "通过拖动滑块选择范围内的数值。",
     "AlertDialog": "在页面上显示模态对话框。",
     "SnackBar": "显示短暂的操作反馈。",
+    "ProgressBar": "以水平线条显示已知或不确定进度。",
+    "ProgressRing": "以圆环显示已知或不确定进度。",
+    "LoadingIndicator": "以动态形状展示正在进行的操作。",
+    "WavyProgressIndicator": "以波浪线条展示进度。",
+    "LinearWavyProgressIndicator": "线性的波浪进度指示器。",
+    "CircularWavyProgressIndicator": "环形的波浪进度指示器。",
     "FilePicker": "调用系统文件选择与保存对话框。",
     "Colors": "颜色名称集合，包含主题色与固定颜色。",
     "Icons": "Material 图标名称集合。",
     "Theme": "定义页面颜色与外观的主题值。",
     "MaterialExpressiveTheme": "Material Expressive 配色主题。",
+    "parse_color": "把颜色名称、十六进制值或颜色对象解析为 RGBA 数值。",
+    "DropdownOption": "下拉框的一个数据选项，由 Dropdown 显示。",
+    "Option": "DropdownOption 的简写名称，用来定义下拉选项。",
+    "FilePickerFile": "文件选择器返回的单个文件信息。",
+    "FilePickerFileType": "限定文件选择器可选文件的类型。",
+    "FilePickerResultEvent": "文件选择或保存操作完成时传入的结果事件。",
+    "FilePickerUploadEvent": "文件上传进度与错误信息事件。",
+    "FilePickerUploadFile": "上传文件时使用的目标地址与请求方式。",
+    "Alignment": "定义子控件在容器内的水平和垂直对齐位置。",
+    "Animation": "定义属性变化动画的时长和曲线。",
+    "AnimationCurve": "选择动画速度随时间变化的曲线。",
+    "Border": "分别定义四个方向的边框。",
+    "BorderRadius": "分别定义四个角的圆角半径。",
+    "BorderSide": "定义一条边框的宽度和颜色。",
+    "BoxFit": "选择图片在给定空间中的缩放与裁切方式。",
+    "BoxShadow": "定义控件阴影的扩展、模糊、颜色和偏移。",
+    "CrossAxisAlignment": "设置布局交叉轴上的子控件对齐方式。",
+    "Duration": "以毫秒等形式表示动画或等待时长。",
+    "FontWeight": "选择文字的字重。",
+    "KeyboardType": "声明文本框适合的输入键盘类型。",
+    "LabelPosition": "设置选择控件标签相对主体的位置。",
+    "MainAxisAlignment": "设置 Row 或 Column 主轴上的排列方式。",
+    "Margin": "定义控件外侧四个方向的留白。",
+    "Offset": "定义二维位移及其命中测试行为。",
+    "Padding": "定义控件内侧四个方向的留白。",
+    "ScrollMode": "选择滚动行为模式。",
+    "OutlineInputBorder": "配置表单输入框的描边外观。",
+    "Rotate": "定义控件的旋转角度和旋转中心。",
+    "Scale": "定义控件沿水平和垂直方向的缩放。",
+    "TextAlign": "选择文本在可用宽度内的水平对齐方式。",
+    "ThemeMode": "选择浅色、深色或跟随系统的主题模式。",
+    "TextOverflow": "选择文本超过可用空间时的处理方式。",
+    "TextStyle": "组合文字尺寸、字重、颜色和间距等样式。",
+    "Tooltip": "配置控件悬停或长按时显示的提示内容。",
+    "TooltipTriggerMode": "选择触发工具提示的交互方式。",
 }
 
-IMAGE_BY_CATEGORY = {
-    "布局与内容": "layout-demo.png",
-    "按钮与操作": "buttons-demo.png",
-    "输入与反馈": "inputs-demo.png",
+METHOD_DESCRIPTIONS = {
+    "add": "在页面或控件列表末尾加入子控件。",
+    "all": "用同一个值创建各方向一致的配置。",
+    "center": "创建位于中心位置的对齐值。",
+    "clean": "移除页面中的全部普通控件。",
+    "client_size_for_outer": "根据窗口外框尺寸换算客户区域尺寸。",
+    "close": "关闭窗口或展开的菜单。",
+    "destroy": "销毁原生窗口并释放资源。",
+    "draw": "请求绘制当前页面内容。",
+    "focus": "使控件获得输入焦点。",
+    "get_directory_path": "打开系统目录选择对话框。",
+    "handle_event": "处理传入的控件事件。",
+    "horizontal": "设置水平方向的两个值。",
+    "insert": "在指定位置插入子控件。",
+    "logical_point": "把物理坐标换算为逻辑坐标。",
+    "mark_dirty": "标记界面需要重新绘制。",
+    "none": "创建没有可见边框的配置。",
+    "only": "分别设置指定方向的值。",
+    "physical_size_for_logical": "把逻辑尺寸换算为物理像素尺寸。",
+    "pick_files": "打开系统文件选择对话框。",
+    "pointer_down": "处理指针按下事件。",
+    "pointer_move": "处理指针移动事件。",
+    "pointer_up": "处理指针松开事件。",
+    "pop_dialog": "关闭当前对话框或提示条。",
+    "remove": "从容器中移除指定控件。",
+    "remove_at": "按索引移除子控件。",
+    "run_until_closed": "持续处理窗口事件，直到窗口关闭。",
+    "save_file": "打开系统文件保存对话框。",
+    "scroll_to": "滚动到指定位置或按给定距离滚动。",
+    "show_dialog": "在页面上显示对话框或提示条。",
+    "start": "启动应用窗口与事件处理。",
+    "symmetric": "分别为水平和垂直方向设置对称值。",
+    "toggle": "切换展开与收起状态。",
+    "update": "请求重绘本控件及其变化。",
+    "upload": "将指定文件上传到给定地址。",
+    "vertical": "设置垂直方向的两个值。",
+    "zero": "创建四个方向均为零的配置。",
 }
-
 
 def markdown_code(value: object) -> str:
     return "`" + str(value).replace("`", "\\`") + "`"
@@ -129,12 +235,12 @@ def method_rows(obj: type) -> list[str]:
         except (TypeError, ValueError):
             signature = "(...)"
         detail = (inspect.getdoc(member) or "").splitlines()
-        summary = detail[0] if detail else "—"
+        summary = detail[0] if detail else METHOD_DESCRIPTIONS.get(name, "执行该方法对应的操作。")
         rows.append(f"| {markdown_code(name + signature)} | {summary.replace('|', '\\|')} |")
     return rows
 
 
-def parameter_rows(obj: object) -> list[str]:
+def parameter_rows(name: str, obj: object) -> list[str]:
     try:
         signature = inspect.signature(obj)
     except (TypeError, ValueError):
@@ -147,27 +253,47 @@ def parameter_rows(obj: object) -> list[str]:
         default = ("额外关键字参数" if param.kind is inspect.Parameter.VAR_KEYWORD else
                    "额外位置参数" if param.kind is inspect.Parameter.VAR_POSITIONAL else
                    "必填" if param.default is inspect.Signature.empty else repr(param.default))
-        rows.append(f"| {markdown_code(param.name)} | {markdown_code(annotation)} | {markdown_code(default)} |")
+        label = param.name
+        if param.kind is inspect.Parameter.VAR_POSITIONAL:
+            label = "*" + label
+        elif param.kind is inspect.Parameter.VAR_KEYWORD:
+            label = "**" + label
+        explanation = describe(name, param.name).replace("|", "\\|")
+        rows.append(f"| {markdown_code(label)} | {markdown_code(annotation)} | {markdown_code(default)} | {explanation} |")
     return rows
 
 
 def page_for(name: str, category: str) -> str:
-    obj = getattr(ft, name)
+    obj = getattr(saturn, name)
     relative, line = source_info(obj)
     doc = (getattr(obj, "__doc__", None) or "").splitlines()
     summary = DESCRIPTIONS.get(name) or (doc[0] if doc else f"Saturn 的 {name} 公开 API。")
     lines = [f"# {name}", "", summary, "", "[← API 索引](./README.md)", ""]
     if relative:
         source = f"../../{relative}"
-        lines += [f"源码：[\u0060{relative}\u0060]({source})" + (f"（第 {line} 行）" if line else "") + "。", ""]
+        lines += [f"源码：[{markdown_code(relative)}]({source})" + (f"（第 {line} 行）" if line else "") + "。", ""]
+
+    if name in EXAMPLES:
+        screenshot = f"../images/controls/{name}.png"
+        snippet = textwrap.indent(EXAMPLES[name], "    ")
+        lines += [
+            "## 效果图", "", f"![{name} 控件的深色主题效果]({screenshot})", "",
+            "## 示例代码", "", "以下代码可从仓库根目录运行，呈现上图中的控件。", "",
+            "```python", "import saturn", "", "", "def main(page: saturn.Page):",
+            "    page.theme_mode = saturn.ThemeMode.DARK",
+            "    page.bgcolor = saturn.Colors.SURFACE",
+            "    page.padding = 40", snippet, "    page.update()", "",
+            "", "saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)",
+            "```", "",
+        ]
 
     if inspect.isclass(obj):
-        bases = [base.__name__ for base in obj.__bases__ if base is not object]
+        bases = [base.__name__ for base in obj.__bases__ if base is not object and base.__name__ != name]
         if bases:
-            links = [f"[{base}](./{base}.md)" if base in ft.__all__ and base != name else markdown_code(base) for base in bases]
+            links = [f"[{base}](./{base}.md)" if base in saturn.__all__ and base != name else markdown_code(base) for base in bases]
             lines += ["**基类：** " + "、".join(links), ""]
         if obj.__name__ != name:
-            lines += [f"公开名称 `ft.{name}` 指向实现类 `{obj.__name__}`。", ""]
+            lines += [f"公开名称 `saturn.{name}` 指向实现类 `{obj.__name__}`。", ""]
         if issubclass(obj, enum.Enum):
             members = list(obj.__members__.items())
             lines += ["## 成员", ""]
@@ -177,61 +303,51 @@ def page_for(name: str, category: str) -> str:
             lines += ["| 名称 | 值 |", "| --- | --- |"]
             lines += [f"| {markdown_code(key)} | {markdown_code(item.value)} |" for key, item in members]
             lines.append("")
+            if members:
+                lines += [f"在代码中通过成员名称使用，例如 `saturn.{name}.{members[0][0]}`。", ""]
+            return "\n".join(lines)
         elif name in ("Colors", "Icons"):
             names = [key for key in vars(obj) if key.isupper()]
             lines += ["## 可用名称", "", f"共 {len(names)} 个名称。示例：" + "、".join(markdown_code(key) for key in names[:16]) + "。", "", "完整列表见上方源码；颜色值会根据主题解析。" if name == "Colors" else "完整图标列表见上方源码。", ""]
         else:
-            try:
-                signature = str(inspect.signature(obj))
-                lines += ["## 构造", "", "```python", f"ft.{name}{signature}", "```", ""]
-            except (TypeError, ValueError):
-                pass
             if name in ("App", "Page", "Window"):
-                lines += ["> 这些对象通常由 `ft.run()` 创建和传入，应用代码无需直接构造。", ""]
-            params = parameter_rows(obj)
-            if params:
-                lines += ["### 参数", "", "| 参数 | 类型标注 | 默认值 |", "| --- | --- | --- |", *params, ""]
-            attributes = own_attributes(obj)
-            if attributes:
-                events = [value for value in attributes if value.startswith("on_")]
-                values = [value for value in attributes if not value.startswith("on_")]
-                if values:
-                    lines += ["## 本类属性", "", "、".join(markdown_code(item) for item in values) + "。", ""]
-                if events:
-                    lines += ["## 事件回调", "", "、".join(markdown_code(item) for item in events) + "。", ""]
+                lines += ["> 这些对象通常由 `saturn.run()` 创建和传入，应用代码无需直接构造。", ""]
             methods = method_rows(obj)
             if methods:
                 lines += ["## 本类公开方法", "", "| 方法 | 说明 |", "| --- | --- |", *methods, ""]
-            if "__init__" not in obj.__dict__:
-                parent = next((base for base in obj.__mro__[1:] if "__init__" in base.__dict__), None)
-                if parent and parent.__name__ in ft.__all__ and parent.__name__ != name:
-                    lines += [f"构造参数继承自 [{parent.__name__}](./{parent.__name__}.md)。", ""]
+    try:
+        signature = str(inspect.signature(obj))
+    except (TypeError, ValueError):
+        signature = "(...)"
+    heading = "构造参数" if inspect.isclass(obj) else "调用参数"
+    lines += [f"## {heading}", "", "```python", f"saturn.{name}{signature}", "```", ""]
+    params = parameter_rows(name, obj)
+    if params:
+        lines += ["| 参数 | 类型标注 | 默认值 | 作用 |", "| --- | --- | --- | --- |", *params, ""]
+        if inspect.isclass(obj) and "**base" in signature:
+            lines += ["`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。", ""]
     else:
-        try:
-            lines += ["## 调用", "", "```python", f"ft.{name}{inspect.signature(obj)}", "```", ""]
-        except (TypeError, ValueError):
-            pass
-        params = parameter_rows(obj)
-        if params:
-            lines += ["| 参数 | 类型标注 | 默认值 |", "| --- | --- | --- |", *params, ""]
-
-    screenshot = IMAGE_BY_CATEGORY.get(category)
-    if screenshot and name in {"Row", "Column", "Container", "Stack", "Button", "FilledButton", "TextField", "Checkbox", "Switch", "Slider", "Dropdown"}:
-        lines += ["## 效果预览", "", f"![{category} 展示](../../shots/{screenshot})", ""]
-    lines += ["---", "", "本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。", ""]
+        lines += ["无需传入参数。", ""]
     return "\n".join(lines)
 
 
 def main() -> None:
     API.mkdir(parents=True, exist_ok=True)
     listed = {name for names in CATEGORIES.values() for name in names.split()}
-    public = set(ft.__all__)
+    public = set(saturn.__all__)
     if listed != public:
         raise SystemExit(f"Catalog mismatch: missing={sorted(public - listed)}, extra={sorted(listed - public)}")
+    visual = set().union(*(set(CATEGORIES[key].split()) for key in
+                           ("布局与内容", "按钮与操作", "输入与反馈"))) - {"DropdownOption", "Option"}
+    if set(EXAMPLES) != visual:
+        raise SystemExit(f"Control examples mismatch: missing={sorted(visual - set(EXAMPLES))}, extra={sorted(set(EXAMPLES) - visual)}")
+    missing_images = [name for name in EXAMPLES if not (OUT / "images" / "controls" / f"{name}.png").exists()]
+    if missing_images:
+        raise SystemExit(f"Control images missing: {missing_images}")
     for category, names in CATEGORIES.items():
         for name in names.split():
             (API / f"{name}.md").write_text(page_for(name, category), encoding="utf-8")
-    lines = ["# Saturn API 索引", "", "[← 文档首页](../README.md) · [截图画廊](../gallery.md)", "", f"按仓库当前 `saturn.__all__` 整理，共 {len(public)} 个公开符号；一符号一篇 Markdown。签名、属性和枚举成员来自 Saturn 源码。", ""]
+    lines = ["# Saturn API 索引", "", "[← 文档首页](../README.md) · [截图画廊](../gallery.md)", "", f"按仓库当前 `saturn.__all__` 整理，共 {len(public)} 个公开符号；一符号一篇 Markdown。可视控件页依次展示简介、深色效果图、完整示例和逐项说明的构造参数。非可视类型与服务页记录其实际接口。", ""]
     for category, names in CATEGORIES.items():
         lines += [f"## {category}", "", " · ".join(f"[{name}](./{name}.md)" for name in names.split()), ""]
     lines += ["## 与 Flet 知识库的关系", "", "分类方式参考仓库本地 `flet-skill/`，但这里仅记录 Saturn 实际导出的符号。Flet 知识库列出的其他控件、服务或属性，不代表 Saturn 已实现。", ""]

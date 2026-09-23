@@ -1,32 +1,47 @@
 # FloatingActionButtonMenuItem
 
-Saturn 的 FloatingActionButtonMenuItem 公开 API。
+浮动操作菜单中的一个可点击项目。
 
 [← API 索引](./README.md)
 
 源码：[`saturn/widgets/floating.py`](../../saturn/widgets/floating.py)（第 139 行）。
 
-**基类：** [ExpressiveButton](./ExpressiveButton.md)
+## 效果图
 
-## 构造
+![FloatingActionButtonMenuItem 控件的深色主题效果](../images/controls/FloatingActionButtonMenuItem.png)
+
+## 示例代码
+
+以下代码可从仓库根目录运行，呈现上图中的控件。
 
 ```python
-ft.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base)
+import saturn
+
+
+def main(page: saturn.Page):
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
+    page.padding = 40
+    page.add(saturn.FloatingActionButtonMenu([saturn.FloatingActionButtonMenuItem("Upload", icon=saturn.Icons.UPLOAD)], expanded=True))
+    page.update()
+
+
+saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-### 参数
+**基类：** [ExpressiveButton](./ExpressiveButton.md)
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `content` | `—` | `必填` |
-| `icon` | `—` | `None` |
-| `on_click` | `—` | `None` |
-| `base` | `—` | `额外关键字参数` |
+## 构造参数
 
-## 事件回调
+```python
+saturn.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base)
+```
 
-`on_action`。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `content` | `—` | `必填` | 要显示的文本或子控件。 |
+| `icon` | `—` | `None` | 要绘制的图标。 |
+| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
+| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。

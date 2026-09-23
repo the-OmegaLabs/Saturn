@@ -1,30 +1,20 @@
 # FilePickerUploadFile
 
-FilePickerUploadFile(upload_url: 'str', method: 'str' = 'PUT', id: 'int | None' = None, name: 'str | None' = None)
+上传文件时使用的目标地址与请求方式。
 
 [← API 索引](./README.md)
 
 源码：[`saturn/services.py`](../../saturn/services.py)（第 29 行）。
 
-## 构造
+## 构造参数
 
 ```python
-ft.FilePickerUploadFile(upload_url: 'str', method: 'str' = 'PUT', id: 'int | None' = None, name: 'str | None' = None) -> None
+saturn.FilePickerUploadFile(upload_url: 'str', method: 'str' = 'PUT', id: 'int | None' = None, name: 'str | None' = None) -> None
 ```
 
-### 参数
-
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `upload_url` | `str` | `必填` |
-| `method` | `str` | `'PUT'` |
-| `id` | `int | None` | `None` |
-| `name` | `str | None` | `None` |
-
-## 本类属性
-
-`id`、`method`、`name`、`upload_url`。
-
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `upload_url` | `str` | `必填` | 文件上传的目标地址。 |
+| `method` | `str` | `'PUT'` | 触发操作的方法名称。 |
+| `id` | `int | None` | `None` | 文件或对象的标识值。 |
+| `name` | `str | None` | `None` | 对象、文件或资源的名称。 |

@@ -1,21 +1,17 @@
 # parse_color
 
-Convert any ColorValue to an (r, g, b, a) tuple.
+把颜色名称、十六进制值或颜色对象解析为 RGBA 数值。
 
 [← API 索引](./README.md)
 
 源码：[`saturn/colors.py`](../../saturn/colors.py)（第 161 行）。
 
-## 调用
+## 调用参数
 
 ```python
-ft.parse_color(value) -> 'tuple[int, int, int, int]'
+saturn.parse_color(value) -> 'tuple[int, int, int, int]'
 ```
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `value` | `—` | `必填` |
-
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `value` | `—` | `必填` | 控件或数据对象的当前值。 |

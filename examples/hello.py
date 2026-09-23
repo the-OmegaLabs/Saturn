@@ -1,20 +1,21 @@
-import saturn as ft
+import saturn
 from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header
 
 
 class Application:
-    def create_window(self, page: ft.Page):
+    def create_window(self, page: saturn.Page):
         page.title = "saturn hello"
+        page.theme_mode = saturn.ThemeMode.DARK
         page.bgcolor = "#1c1b1f"
         page.padding = 24
         page.add(
             brand_header("Hello Demo"),
-            ft.Text("Hello from saturn!", size=32, color="#e6e1e5"),
+            saturn.Text("Hello from saturn!", size=32, color="#e6e1e5"),
         )
         page.update()
 
 
 if __name__ == "__main__":
-    app = ft.run(main=Application().create_window, backend=ft.Render.SOFTWARE,
+    app = saturn.run(main=Application().create_window, backend=saturn.Render.SOFTWARE,
            width=DEMO_WIDTH, height=DEMO_HEIGHT)
     print("window closed, app returned:", type(app).__name__)

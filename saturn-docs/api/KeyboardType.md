@@ -1,6 +1,6 @@
 # KeyboardType
 
-Saturn 的 KeyboardType 公开 API。
+声明文本框适合的输入键盘类型。
 
 [← API 索引](./README.md)
 
@@ -21,6 +21,4 @@ Saturn 的 KeyboardType 公开 API。
 | `PASSWORD` | `visiblePassword` |
 | `NONE` | `none` |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+在代码中通过成员名称使用，例如 `saturn.KeyboardType.TEXT`。

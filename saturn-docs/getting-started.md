@@ -14,32 +14,33 @@ uv run python examples/hello.py
 ## 第一个窗口
 
 ```python
-import saturn as ft
+import saturn
 
 
-def main(page: ft.Page):
+def main(page: saturn.Page):
     page.title = "Hello Saturn"
+    page.theme_mode = saturn.ThemeMode.DARK
     page.padding = 24
 
-    message = ft.Text("你好，Saturn", size=24)
+    message = saturn.Text("你好，Saturn", size=24)
 
-    def clicked(event: ft.ControlEvent):
+    def clicked(event: saturn.ControlEvent):
         message.value = "按钮已点击"
         message.update()
 
-    page.add(message, ft.FilledButton("点击我", on_click=clicked))
+    page.add(message, saturn.FilledButton("点击我", on_click=clicked))
     page.update()
 
 
-ft.run(main, backend=ft.Render.SOFTWARE)
+saturn.run(main, backend=saturn.Render.SOFTWARE)
 ```
 
-`ft.run()` 创建窗口并把 [`Page`](./api/Page.md) 交给 `main`。通过 `page.add()` 加入控件；修改控件后调用 `control.update()` 或 `page.update()` 请求重绘。回调中的 `event.control` 指向触发事件的控件。
+`saturn.run()` 创建窗口并把 [`Page`](./api/Page.md) 交给 `main`。通过 `page.add()` 加入控件；修改控件后调用 `control.update()` 或 `page.update()` 请求重绘。回调中的 `event.control` 指向触发事件的控件。
 
 ## 切换绘制后端
 
 ```python
-ft.run(main, backend=ft.Render.OPENGL)
+saturn.run(main, backend=saturn.Render.OPENGL)
 ```
 
 也可在省略 `backend` 时设置环境变量 `SATURN_BACKEND`。`Render.VULKAN` 已导出；具体可用性取决于本机驱动与当前实现。

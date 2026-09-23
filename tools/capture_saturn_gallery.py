@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-import saturn as ft
+import saturn
 from examples.demo_common import DEMO_HEIGHT, DEMO_WIDTH
 
 
@@ -24,8 +24,7 @@ VARIANTS = {
     "layout": ("layout_demo.py", "layout-demo.png", []),
     "text": ("text_demo.py", "text-demo.png", []),
     "widgets": ("widgets_demo.py", "widgets-demo.png", []),
-    "light": ("expressive_demo.py", "expressive-light.png", []),
-    "dark": ("expressive_demo.py", "expressive-dark.png", ["--dark"]),
+    "dark": ("expressive_demo.py", "expressive-dark.png", []),
     "motion": ("expressive_motion_demo.py", "expressive-motion.png", []),
     "menu": ("expressive_motion_demo.py", "expressive-menu.png", ["--menu"]),
 }
@@ -43,12 +42,11 @@ def main() -> None:
     example = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(example)
     sys.argv[:] = [str(path), *flags]
-    entry = (example.main if variant in {"light", "dark", "motion", "menu"}
+    entry = (example.main if variant in {"dark", "motion", "menu"}
              else example.Application().create_window)
 
-    def capture(page: ft.Page) -> None:
-        page.theme_mode = (ft.ThemeMode.DARK if variant in {"dark", "hello"}
-                           else ft.ThemeMode.LIGHT)
+    def capture(page: saturn.Page) -> None:
+        page.theme_mode = saturn.ThemeMode.DARK
         entry(page)
         time.sleep(0.8)
         destination = ROOT / "shots" / image_name
@@ -56,8 +54,8 @@ def main() -> None:
         print(destination)
         page.window.destroy()
 
-    ft.run(capture, backend=ft.Render.SOFTWARE,
-           width=DEMO_WIDTH, height=DEMO_HEIGHT)
+    saturn.run(capture, backend=saturn.Render.SOFTWARE,
+               width=DEMO_WIDTH, height=DEMO_HEIGHT)
 
 
 if __name__ == "__main__":

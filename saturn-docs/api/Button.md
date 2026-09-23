@@ -6,43 +6,56 @@
 
 源码：[`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py)（第 291 行）。
 
-**基类：** `Button`
+## 效果图
 
-公开名称 `ft.Button` 指向实现类 `_ConcreteButton`。
+![Button 控件的深色主题效果](../images/controls/Button.png)
 
-## 构造
+## 示例代码
+
+以下代码可从仓库根目录运行，呈现上图中的控件。
 
 ```python
-ft.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, expressive=False, size=None, shape='round', **base)
+import saturn
+
+
+def main(page: saturn.Page):
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
+    page.padding = 40
+    page.add(saturn.Button("Open project", icon=saturn.Icons.FOLDER_OPEN))
+    page.update()
+
+
+saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-### 参数
+公开名称 `saturn.Button` 指向实现类 `_ConcreteButton`。
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `content` | `—` | `None` |
-| `icon` | `—` | `None` |
-| `icon_color` | `—` | `None` |
-| `color` | `—` | `None` |
-| `bgcolor` | `—` | `None` |
-| `elevation` | `float` | `1` |
-| `style` | `—` | `None` |
-| `on_click` | `—` | `None` |
-| `on_hover` | `—` | `None` |
-| `on_long_press` | `—` | `None` |
-| `on_focus` | `—` | `None` |
-| `on_blur` | `—` | `None` |
-| `autofocus` | `—` | `False` |
-| `url` | `—` | `None` |
-| `expressive` | `—` | `False` |
-| `size` | `—` | `None` |
-| `shape` | `—` | `'round'` |
-| `base` | `—` | `额外关键字参数` |
+## 构造参数
 
-## 效果预览
+```python
+saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, expressive=False, size=None, shape='round', **base)
+```
 
-![按钮与操作 展示](../../shots/buttons-demo.png)
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `content` | `—` | `None` | 按钮上显示的文字或控件。 |
+| `icon` | `—` | `None` | 要绘制的图标。 |
+| `icon_color` | `—` | `None` | 图标的前景颜色。 |
+| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
+| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
+| `elevation` | `float` | `1` | 表面高度，对应阴影的视觉强度。 |
+| `style` | `—` | `None` | 附加的按钮样式配置。 |
+| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
+| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
+| `on_long_press` | `—` | `None` | 长按控件时调用的回调。 |
+| `on_focus` | `—` | `None` | 控件获得焦点时调用的回调。 |
+| `on_blur` | `—` | `None` | 控件失去焦点时调用的回调。 |
+| `autofocus` | `—` | `False` | 页面打开时是否尝试自动获得焦点。 |
+| `url` | `—` | `None` | 点击按钮时打开的目标地址。 |
+| `expressive` | `—` | `False` | 是否启用 Expressive 尺寸与形状行为。 |
+| `size` | `—` | `None` | 文字、图标或控件的尺寸等级。 |
+| `shape` | `—` | `'round'` | 按钮的基础形状。 |
+| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。

@@ -11,8 +11,8 @@ Saturn 是面向 Python 桌面应用的轻量 UI 框架。这套文档按仓库�
 | 入口 | 适合做什么 |
 | --- | --- |
 | [五分钟上手](./getting-started.md) | 安装、运行第一个窗口、响应事件 |
-| [API 索引](./api/README.md) | 查阅全部 99 个公开符号的签名、属性和方法 |
-| [截图画廊](./gallery.md) | 观赏布局、按钮、输入、主题与动态组件 |
+| [API 索引](./api/README.md) | 逐个查看控件介绍、独立效果图、代码与构造参数 |
+| [截图画廊](./gallery.md) | 观赏深色主题下的布局、按钮、输入与动态组件 |
 | [标志设计](./branding.md) | 查看经典标志与透明版的使用方式 |
 | [Flet 对照与范围](./flet-mapping.md) | 了解命名对应关系和已覆盖范围 |
 | [Expressive 组件](../docs/expressive.md) | 查看 Expressive 实现说明和示例 |

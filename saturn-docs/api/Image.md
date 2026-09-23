@@ -6,28 +6,43 @@
 
 源码：[`saturn/widgets/basic.py`](../../saturn/widgets/basic.py)（第 71 行）。
 
-**基类：** [Control](./Control.md)
+## 效果图
 
-## 构造
+![Image 控件的深色主题效果](../images/controls/Image.png)
+
+## 示例代码
+
+以下代码可从仓库根目录运行，呈现上图中的控件。
 
 ```python
-ft.Image(src=None, *, fit=None, border_radius=None, color=None, **base)
+import saturn
+
+
+def main(page: saturn.Page):
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
+    page.padding = 40
+    page.add(saturn.Image("examples/assets/test_img.png", width=300, height=150, border_radius=12))
+    page.update()
+
+
+saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-### 参数
+**基类：** [Control](./Control.md)
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `src` | `—` | `None` |
-| `fit` | `—` | `None` |
-| `border_radius` | `—` | `None` |
-| `color` | `—` | `None` |
-| `base` | `—` | `额外关键字参数` |
+## 构造参数
 
-## 本类属性
+```python
+saturn.Image(src=None, *, fit=None, border_radius=None, color=None, **base)
+```
 
-`border_radius`、`color`、`fit`、`src`。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `src` | `—` | `None` | 图片来源，可为本地路径、字节数据或 data URI。 |
+| `fit` | `—` | `None` | 图片在给定尺寸内的缩放和裁切方式。 |
+| `border_radius` | `—` | `None` | 边框或背景的圆角半径。 |
+| `color` | `—` | `None` | 可选的图片着色颜色，会与原像素相乘。 |
+| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。

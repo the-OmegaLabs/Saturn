@@ -1,6 +1,6 @@
 # DropdownOption
 
-Options hold key/text data; the Dropdown renders them as a menu.
+下拉框的一个数据选项，由 Dropdown 显示。
 
 [← API 索引](./README.md)
 
@@ -8,25 +8,17 @@ Options hold key/text data; the Dropdown renders them as a menu.
 
 **基类：** [Control](./Control.md)
 
-## 构造
+## 构造参数
 
 ```python
-ft.DropdownOption(key=None, *, text=None, content=None, **base)
+saturn.DropdownOption(key=None, *, text=None, content=None, **base)
 ```
 
-### 参数
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `key` | `—` | `None` | 用于定位控件或服务的键。 |
+| `text` | `—` | `None` | 显示在控件上的文字。 |
+| `content` | `—` | `None` | 要显示的文本或子控件。 |
+| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `key` | `—` | `None` |
-| `text` | `—` | `None` |
-| `content` | `—` | `None` |
-| `base` | `—` | `额外关键字参数` |
-
-## 本类属性
-
-`content`、`key`、`text`。
-
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。

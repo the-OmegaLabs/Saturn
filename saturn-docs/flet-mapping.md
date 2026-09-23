@@ -6,7 +6,7 @@
 
 | 熟悉的 Flet 概念 | Saturn 入口 | 当前用途 |
 | --- | --- | --- |
-| `ft.run()`、`Page` | [run](./api/run.md)、[Page](./api/Page.md) | 创建窗口和页面、添加控件 |
+| 应用入口 `run()`、`Page` | [run](./api/run.md)、[Page](./api/Page.md) | 创建窗口和页面、添加控件 |
 | `Row`、`Column`、`Container` | [布局类](./api/README.md#布局与内容) | 排列和装饰控件 |
 | `Text`、`Icon`、`Image` | [内容类](./api/README.md#布局与内容) | 显示文本、图标、图片 |
 | `Button` 与按钮变体 | [按钮类](./api/README.md#按钮与操作) | 常规操作和 Expressive 操作 |

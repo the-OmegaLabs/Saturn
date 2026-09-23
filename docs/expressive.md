@@ -17,25 +17,26 @@
 ## 示例
 
 ```python
-import saturn as ft
+import saturn
 
 def main(page):
-    page.theme = ft.MaterialExpressiveTheme()
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.theme = saturn.MaterialExpressiveTheme()
     page.add(
-        ft.LoadingIndicator(contained=True),
-        ft.WavyProgressIndicator(.6),
-        ft.FloatingToolbar(ft.IconButton(ft.Icons.EDIT), ft.IconButton(ft.Icons.SHARE)),
-        ft.FloatingActionButtonMenu([
-            ft.FloatingActionButtonMenuItem("Create", icon=ft.Icons.ADD,
+        saturn.LoadingIndicator(contained=True),
+        saturn.WavyProgressIndicator(.6),
+        saturn.FloatingToolbar(saturn.IconButton(saturn.Icons.EDIT), saturn.IconButton(saturn.Icons.SHARE)),
+        saturn.FloatingActionButtonMenu([
+            saturn.FloatingActionButtonMenuItem("Create", icon=saturn.Icons.ADD,
                                            on_click=lambda e: print("create")),
         ]),
     )
 
-ft.run(main)
+saturn.run(main)
 ```
 
 - 基础展板：`uv run python examples/expressive_demo.py`。
-- 动画展板：`uv run python examples/expressive_motion_demo.py`；可加 `--dark`、`--menu`、`--pressed`。
+- 动画展板：`uv run python examples/expressive_motion_demo.py`；可加 `--menu`、`--pressed` 查看不同交互状态。
 - 回归检查：`uv run python -m tests.expressive_checks`。
 - 过渡性能回放：`uv run python -m tests.floating_perf software` 或 `opengl`；分别报告首次与缓存命中后的帧耗时，不包含显示同步等待。
 

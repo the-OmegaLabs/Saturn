@@ -61,12 +61,12 @@ If you're looking to build a **web application**, [use Flet instead](https://fle
   </tr>
   <tr>
     <td align="center">
-      <strong>Expressive · Light</strong><br>
-      <img src="./shots/expressive-light.png" width="440" alt="Expressive controls with light theme">
+      <strong>Expressive</strong><br>
+      <img src="./shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
     </td>
     <td align="center">
-      <strong>Expressive · Dark</strong><br>
-      <img src="./shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
+      <strong>Demo</strong><br>
+      <img src="./shots/demo.png" width="440" alt="Saturn controls with dark theme">
     </td>
   </tr>
   <tr>
@@ -124,19 +124,20 @@ python -m pip install -e .
 ## Quick start
 
 ```python
-import saturn as ft
+import saturn
 
 
-def main(page: ft.Page):
+def main(page: saturn.Page):
     page.title = "Hello Saturn"
-    page.bgcolor = ft.Colors.SURFACE
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
     page.padding = 24
 
-    message = ft.Text(
+    message = saturn.Text(
         "Hello from Saturn!",
         size=28,
-        weight=ft.FontWeight.BOLD,
-        color=ft.Colors.ON_SURFACE,
+        weight=saturn.FontWeight.BOLD,
+        color=saturn.Colors.ON_SURFACE,
     )
 
     def handle_click(e):
@@ -145,16 +146,16 @@ def main(page: ft.Page):
 
     page.add(
         message,
-        ft.FilledButton(
+        saturn.FilledButton(
             "Click me",
-            icon=ft.Icons.AUTO_AWESOME,
+            icon=saturn.Icons.AUTO_AWESOME,
             on_click=handle_click,
         ),
     )
     page.update()
 
 
-ft.run(main)
+saturn.run(main)
 ```
 Controls are mutable. After changing a control's state, call `control.update()` or `page.update()` to schedule a redraw.
 
@@ -172,10 +173,10 @@ Select a renderer when starting the application:
 
 ```python
 # Portable CPU renderer
-ft.run(main, backend=ft.Render.SOFTWARE)
+saturn.run(main, backend=saturn.Render.SOFTWARE)
 
 # GPU-accelerated renderer
-ft.run(main, backend=ft.Render.OPENGL)
+saturn.run(main, backend=saturn.Render.OPENGL)
 ```
 
 The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:

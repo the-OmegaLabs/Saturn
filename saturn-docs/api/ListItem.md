@@ -1,48 +1,59 @@
 # ListItem
 
-An interactive or passive M3 Expressive list row.
+展示一行带标题、辅助文字和前后插槽的列表内容。
 
 [← API 索引](./README.md)
 
 源码：[`saturn/widgets/list_item.py`](../../saturn/widgets/list_item.py)（第 30 行）。
 
-**基类：** [Control](./Control.md)
+## 效果图
 
-## 构造
+![ListItem 控件的深色主题效果](../images/controls/ListItem.png)
+
+## 示例代码
+
+以下代码可从仓库根目录运行，呈现上图中的控件。
 
 ```python
-ft.ListItem(content=None, *, headline=None, leading=None, trailing=None, overline=None, supporting=None, selected=False, container_color=None, selected_container_color=None, content_color=None, selected_content_color=None, border_radius=None, on_click=None, on_hover=None, on_long_press=None, **base)
+import saturn
+
+
+def main(page: saturn.Page):
+    page.theme_mode = saturn.ThemeMode.DARK
+    page.bgcolor = saturn.Colors.SURFACE
+    page.padding = 40
+    page.add(saturn.ListItem("Your library", supporting="24 saved items", leading=saturn.Icon(saturn.Icons.FOLDER), width=400))
+    page.update()
+
+
+saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-### 参数
+**基类：** [Control](./Control.md)
 
-| 参数 | 类型标注 | 默认值 |
-| --- | --- | --- |
-| `content` | `—` | `None` |
-| `headline` | `—` | `None` |
-| `leading` | `—` | `None` |
-| `trailing` | `—` | `None` |
-| `overline` | `—` | `None` |
-| `supporting` | `—` | `None` |
-| `selected` | `—` | `False` |
-| `container_color` | `—` | `None` |
-| `selected_container_color` | `—` | `None` |
-| `content_color` | `—` | `None` |
-| `selected_content_color` | `—` | `None` |
-| `border_radius` | `—` | `None` |
-| `on_click` | `—` | `None` |
-| `on_hover` | `—` | `None` |
-| `on_long_press` | `—` | `None` |
-| `base` | `—` | `额外关键字参数` |
+## 构造参数
 
-## 本类属性
+```python
+saturn.ListItem(content=None, *, headline=None, leading=None, trailing=None, overline=None, supporting=None, selected=False, container_color=None, selected_container_color=None, content_color=None, selected_content_color=None, border_radius=None, on_click=None, on_hover=None, on_long_press=None, **base)
+```
 
-`border_radius`、`container_color`、`content_color`、`headline`、`leading`、`overline`、`selected`、`selected_container_color`、`selected_content_color`、`supporting`、`trailing`。
+| 参数 | 类型标注 | 默认值 | 作用 |
+| --- | --- | --- | --- |
+| `content` | `—` | `None` | 列表项的主要显示内容。 |
+| `headline` | `—` | `None` | 列表项中最醒目的主标题。 |
+| `leading` | `—` | `None` | 放在主要内容前面的控件或区域。 |
+| `trailing` | `—` | `None` | 放在主要内容后面的控件或区域。 |
+| `overline` | `—` | `None` | 列表项标题上方的小字。 |
+| `supporting` | `—` | `None` | 列表项标题下方的辅助说明。 |
+| `selected` | `—` | `False` | 列表项或图标按钮当前是否选中。 |
+| `container_color` | `—` | `None` | 列表项或容器在普通状态下的背景色。 |
+| `selected_container_color` | `—` | `None` | 列表项选中时的背景色。 |
+| `content_color` | `—` | `None` | 列表项内容在普通状态下的前景色。 |
+| `selected_content_color` | `—` | `None` | 列表项选中时的前景色。 |
+| `border_radius` | `—` | `None` | 边框或背景的圆角半径。 |
+| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
+| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
+| `on_long_press` | `—` | `None` | 长按控件时调用的回调。 |
+| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
 
-## 事件回调
-
-`on_click`、`on_hover`、`on_long_press`。
-
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。

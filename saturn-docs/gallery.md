@@ -4,7 +4,7 @@
 
 以下图片来自仓库中的 Saturn 示例。点击对应示例源码，可在本机运行并观察交互效果。
 
-所有示例窗口统一为 960 × 800；每个标题前使用透明背景的经典 Saturn 标志，颜色随主题变化。
+所有示例窗口统一为 960 × 800，并使用深色主题；每个标题前使用透明背景的经典 Saturn 标志。
 
 ## 基础组件
 
@@ -48,9 +48,7 @@
 
 [Expressive 示例](../examples/expressive_demo.py) · [ExpressiveButton](./api/ExpressiveButton.md) · [MaterialExpressiveTheme](./api/MaterialExpressiveTheme.md)
 
-| 浅色 | 深色 |
-| --- | --- |
-| ![Expressive 浅色](../shots/expressive-light.png) | ![Expressive 深色](../shots/expressive-dark.png) |
+![Expressive 深色主题](../shots/expressive-dark.png)
 
 ### 动态与浮动菜单
 

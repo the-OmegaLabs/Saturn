@@ -1,6 +1,6 @@
 # MainAxisAlignment
 
-Saturn 的 MainAxisAlignment 公开 API。
+设置 Row 或 Column 主轴上的排列方式。
 
 [← API 索引](./README.md)
 
@@ -19,6 +19,4 @@ Saturn 的 MainAxisAlignment 公开 API。
 | `SPACE_AROUND` | `spaceAround` |
 | `SPACE_EVENLY` | `spaceEvenly` |
 
----
-
-本页依据仓库当前公开 API 与源码生成。继承成员请查阅基类；参数表中的 `**base` 会传给基类。
+在代码中通过成员名称使用，例如 `saturn.MainAxisAlignment.START`。
