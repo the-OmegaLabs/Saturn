@@ -220,6 +220,8 @@ ft.run(main)
 
 WOFF2 is decoded on first use and cached as a native font. Variable WOFF2 fonts use the existing weight selection and glyph fallback paths. A local font file path can also be passed directly as `font_family`.
 
+The bundled Inter and Noto Sans SC families ship as WOFF2. The Chinese fallback is decoded only when a character needs it; common regular and bold weights retain their prebuilt instances.
+
 ## Examples
 
 | Example | Description |

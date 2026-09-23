@@ -38,9 +38,12 @@ import pygame.freetype as _freetype
 # bundled UI fonts (SIL OFL 1.1 — see saturn/assets/OFL.txt)
 # DEFAULT = Inter (variable; real weights via runtime instancing). CJK
 # fallback = Noto Sans SC (variable, same mechanism). Italic = real Inter Italic.
-INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.ttf"
-INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.ttf"
-NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.ttf"
+INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.woff2"
+INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.woff2"
+INTER_BOLD = Path(__file__).parent / "assets" / "Inter-Bold.woff2"
+NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.woff2"
+NOTO_REGULAR = NOTO.parent / "NotoSansSC-Regular.woff2"
+NOTO_BOLD = NOTO.parent / "NotoSansSC-Bold.woff2"
 
 # CJK-capable system fonts (extra fallback chain; windows/mac/linux picklist)
 CJK_FAMILY = "microsoftyahei,msyh,pingfangsc,hiraginosansgb,notosanscjk,wqymicrohei,simhei"
@@ -49,11 +52,7 @@ _CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
 # pre-instanced hot-path weights shipped with the framework: zero instancing
 # on a cold start for 400/700 text (Inter@400 needs none — its fvar default
 # IS 400; Noto's default master is 100/Thin and MUST be instanced or static)
-_STATIC_WEIGHTS: dict[str, dict[int, str]] = {
-    str(INTER): {700: str(INTER.parent / "Inter-Bold.ttf")},
-    str(NOTO): {400: str(NOTO.parent / "NotoSansSC-Regular.ttf"),
-                700: str(NOTO.parent / "NotoSansSC-Bold.ttf")},
-}
+_STATIC_WEIGHTS: dict[object, dict[int, object]] = {}
 
 # instancing a big CJK variable font takes seconds; for fonts above this size
 # snap un-shipped weights to the nearest shipped static instead
@@ -148,7 +147,17 @@ def _font_source(path: str):
             raise ValueError(f"not a WOFF2 font: {path}")
     stat = resolved.stat()
     with _woff2_lock:
-        return _decode_woff2(str(resolved), stat.st_mtime_ns, stat.st_size)
+        source = _decode_woff2(str(resolved), stat.st_mtime_ns, stat.st_size)
+        if resolved == INTER.resolve() and source not in _STATIC_WEIGHTS:
+            _STATIC_WEIGHTS[source] = {700: str(INTER_BOLD)}
+        elif resolved == NOTO.resolve() and source not in _STATIC_WEIGHTS:
+            _STATIC_WEIGHTS[source] = {
+                400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)}
+        elif resolved in (NOTO_REGULAR.resolve(), NOTO_BOLD.resolve()) \
+                and source not in _STATIC_WEIGHTS:
+            _STATIC_WEIGHTS[source] = {
+                400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)}
+        return source
 
 
 def weight_num(weight) -> int:
@@ -246,8 +255,8 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
     ~/.cache/saturn/font-cache, first build in the background while Regular
     shows) -> the original file with synthetic bold."""
     static = _STATIC_WEIGHTS.get(path, {}).get(wnum)
-    if static and os.path.exists(static):
-        return static, True
+    if static and (isinstance(static, io.BytesIO) or os.path.exists(static)):
+        return _font_source(static) if isinstance(static, str) else static, True
     table = _STATIC_WEIGHTS.get(path, {})
     memory = isinstance(path, io.BytesIO)
     try:
@@ -260,8 +269,9 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
         # shipped static instead (ponytail: exact weights via instancing if
         # someone actually needs them)
         near = min(table, key=lambda w: abs(w - wnum))
-        if os.path.exists(table[near]):
-            return table[near], True
+        if isinstance(table[near], io.BytesIO) or os.path.exists(table[near]):
+            source = table[near]
+            return _font_source(source) if isinstance(source, str) else source, True
     default_wght = _fvar_default_wght(path)
     if default_wght is None:
         return path, False                      # static font: synthetic bold
@@ -349,16 +359,16 @@ def _primary_link(family: str | None, wnum: int, italic: bool) -> tuple:
 
 def _default_link(wnum: int, italic: bool) -> tuple:
     if italic:
-        return ("file", str(INTER_ITALIC), wnum, True)
-    return ("file", str(INTER), wnum, False)
+        return ("file", _font_source(str(INTER_ITALIC)), wnum, True)
+    return ("file", _font_source(str(INTER)), wnum, False)
 
 
 def _chain(family: str | None, wnum: int, italic: bool) -> list[tuple]:
     """Primary link first, then fallbacks: the other bundled fonts (Inter /
     Inter-Italic / Noto), then the CJK system chain. Deduped by priority."""
     links = [_primary_link(family, wnum, italic)]
-    for path in (str(NOTO), str(INTER)):
-        links.append(("file", path, wnum, False))
+    links.append(("file", str(NOTO_REGULAR), wnum, False))
+    links.append(_default_link(wnum, False))
     links += [("sys", n.strip(), wnum, False)
               for n in CJK_FAMILY.split(",") if n.strip()]
     out, seen = [], set()
@@ -378,8 +388,10 @@ def _probe(link: tuple) -> _freetype.Font:
             _freetype.init()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            source = (io.BytesIO(link[1].getvalue())
-                      if isinstance(link[1], io.BytesIO) else link[1])
+            source = (_font_source(link[1]) if link[0] == "file"
+                      and isinstance(link[1], str) else link[1])
+            if isinstance(source, io.BytesIO):
+                source = io.BytesIO(source.getvalue())
             f = _freetype.Font(source, 16) if link[0] == "file" \
                 else _freetype.SysFont(link[1], 16)
         _probe_cache[key] = f
@@ -403,6 +415,8 @@ def _render_font(link: tuple, px: int) -> pygame.font.Font:
     kind, ident, wnum, italic = link
     if not pygame.font.get_init():
         pygame.font.init()
+    if kind == "file" and isinstance(ident, str):
+        ident = _font_source(ident)
     key = (kind, ident, wnum, italic, px)
     f = _font_cache.get(key)
     if f is None:
@@ -414,8 +428,7 @@ def _render_font(link: tuple, px: int) -> pygame.font.Font:
             # real weight already instanced; synthetic bold only for
             # non-variable files that cannot express the requested weight
             f.set_bold((not is_var) and wnum >= 550)
-            f.set_italic(italic and not is_var or (is_var and italic
-                                                   and ident == str(INTER_ITALIC)))
+            f.set_italic(italic and not is_var)
         else:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -467,12 +480,14 @@ def _segment(text: str, px: int, wnum: int, italic: bool,
     if not text:
         return []
     links = _chain(family, wnum, italic)
-    fonts = {id(l): _render_font(l, px) for l in links}
+    fonts = {}
     runs: list[tuple[pygame.font.Font, str]] = []
     cur_font, cur = None, ""
     for ch in text:
         link = next((l for l in links if _covers(l, ch)), links[0])
-        f = fonts[id(link)]
+        f = fonts.get(link)
+        if f is None:
+            f = fonts[link] = _render_font(link, px)
         if cur_font is None or f is cur_font:
             cur_font, cur = f, cur + ch
         else:

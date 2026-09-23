@@ -12,28 +12,37 @@ import saturn as ft
 from saturn import text
 
 
-def compress(source: Path, target: Path):
-    font = TTFont(source)
-    try:
-        font.flavor = 'woff2'
-        font.save(target)
-    finally:
-        font.close()
-    assert target.read_bytes()[:4] == b'wOF2'
-
-
 def check():
     assets = Path(text.__file__).parent / 'assets'
+    assert not list(assets.glob('Inter-*.ttf'))
+    assert not list(assets.glob('NotoSansSC-*.ttf'))
     with TemporaryDirectory() as temp:
         directory = Path(temp)
         cache_root = Path(__file__).resolve().parents[1] / '.build-probe' / 'woff2-checks'
         cache_root.mkdir(parents=True, exist_ok=True)
         static = directory / 'static.woff2'
         variable = directory / 'variable.woff2'
-        compress(assets / 'Inter-Bold.ttf', static)
-        compress(assets / 'Inter-VariableFont_opsz,wght.ttf', variable)
+        static.write_bytes((assets / 'Inter-Bold.woff2').read_bytes())
+        variable.write_bytes((assets / 'Inter-VariableFont_opsz,wght.woff2').read_bytes())
+        assert static.read_bytes()[:4] == variable.read_bytes()[:4] == b'wOF2'
 
         with patch('saturn.text.Path.home', return_value=cache_root):
+            inter = text._font_source(str(text.INTER))
+            assert Path(inter).read_bytes()[:4] == b'\x00\x01\x00\x00'
+            bundled_bold, exact = text._weighted_source(inter, 700)
+            assert exact and bundled_bold == text._font_source(str(text.INTER_BOLD))
+            assert text.get_font(18, italic=True).size('Saturn')[0] > 0
+            with patch('saturn.text._font_source', wraps=text._font_source) as resolve:
+                assert text.render_line('Latin only', 18).get_width() > 0
+                assert not any('NotoSansSC' in str(call.args[0])
+                               for call in resolve.call_args_list)
+
+            assert text.render_line('中文', 18).get_width() > 0
+            noto = text._font_source(str(text.NOTO_REGULAR))
+            assert text._weighted_source(noto, 400)[0] == noto
+            assert text._weighted_source(noto, 700)[0] == \
+                text._font_source(str(text.NOTO_BOLD))
+
             source = text._font_source(str(static))
             assert Path(source).read_bytes()[:4] == b'\x00\x01\x00\x00'
             assert text._font_source(str(static)) == source
