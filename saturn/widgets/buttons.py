@@ -20,6 +20,18 @@ _LABEL_SIZE = 14.0
 _LABEL_WEIGHT = 500
 _ICON_SIZE = 18.0
 
+# Compose M3 1.5.0-alpha28 ButtonDefaults.  Each entry is
+# (height, horizontal padding, icon, gap, text size, weight,
+#  square corner, pressed corner).  The source overrides its generated
+# extra-small padding/spacing tokens with 12/4.
+_EXPRESSIVE_SIZES = {
+    "xsmall": (32.0, 12.0, 20.0, 4.0, 14.0, 500, 12.0, 8.0),
+    "small": (40.0, 16.0, 20.0, 8.0, 14.0, 500, 12.0, 8.0),
+    "medium": (56.0, 24.0, 24.0, 8.0, 16.0, 500, 16.0, 12.0),
+    "large": (96.0, 48.0, 32.0, 12.0, 24.0, 400, 28.0, 16.0),
+    "xlarge": (136.0, 64.0, 40.0, 16.0, 32.0, 400, 28.0, 16.0),
+}
+
 
 class Button(Control):
     variant_bg = None     # class defaults, resolved at draw (theme-aware)
@@ -30,8 +42,16 @@ class Button(Control):
     def __init__(self, content=None, *, icon=None, icon_color=None, color=None,
                  bgcolor=None, elevation: float = 1, style=None, on_click=None,
                  on_hover=None, on_long_press=None, on_focus=None, on_blur=None,
-                 autofocus=False, url=None, **base):
+                 autofocus=False, url=None, expressive=False, size=None,
+                 shape="round", **base):
         super().__init__(**base)
+        self.expressive = bool(expressive or size is not None)
+        self.button_size = (size or "small").replace("_", "").lower()
+        if self.expressive and self.button_size not in _EXPRESSIVE_SIZES:
+            raise ValueError(f"invalid expressive button size: {size!r}")
+        if shape not in ("round", "square"):
+            raise ValueError(f"invalid expressive button shape: {shape!r}")
+        self.button_shape = shape
         self.content = content      # str or Control
         self.icon = icon
         self.icon_color = icon_color
@@ -49,28 +69,44 @@ class Button(Control):
         self._hovered = False
         self._pressed = False
         self._elevation_progress = self.variant_elevation
+        self._shape_progress = 0.0
         init_state_layer(self)
+
+    def _metrics(self):
+        return (_EXPRESSIVE_SIZES[self.button_size] if self.expressive else
+                (_HEIGHT, _PAD_H, _ICON_SIZE, _GAP, _LABEL_SIZE,
+                 _LABEL_WEIGHT, _HEIGHT / 2, _HEIGHT / 2))
+
+    def _radius(self, height):
+        if not self.expressive:
+            return height / 2
+        _, _, _, _, _, _, square, pressed = self._metrics()
+        normal = height / 2 if self.button_shape == "round" else square
+        return normal + (pressed - normal) * self._shape_progress
 
     # -- metrics -----------------------------------------------------------
     def _label(self) -> str:
         return self.content if isinstance(self.content, str) else ""
 
     def _intrinsic(self, max_w, max_h, scale):
-        w, h = 0.0, _HEIGHT
+        token_h, pad, icon_size, gap, label_size, label_weight, _, _ = self._metrics()
+        w, h = 0.0, token_h
         if label := self._label():
-            lw, lh = txt.measure(label, _LABEL_SIZE, scale=scale,
-                                 weight=_LABEL_WEIGHT)
+            lw, lh = txt.measure(label, label_size, scale=scale,
+                                 weight=label_weight)
             w += lw
-            h = max(h, lh + 20)
+            if not self.expressive:
+                h = max(h, lh + 20)
         elif isinstance(self.content, Control):
             cw, ch = self.content._intrinsic(max_w, max_h, scale)
             w += cw
             h = max(h, ch + 20)
         if self.icon is not None:
-            w += _ICON_SIZE + (_GAP if w else 0)
-        # Material buttons with a leading icon use 16px at the start and
-        # 24px at the end. Text-only buttons use 24px on both sides.
-        w += (16.0 if self.icon is not None else _PAD_H) + _PAD_H
+            w += icon_size + (gap if w else 0)
+        # Baseline leading-icon buttons use 16/24; Expressive sizes have
+        # symmetric content padding from ButtonDefaults.contentPaddingFor.
+        start = pad if self.expressive or self.icon is None else 16.0
+        w += start + pad
         if self._width is not None:
             w = self._width
         if self._height is not None:
@@ -114,46 +150,50 @@ class Button(Control):
     # -- drawing -----------------------------------------------------------
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
+        _, pad, icon_size, gap, label_size, label_weight, _, _ = self._metrics()
+        radius = self._radius(h)
         bg = self._bg()
         elevation = self._elevation_progress
         if elevation > 0 and not self.disabled:
             shadow_alpha = round(18 + 8 * elevation)
             r.overlay_rect(x - elevation, y + elevation,
                            w + 2 * elevation, h + elevation,
-                           (0, 0, 0, shadow_alpha), radius=h / 2 + elevation)
+                           (0, 0, 0, shadow_alpha), radius=radius + elevation)
         if bg is not None:
-            r.fill_rect(x, y, w, h, bg, radius=h / 2)
+            r.fill_rect(x, y, w, h, bg, radius=radius)
         if self.variant_border is not None:
             border = (colors.Colors.OUTLINE_VARIANT if self.disabled
                       else self.variant_border)
             r.stroke_rect(x, y, w, h, colors.parse_color(border),
-                          width=1, radius=h / 2)
+                          width=1, radius=radius)
         if not self.disabled:
-            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), h / 2)
+            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), radius)
         # content: [icon] gap [label/control]
         scale = r.scale
         icon_surf = label_surf = None
         label_w = icon_w = 0.0
         if self.icon is not None:
             icon_surf = render_icon_cached(
-                self.icon, round(_ICON_SIZE * scale), self._fg())
+                self.icon, round(icon_size * scale),
+                colors.parse_color(self.icon_color)
+                if self.icon_color and not self.disabled else self._fg())
             icon_w = icon_surf.get_width() / scale
         if label := self._label():
             label_surf = txt.render_line_cached(
-                label, _LABEL_SIZE, scale=scale, weight=_LABEL_WEIGHT,
+                label, label_size, scale=scale, weight=label_weight,
                 color=self._fg())
             label_w = label_surf.get_width() / scale
         elif isinstance(self.content, Control):
             label_w = self.content._rect[2]
-        total = icon_w + ((_GAP) if icon_w and label_w else 0) + label_w
-        pad_start = 16.0 if self.icon is not None else _PAD_H
-        content_w = w - pad_start - _PAD_H
+        total = icon_w + (gap if icon_w and label_w else 0) + label_w
+        pad_start = pad if self.expressive or self.icon is None else 16.0
+        content_w = w - pad_start - pad
         cx = x + pad_start + (content_w - total) / 2
         cy = y + h / 2
         if icon_surf is not None:
             r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
-            cx += icon_w + _GAP
+            cx += icon_w + (gap if label_w else 0)
         if label_surf is not None:
             r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
@@ -190,12 +230,18 @@ class Button(Control):
     def _pressed_hook(self, x, y):
         press(self, x, y, ripple_duration=motion.SHORT4,
               press_duration=75)
+        if self.expressive:
+            self._animate_internal("_shape_progress", 1.0, motion.SHORT2,
+                                   motion.EMPHASIZED)
         if self.variant_elevation:
             self._animate_internal("_elevation_progress", 1.0, motion.SHORT3,
                                    motion.EMPHASIZED)
 
     def _released_hook(self, _x, _y):
         release(self, minimum_ms=0, fade_duration=motion.SHORT2)
+        if self.expressive:
+            self._animate_internal("_shape_progress", 0.0, motion.SHORT2,
+                                   motion.EMPHASIZED)
         if self.variant_elevation:
             self._animate_internal(
                 "_elevation_progress",
@@ -232,6 +278,15 @@ class OutlinedButton(Button):
 class TextButton(Button):
     variant_bg = None
     variant_fg = colors.Colors.PRIMARY
+
+
+class ExpressiveButton(Button):
+    """Compose M3 Button with size tokens and pressed shape morph."""
+    variant_bg = colors.Colors.PRIMARY
+    variant_fg = colors.Colors.ON_PRIMARY
+
+    def __init__(self, content=None, *, size="small", shape="round", **kwargs):
+        super().__init__(content, size=size, shape=shape, **kwargs)
 
 
 # Flet 1.0 renamed ElevatedButton to Button. Its defaults remain the Material
