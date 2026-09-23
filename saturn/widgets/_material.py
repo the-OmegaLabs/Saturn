@@ -7,6 +7,8 @@ import time
 from .. import colors
 from .. import motion
 from ..types import AnimationCurve
+from ..painting import corners, shape_mask
+import pygame
 
 HOVER_OPACITY = 0.08
 PRESS_OPACITY = 0.12
@@ -70,18 +72,18 @@ def tick_state_layer(control, now: float) -> bool:
 
 
 def draw_state_layer(control, renderer, rect, color, radius=0.0):
-    """Draw Material Web's 15ms hover layer and expanding press ripple."""
+    """Draw hover and a radial ripple clipped to the exact component silhouette."""
     x, y, w, h = rect
     red, green, blue, _ = colors.parse_color(color)
     hover = control._state_hover_alpha
-    if hover > 0.0:
-        renderer.overlay_rect(
-            x, y, w, h,
-            (red, green, blue, round(255 * hover)), radius=radius)
-
     pressed = control._state_press_alpha
-    if pressed <= 0.0:
+    if (hover <= 0 and pressed <= 0) or w <= 0 or h <= 0:
         return
+    scale = renderer.scale
+    pw, ph = max(1, round(w * scale)), max(1, round(h * scale))
+    mask = shape_mask(pw, ph, corners(radius, scale, pw, ph))
+    layer = pygame.Surface((pw, ph), pygame.SRCALPHA)
+    layer.fill((red, green, blue, round(255 * max(0, hover))))
     ox, oy = control._state_press_origin
     ox = max(x, min(x + w, ox))
     oy = max(y, min(y + h, oy))
@@ -95,17 +97,11 @@ def draw_state_layer(control, renderer, rect, color, radius=0.0):
     ) + 10.0
     start_radius = 0.1 * max(w, h)
     ripple_radius = start_radius + (end_radius - start_radius) * progress
-    # Renderer clipping is rectangular. Cross-fade the expanding radial wave
-    # into the component's rounded state layer before it reaches the corners;
-    # this preserves Material's clipped ripple silhouette on both backends.
-    cover = max(0.0, min(1.0, (progress - 0.45) / 0.25))
-    if cover < 1.0:
-        renderer.clip_push(x, y, w, h)
-        renderer.circle(
-            ripple_x, ripple_y, ripple_radius,
-            (red, green, blue, round(255 * pressed * (1.0 - cover))))
-        renderer.clip_pop()
-    if cover > 0.0:
-        renderer.overlay_rect(
-            x, y, w, h,
-            (red, green, blue, round(255 * pressed * cover)), radius=radius)
+    if pressed > 0:
+        ripple = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        pygame.draw.circle(ripple, (red, green, blue, round(255 * pressed)),
+                           (round((ripple_x - x) * scale), round((ripple_y - y) * scale)),
+                           max(1, round(ripple_radius * scale)))
+        layer.blit(ripple, (0, 0))
+    layer.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    renderer.blit(layer, x, y)

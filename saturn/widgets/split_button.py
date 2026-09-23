@@ -66,9 +66,10 @@ class _SplitSegment(Button):
         if bg is not None:
             _fill_segment(r, x, y, w, h, bg, self.side, self._inner_radius)
         if not self.disabled:
-            # The ripple uses the outer radius to stay inside the exposed
-            # perimeter; the inner corners are painted by _fill_segment.
-            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), h / 2)
+            outer, inner = min(w, h) / 2, self._inner_radius
+            radii = ((outer, inner, inner, outer) if self.side == "leading"
+                     else (inner, outer, outer, inner))
+            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), radii)
 
         scale = r.scale
         icon_size = (_LEADING_ICON_SIZE if self.side == "leading"

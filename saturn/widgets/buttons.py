@@ -9,6 +9,7 @@ from .. import colors, motion, text as txt
 from ..control import Control
 from ..event import fire
 from ..text import render_icon_cached
+from ..painting import draw_shadow
 from ._material import (draw_state_layer, init_state_layer, press,
                         release, set_hover, tick_state_layer)
 
@@ -155,10 +156,7 @@ class Button(Control):
         bg = self._bg()
         elevation = self._elevation_progress
         if elevation > 0 and not self.disabled:
-            shadow_alpha = round(18 + 8 * elevation)
-            r.overlay_rect(x - elevation, y + elevation,
-                           w + 2 * elevation, h + elevation,
-                           (0, 0, 0, shadow_alpha), radius=radius + elevation)
+            draw_shadow(r, (x, y, w, h), radius, elevation)
         if bg is not None:
             r.fill_rect(x, y, w, h, bg, radius=radius)
         if self.variant_border is not None:

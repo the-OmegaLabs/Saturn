@@ -8,6 +8,7 @@ from __future__ import annotations
 from .. import colors, motion, text as txt
 from ..event import fire
 from ..text import render_icon_cached
+from ..painting import draw_shadow
 from ._material import draw_state_layer, press, release, set_hover
 from .buttons import Button
 
@@ -96,13 +97,7 @@ class FloatingActionButton(Button):
         fg = self._fg()
         elevation = self._elevation_progress
         if elevation > 0 and not self.disabled:
-            # Saturn has no native blurred shadow; this mirrors its other
-            # elevated controls while retaining Compose's 6/8dp state levels.
-            spread = elevation / 2
-            r.overlay_rect(x - spread, y + spread,
-                           w + 2 * spread, h + spread,
-                           (0, 0, 0, round(18 + 2 * elevation)),
-                           radius=radius + spread)
+            draw_shadow(r, (x, y, w, h), radius, elevation)
         if bg is not None:
             r.fill_rect(x, y, w, h, bg, radius=radius)
         if not self.disabled:

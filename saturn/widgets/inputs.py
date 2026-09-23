@@ -19,6 +19,7 @@ from .._gen.icons import Icons
 from ..control import Control
 from ..event import fire
 from ..text import get_font, get_icon_font
+from ..painting import draw_notched_outline
 from ..types import (Alignment, AnimationCurve, LabelPosition,
                      OutlineInputBorder, Padding, as_border_radius)
 
@@ -692,8 +693,16 @@ class TextField(Control):
                 r.fill_rect(x, y + h - border_width, w, border_width,
                             border_draw_color)
             else:
-                r.stroke_rect(x, y, w, h, border_draw_color,
-                              width=border_width, radius=radius)
+                label_visible = self.label and (
+                    self._focused or bool(self.value) or self._label_progress > 0)
+                if label_visible:
+                    family, _, _ = self._style()
+                    gap = txt.line_width(self.label, 12, scale=scale, family=family) + 8
+                    draw_notched_outline(r, (x, y, w, h), border_draw_color,
+                                         border_width, radius, _FIELD_PAD - 4, gap)
+                else:
+                    r.stroke_rect(x, y, w, h, border_draw_color,
+                                  width=border_width, radius=radius)
         label_progress = self._label_progress if self.label else 0.0
         ty, th = y, h
         if filled_style and self.label:
@@ -715,13 +724,6 @@ class TextField(Control):
             inline_width = inline_label.get_width() / scale
             floating_width = floating_active.get_width() / scale
             floating_height = floating_active.get_height() / scale
-            if label_progress > 0.0 and not filled_style:
-                notch_width = (floating_width + 8.0) * label_progress
-                notch_bg = _parse(
-                    self.page.bgcolor if self.page and self.page.bgcolor
-                    else colors.Colors.SURFACE)
-                r.fill_rect(x + _FIELD_PAD - 4.0, y - border_width,
-                            notch_width, max(2.0, border_width * 2), notch_bg)
             if label_progress <= 0.0 or floating_width <= 0.0:
                 inline_y = y + (h - inline_label.get_height() / scale) / 2
                 r.blit(inline_label, x + _FIELD_PAD, inline_y)
