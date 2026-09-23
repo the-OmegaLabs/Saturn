@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1000" height="1000" viewBox="0 0 1000 1000"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Saturn A2</title>
+  <desc id="desc">A bold white planet crossed by a tilted orbit on charcoal.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="48%" r="72%">
+      <stop stop-color="#272727"/>
+      <stop offset="1" stop-color="#1e1e1e"/>
+    </radialGradient>
+    <clipPath id="planet-clip">
+      <circle cx="497" cy="479" r="219"/>
+    </clipPath>
+    <path id="front-orbit" d="M 839 359 A 360 115 -19 0 1 159 593"/>
+  </defs>
+
+  <rect width="1000" height="1000" fill="url(#background)"/>
+
+  <!-- Rear orbit disappears behind the planet. -->
+  <ellipse cx="499" cy="476" rx="360" ry="115"
+           transform="rotate(-19 499 476)"
+           fill="none" stroke="#fff" stroke-width="70"/>
+  <circle cx="497" cy="479" r="219" fill="#fff"/>
+
+  <!-- A narrow dark edge separates the near orbit from the planet. -->
+  <use href="#front-orbit" transform="translate(0 -8)"
+       clip-path="url(#planet-clip)"
+       fill="none" stroke="#242424" stroke-width="72"/>
+  <use href="#front-orbit" fill="none" stroke="#fff"
+       stroke-width="70" stroke-linecap="round"/>
+</svg>
