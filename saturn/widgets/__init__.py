@@ -10,5 +10,7 @@ from .fab import (ExtendedFloatingActionButton, FloatingActionButton,  # noqa: F
 from .inputs import (Checkbox, Dropdown, DropdownOption, Option, Radio,  # noqa: F401
                      RadioGroup, Slider, Switch, TextField)
 from .list_item import ListItem  # noqa: F401
+from .split_button import SplitButton  # noqa: F401
+from .button_group import ButtonGroup  # noqa: F401
 from .scrolling import GestureDetector, ListView  # noqa: F401
 from .text import Text  # noqa: F401
