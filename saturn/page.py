@@ -341,6 +341,13 @@ class Page(Control):
                 return hit
         return super()._hit_test(x, y)
 
+    def _hit_test_hover(self, x, y):
+        for control in reversed(self.overlay):
+            hit = control._hit_test_hover(x, y)
+            if hit is not None:
+                return hit
+        return super()._hit_test_hover(x, y)
+
     def draw(self):
         now = time.perf_counter()
         animating = False
@@ -421,6 +428,9 @@ class Page(Control):
                     e.text, getattr(e, "start", 0), getattr(e, "length", 0))
             return
         if e.type == pygame.KEYDOWN:
+            for control in reversed(self.overlay):
+                if control.handle_event(e):
+                    return
             self._dispatch(self.on_keyboard_event)
             if self._focused is not None:
                 self._focused._key(e)

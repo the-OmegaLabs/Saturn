@@ -13,6 +13,8 @@ from .inputs import (Checkbox, Dropdown, DropdownOption, Option, Radio,  # noqa:
 from .list_item import ListItem  # noqa: F401
 from .expressive_progress import (LoadingIndicator, WavyProgressIndicator,
                                  LinearWavyProgressIndicator, CircularWavyProgressIndicator)
+from .floating import (FloatingToolbar, HorizontalFloatingToolbar, VerticalFloatingToolbar,
+                       FloatingActionButtonMenu, FloatingActionButtonMenuItem)
 from .split_button import SplitButton  # noqa: F401
 from .button_group import ButtonGroup  # noqa: F401
 from .toggle_button import (ToggleButton, ElevatedToggleButton,  # noqa: F401

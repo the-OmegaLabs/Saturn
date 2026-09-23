@@ -7,6 +7,7 @@ from saturn.widgets._material import draw_state_layer
 from saturn.painting import _shadow
 from saturn.widgets.expressive_progress import _shapes, _morph_points
 import math
+import time
 
 
 def renderer(w=400, h=200):
@@ -59,7 +60,42 @@ def check_progress():
             assert first != pygame.image.tobytes(r._buf, 'RGBA')
 
 
+def check_floating():
+    a,b,c = [ft.IconButton(ft.Icons.ADD) for _ in range(3)]
+    toolbar = ft.FloatingToolbar(b,leading=a,trailing=c)
+    expanded = toolbar._intrinsic(None,None,1)
+    toolbar._reveal = 0
+    collapsed = toolbar._intrinsic(None,None,1)
+    assert collapsed[0] < expanded[0] and collapsed[1] == 64
+    toolbar._place(0,0,*collapsed,1)
+    assert toolbar._hit_test(20,32) is b
+    r = renderer()
+    app = SimpleNamespace(size=(400,300),renderer=r,mark_dirty=lambda:None,
+                          post=lambda fn:None,call=lambda fn,*args:fn(*args))
+    page = ft.Page(app)
+    selected = []
+    item = ft.FloatingActionButtonMenuItem('Create',icon=ft.Icons.ADD,
+                                         on_click=lambda event:selected.append(event.control))
+    menu = ft.FloatingActionButtonMenu([item])
+    page.add(menu)
+    menu._place(300,230,56,56,1)
+    menu.toggle()
+    assert menu._overlay in page.overlay
+    menu._overlay._place(0,0,400,300,1)
+    ix,iy,iw,ih = item._rect
+    assert page._hit_test(ix+iw/2,iy+ih/2) is item
+    assert page._hit_test_hover(ix+iw/2,iy+ih/2) is item
+    item._activate()
+    assert not menu.expanded and selected == [item]
+    menu._tick_animations(time.perf_counter()+1)
+    assert not page.overlay
+    menu.toggle()
+    page.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_ESCAPE))
+    assert not menu.expanded
+
+
 if __name__ == '__main__':
     check_regressions()
     check_progress()
+    check_floating()
     print('EXPRESSIVE REGRESSION CHECKS PASS')
