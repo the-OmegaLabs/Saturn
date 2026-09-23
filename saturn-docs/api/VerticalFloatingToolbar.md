@@ -1,18 +1,18 @@
 # VerticalFloatingToolbar
 
-纵向排列操作的浮动工具栏。
+Floating toolbar with vertically arranged actions.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/floating.py`](../../saturn/widgets/floating.py)（第 134 行）。
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 134).
 
-## 效果图
+## Preview
 
-![VerticalFloatingToolbar 控件的深色主题效果](../images/controls/VerticalFloatingToolbar.png)
+![VerticalFloatingToolbar control in the dark theme](../images/controls/VerticalFloatingToolbar.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,15 +29,15 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [FloatingToolbar](./FloatingToolbar.md)
+**Base class:** [FloatingToolbar](./FloatingToolbar.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.VerticalFloatingToolbar(*items, **kwargs)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `*items` | `—` | `额外位置参数` | 传给布局、分组或菜单的项目列表。 |
-| `**kwargs` | `—` | `额外关键字参数` | 传给父类构造函数的关键字参数。 |
+| `*items` | `—` | `additional positional arguments` | Items passed to a layout, group, or menu. |
+| `**kwargs` | `—` | `additional keyword arguments` | Keyword arguments passed to the parent constructor. |

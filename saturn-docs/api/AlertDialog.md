@@ -1,18 +1,18 @@
 # AlertDialog
 
-在页面上显示模态对话框。
+Displays a modal dialog on the page.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py)（第 69 行）。
+Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 69).
 
-## 效果图
+## Preview
 
-![AlertDialog 控件的深色主题效果](../images/controls/AlertDialog.png)
+![AlertDialog control in the dark theme](../images/controls/AlertDialog.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,23 +29,23 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `DialogControl`
+**Base class:** `DialogControl`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.AlertDialog(title=None, content=None, *, actions=None, modal=False, bgcolor=None, open=False, on_dismiss=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `title` | `—` | `None` | 对话框、提示或窗口的标题。 |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `actions` | `—` | `None` | 对话框底部的操作按钮列表。 |
-| `modal` | `—` | `False` | 为 True 时禁止点击遮罩关闭对话框。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `open` | `—` | `False` | 对话框或提示条当前是否处于打开状态。 |
-| `on_dismiss` | `—` | `None` | 对话框或提示条关闭时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `title` | `—` | `None` | Title of a dialog, notification, or window. |
+| `content` | `—` | `None` | Text or child control to display. |
+| `actions` | `—` | `None` | Action buttons at the bottom of a dialog. |
+| `modal` | `—` | `False` | Prevent closing the dialog by clicking its barrier when True. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `open` | `—` | `False` | Whether the dialog or snackbar is open. |
+| `on_dismiss` | `—` | `None` | Callback called when the dialog or snackbar closes. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

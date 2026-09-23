@@ -1,17 +1,17 @@
-# 五分钟上手
+# Get started in five minutes
 
-[← 文档首页](./README.md) · [API 索引](./api/README.md)
+[← Documentation home](./README.md) · [API index](./api/README.md)
 
-## 安装与运行
+## Install and run
 
-需要 Python 3.10 或更新版本。当前主要在 Windows 上开发和测试。
+Python 3.10 or later is required. Development and testing currently focus on Windows.
 
 ```powershell
 uv sync
 uv run python examples/hello.py
 ```
 
-## 第一个窗口
+## Your first window
 
 ```python
 import saturn
@@ -22,31 +22,31 @@ def main(page: saturn.Page):
     page.theme_mode = saturn.ThemeMode.DARK
     page.padding = 24
 
-    message = saturn.Text("你好，Saturn", size=24)
+    message = saturn.Text("Hello, Saturn", size=24)
 
     def clicked(event: saturn.ControlEvent):
-        message.value = "按钮已点击"
+        message.value = "Button clicked"
         message.update()
 
-    page.add(message, saturn.FilledButton("点击我", on_click=clicked))
+    page.add(message, saturn.FilledButton("Click me", on_click=clicked))
     page.update()
 
 
 saturn.run(main, backend=saturn.Render.SOFTWARE)
 ```
 
-`saturn.run()` 创建窗口并把 [`Page`](./api/Page.md) 交给 `main`。通过 `page.add()` 加入控件；修改控件后调用 `control.update()` 或 `page.update()` 请求重绘。回调中的 `event.control` 指向触发事件的控件。
+`saturn.run()` creates a window and passes a [`Page`](./api/Page.md) to `main`. Add controls with `page.add()`. After changing a control, call `control.update()` or `page.update()` to request a redraw. In a callback, `event.control` refers to the control that triggered the event.
 
-## 切换绘制后端
+## Change the rendering backend
 
 ```python
 saturn.run(main, backend=saturn.Render.OPENGL)
 ```
 
-也可在省略 `backend` 时设置环境变量 `SATURN_BACKEND`。`Render.VULKAN` 已导出；具体可用性取决于本机驱动与当前实现。
+You can also set `SATURN_BACKEND` when omitting the `backend` argument. `Render.VULKAN` is exported; availability depends on the local driver and current implementation.
 
-## 接着浏览
+## Keep exploring
 
-- [截图画廊](./gallery.md) 展示主要控件的视觉效果。
-- [API 索引](./api/README.md) 按组件类别查参数和方法。
-- [Flet 对照与范围](./flet-mapping.md) 帮助迁移 Flet 桌面界面。
+- The [screenshot gallery](./gallery.md) shows the main controls.
+- The [API index](./api/README.md) lists parameters and methods by category.
+- The [Flet mapping and scope](./flet-mapping.md) helps with migration from Flet desktop apps.

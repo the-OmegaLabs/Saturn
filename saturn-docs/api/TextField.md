@@ -1,18 +1,18 @@
 # TextField
 
-可编辑的文本输入框。
+Editable text input field.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py)（第 76 行）。
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 76).
 
-## 效果图
+## Preview
 
-![TextField 控件的深色主题效果](../images/controls/TextField.png)
+![TextField control in the dark theme](../images/controls/TextField.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,38 +29,38 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.TextField(value: 'str' = '', *, label=None, hint_text=None, password: 'bool' = False, multiline: 'bool' = False, max_lines: 'int | None' = None, read_only: 'bool' = False, text_size: 'float | None' = None, on_change=None, on_submit=None, on_focus=None, on_blur=None, on_click=None, filled: 'bool' = False, bgcolor=None, border_color=None, cursor_color=None, border_radius: 'float | None' = None, border=None, text_style=None, can_reveal_password: 'bool' = False, on_hover=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `value` | `str` | `''` | 文本框初始或当前输入内容。 |
-| `label` | `—` | `None` | 显示在输入框、选项或控件旁的标签。 |
-| `hint_text` | `—` | `None` | 尚无输入或选择时显示的提示文字。 |
-| `password` | `bool` | `False` | 为 True 时遮蔽输入字符。 |
-| `multiline` | `bool` | `False` | 是否允许输入多行文本。 |
-| `max_lines` | `int | None` | `None` | 最多显示或输入的行数。 |
-| `read_only` | `bool` | `False` | 为 True 时显示内容但不允许编辑。 |
-| `text_size` | `float | None` | `None` | 输入或选择内容的文字大小。 |
-| `on_change` | `—` | `None` | 值改变时调用的回调。 |
-| `on_submit` | `—` | `None` | 提交输入内容时调用的回调。 |
-| `on_focus` | `—` | `None` | 控件获得焦点时调用的回调。 |
-| `on_blur` | `—` | `None` | 控件失去焦点时调用的回调。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `filled` | `bool` | `False` | 是否使用填充式输入区域。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `border_color` | `—` | `None` | 输入区域的边框颜色。 |
-| `cursor_color` | `—` | `None` | 文本插入光标的颜色。 |
-| `border_radius` | `float | None` | `None` | 边框或背景的圆角半径。 |
-| `border` | `—` | `None` | 边框配置。 |
-| `text_style` | `—` | `None` | 输入或显示文字的样式。 |
-| `can_reveal_password` | `bool` | `False` | 是否提供显示密码的切换按钮。 |
-| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `value` | `str` | `''` | Initial or current text field content. |
+| `label` | `—` | `None` | Label beside an input, option, or control. |
+| `hint_text` | `—` | `None` | Hint shown before a value is entered or selected. |
+| `password` | `bool` | `False` | Mask entered characters when True. |
+| `multiline` | `bool` | `False` | Allow multiple lines of text input. |
+| `max_lines` | `int | None` | `None` | Maximum number of lines to show or accept. |
+| `read_only` | `bool` | `False` | Display content without allowing edits when True. |
+| `text_size` | `float | None` | `None` | Font size of entered or selected text. |
+| `on_change` | `—` | `None` | Callback called when the value changes. |
+| `on_submit` | `—` | `None` | Callback called when input is submitted. |
+| `on_focus` | `—` | `None` | Callback called when the control gains focus. |
+| `on_blur` | `—` | `None` | Callback called when the control loses focus. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `filled` | `bool` | `False` | Use a filled input area. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `border_color` | `—` | `None` | Border color of the input area. |
+| `cursor_color` | `—` | `None` | Color of the text insertion cursor. |
+| `border_radius` | `float | None` | `None` | Corner radius of the border or background. |
+| `border` | `—` | `None` | Border settings. |
+| `text_style` | `—` | `None` | Style of entered or displayed text. |
+| `can_reveal_password` | `bool` | `False` | Show a button for toggling password visibility. |
+| `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

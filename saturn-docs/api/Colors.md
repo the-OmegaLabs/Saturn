@@ -1,18 +1,18 @@
 # Colors
 
-颜色名称集合，包含主题色与固定颜色。
+Collection of theme and fixed color names.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/_gen/colors.py`](../../saturn/_gen/colors.py)（第 303 行）。
+Source: [`saturn/_gen/colors.py`](../../saturn/_gen/colors.py) (line 303).
 
-**基类：** `str`、`Enum`
+**Base class:** `str`, `Enum`
 
-## 成员
+## Members
 
-共 352 个名称。以下展示前 20 个；完整列表以源码为准。
+There are 352 names. The first 20 appear below; see the source for the full list.
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `AMBER` | `amber` |
 | `AMBER_100` | `amber100` |
@@ -35,4 +35,4 @@
 | `BLACK_26` | `black26` |
 | `BLACK_38` | `black38` |
 
-在代码中通过成员名称使用，例如 `saturn.Colors.AMBER`。
+Use members by name, for example `saturn.Colors.AMBER`.

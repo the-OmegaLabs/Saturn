@@ -1,18 +1,18 @@
 # Divider
 
-在相邻内容之间绘制一条分隔线。
+Draws a dividing line between adjacent content.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/containers.py`](../../saturn/widgets/containers.py)（第 411 行）。
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 411).
 
-## 效果图
+## Preview
 
-![Divider 控件的深色主题效果](../images/controls/Divider.png)
+![Divider control in the dark theme](../images/controls/Divider.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,21 +29,21 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Divider(*, height: 'float' = 16, thickness: 'float' = 1, color=None, leading_indent: 'float' = 0, trailing_indent: 'float' = 0, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `height` | `float` | `16` | 控件的指定高度。 |
-| `thickness` | `float` | `1` | 线条或分隔线的粗细。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `leading_indent` | `float` | `0` | 分隔线起点留白。 |
-| `trailing_indent` | `float` | `0` | 分隔线终点留白。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `height` | `float` | `16` | Specified control height. |
+| `thickness` | `float` | `1` | Thickness of a line or divider. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `leading_indent` | `float` | `0` | Inset at the start of a divider. |
+| `trailing_indent` | `float` | `0` | Inset at the end of a divider. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,21 +1,21 @@
 # Rotate
 
-定义控件的旋转角度和旋转中心。
+Rotation angle and center of a control.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 335 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 335).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Rotate(angle: 'float' = 0.0, alignment: 'Alignment | None' = None, origin: 'Offset | None' = None, transform_hit_tests: 'bool' = True, filter_quality: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `angle` | `float` | `0.0` | 旋转角度。 |
-| `alignment` | `Alignment | None` | `None` | 子内容在容器或布局中的排列方式。 |
-| `origin` | `Offset | None` | `None` | 变换的参考原点。 |
-| `transform_hit_tests` | `bool` | `True` | 几何变换是否同步影响点击命中区域。 |
-| `filter_quality` | `object` | `None` | 图片缩放时使用的采样质量。 |
+| `angle` | `float` | `0.0` | Rotation angle. |
+| `alignment` | `Alignment | None` | `None` | Alignment of child content within a container or layout. |
+| `origin` | `Offset | None` | `None` | Reference origin for the transformation. |
+| `transform_hit_tests` | `bool` | `True` | Apply the geometry transform to the hit area as well. |
+| `filter_quality` | `object` | `None` | Sampling quality used when scaling an image. |

@@ -1,18 +1,18 @@
 # Icon
 
-显示 Material 图标。
+Displays a Material icon.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/basic.py`](../../saturn/widgets/basic.py)（第 50 行）。
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 50).
 
-## 效果图
+## Preview
 
-![Icon 控件的深色主题效果](../images/controls/Icon.png)
+![Icon control in the dark theme](../images/controls/Icon.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,19 +29,19 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Icon(icon, *, color=None, size: 'float' = 24, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `icon` | `—` | `必填` | 要绘制的图标。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `size` | `float` | `24` | 文字、图标或控件的尺寸等级。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `icon` | `—` | `required` | Icon to draw. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `size` | `float` | `24` | Size of the text, icon, or control. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

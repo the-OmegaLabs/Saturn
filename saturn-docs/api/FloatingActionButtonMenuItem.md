@@ -1,18 +1,18 @@
 # FloatingActionButtonMenuItem
 
-浮动操作菜单中的一个可点击项目。
+Clickable item in a floating action menu.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/floating.py`](../../saturn/widgets/floating.py)（第 139 行）。
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 139).
 
-## 效果图
+## Preview
 
-![FloatingActionButtonMenuItem 控件的深色主题效果](../images/controls/FloatingActionButtonMenuItem.png)
+![FloatingActionButtonMenuItem control in the dark theme](../images/controls/FloatingActionButtonMenuItem.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,19 +29,19 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [ExpressiveButton](./ExpressiveButton.md)
+**Base class:** [ExpressiveButton](./ExpressiveButton.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `必填` | 要显示的文本或子控件。 |
-| `icon` | `—` | `None` | 要绘制的图标。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `—` | `required` | Text or child control to display. |
+| `icon` | `—` | `None` | Icon to draw. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

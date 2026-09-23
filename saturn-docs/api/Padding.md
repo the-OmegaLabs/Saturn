@@ -1,29 +1,29 @@
 # Padding
 
-定义控件内侧四个方向的留白。
+Space inside a control on each side.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 217 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 217).
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `all(cls, value: 'float')` | 用同一个值创建各方向一致的配置。 |
-| `symmetric(cls, vertical: 'float' = 0.0, horizontal: 'float' = 0.0)` | 分别为水平和垂直方向设置对称值。 |
-| `only(cls, left: 'float' = 0.0, top: 'float' = 0.0, right: 'float' = 0.0, bottom: 'float' = 0.0)` | 分别设置指定方向的值。 |
-| `zero(cls)` | 创建四个方向均为零的配置。 |
+| `all(cls, value: 'float')` | Creates the same setting for every side. |
+| `symmetric(cls, vertical: 'float' = 0.0, horizontal: 'float' = 0.0)` | Sets symmetric horizontal and vertical values. |
+| `only(cls, left: 'float' = 0.0, top: 'float' = 0.0, right: 'float' = 0.0, bottom: 'float' = 0.0)` | Sets values for specified sides individually. |
+| `zero(cls)` | Creates a setting with zero on all four sides. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Padding(left: 'float' = 0.0, top: 'float' = 0.0, right: 'float' = 0.0, bottom: 'float' = 0.0) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `left` | `float` | `0.0` | 相对 Stack 左边的定位距离。 |
-| `top` | `float` | `0.0` | 相对 Stack 上边的定位距离。 |
-| `right` | `float` | `0.0` | 相对 Stack 右边的定位距离。 |
-| `bottom` | `float` | `0.0` | 相对 Stack 底边的定位距离。 |
+| `left` | `float` | `0.0` | Distance from the left edge of a Stack. |
+| `top` | `float` | `0.0` | Distance from the top edge of a Stack. |
+| `right` | `float` | `0.0` | Distance from the right edge of a Stack. |
+| `bottom` | `float` | `0.0` | Distance from the bottom edge of a Stack. |

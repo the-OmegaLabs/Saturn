@@ -37,7 +37,7 @@ def check():
                 assert not any('NotoSansSC' in str(call.args[0])
                                for call in resolve.call_args_list)
 
-            assert text.render_line('中文', 18).get_width() > 0
+            assert text.render_line('\u4e2d\u6587', 18).get_width() > 0
             noto = text._font_source(str(text.NOTO_REGULAR))
             assert text._weighted_source(noto, 400)[0] == noto
             assert text._weighted_source(noto, 700)[0] == \

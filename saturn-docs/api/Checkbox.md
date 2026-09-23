@@ -1,18 +1,18 @@
 # Checkbox
 
-允许独立勾选或取消勾选的输入控件。
+Input control that can be checked independently.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py)（第 931 行）。
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 931).
 
-## 效果图
+## Preview
 
-![Checkbox 控件的深色主题效果](../images/controls/Checkbox.png)
+![Checkbox control in the dark theme](../images/controls/Checkbox.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,21 +29,21 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `_Toggle`
+**Base class:** `_Toggle`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Checkbox(label: 'str' = '', *, value=False, active_color=None, label_position=<LabelPosition.RIGHT: 'right'>, on_change=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `label` | `str` | `''` | 显示在输入框、选项或控件旁的标签。 |
-| `value` | `—` | `False` | 复选框当前是否勾选。 |
-| `active_color` | `—` | `None` | 选中或开启状态使用的颜色。 |
-| `label_position` | `—` | `<LabelPosition.RIGHT: 'right'>` | 标签相对于选择控件的位置。 |
-| `on_change` | `—` | `None` | 值改变时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `label` | `str` | `''` | Label beside an input, option, or control. |
+| `value` | `—` | `False` | Whether the checkbox is checked. |
+| `active_color` | `—` | `None` | Color used in the selected or on state. |
+| `label_position` | `—` | `<LabelPosition.RIGHT: 'right'>` | Position of the label relative to the selection control. |
+| `on_change` | `—` | `None` | Callback called when the value changes. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

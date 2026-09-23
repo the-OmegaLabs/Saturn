@@ -1,16 +1,16 @@
 # CrossAxisAlignment
 
-设置布局交叉轴上的子控件对齐方式。
+Alignment of children on the layout's cross axis.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 18 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 18).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `START` | `start` |
 | `END` | `end` |
@@ -18,4 +18,4 @@
 | `STRETCH` | `stretch` |
 | `BASELINE` | `baseline` |
 
-在代码中通过成员名称使用，例如 `saturn.CrossAxisAlignment.START`。
+Use members by name, for example `saturn.CrossAxisAlignment.START`.

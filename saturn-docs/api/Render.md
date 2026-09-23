@@ -1,20 +1,20 @@
 # Render
 
-选择软件、OpenGL 或 Vulkan 绘制后端。
+Selects the software, OpenGL, or Vulkan renderer.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/app.py`](../../saturn/app.py)（第 30 行）。
+Source: [`saturn/app.py`](../../saturn/app.py) (line 30).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `SOFTWARE` | `software` |
 | `OPENGL` | `opengl` |
 | `GL` | `opengl` |
 | `VULKAN` | `vulkan` |
 
-在代码中通过成员名称使用，例如 `saturn.Render.SOFTWARE`。
+Use members by name, for example `saturn.Render.SOFTWARE`.

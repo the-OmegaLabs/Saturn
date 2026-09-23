@@ -1,18 +1,18 @@
 # Card
 
-带有表面和阴影的内容容器。
+Content container with a surface and shadow.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/basic.py`](../../saturn/widgets/basic.py)（第 140 行）。
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 140).
 
-## 效果图
+## Preview
 
-![Card 控件的深色主题效果](../images/controls/Card.png)
+![Card control in the dark theme](../images/controls/Card.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,19 +29,19 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Container](./Container.md)
+**Base class:** [Container](./Container.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Card(content=None, *, elevation: 'float' = 1, variant: 'str' = 'elevated', **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `elevation` | `float` | `1` | 表面高度，对应阴影的视觉强度。 |
-| `variant` | `str` | `'elevated'` | 选择该控件的视觉变体。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `—` | `None` | Text or child control to display. |
+| `elevation` | `float` | `1` | Surface elevation, which determines shadow strength. |
+| `variant` | `str` | `'elevated'` | Visual variant of this control. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

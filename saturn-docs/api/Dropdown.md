@@ -1,18 +1,18 @@
 # Dropdown
 
-从选项列表中选择一个值。
+Selects a value from a list of options.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py)（第 1468 行）。
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1468).
 
-## 效果图
+## Preview
 
-![Dropdown 控件的深色主题效果](../images/controls/Dropdown.png)
+![Dropdown control in the dark theme](../images/controls/Dropdown.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,27 +29,27 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Dropdown(value=None, *, options=None, hint_text=None, label=None, on_select=None, text_size: 'float' = 16.0, filled=False, fill_color=None, bgcolor=None, border=None, border_radius=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `value` | `—` | `None` | 当前选中选项的键。 |
-| `options` | `—` | `None` | 下拉菜单中的可选项。 |
-| `hint_text` | `—` | `None` | 尚无输入或选择时显示的提示文字。 |
-| `label` | `—` | `None` | 显示在输入框、选项或控件旁的标签。 |
-| `on_select` | `—` | `None` | 选中菜单项或选项时调用的回调。 |
-| `text_size` | `float` | `16.0` | 输入或选择内容的文字大小。 |
-| `filled` | `—` | `False` | 是否使用填充式输入区域。 |
-| `fill_color` | `—` | `None` | 填充式输入区域的背景颜色。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `border` | `—` | `None` | 边框配置。 |
-| `border_radius` | `—` | `None` | 边框或背景的圆角半径。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `value` | `—` | `None` | Key of the currently selected option. |
+| `options` | `—` | `None` | Options available in the dropdown menu. |
+| `hint_text` | `—` | `None` | Hint shown before a value is entered or selected. |
+| `label` | `—` | `None` | Label beside an input, option, or control. |
+| `on_select` | `—` | `None` | Callback called when a menu item or option is selected. |
+| `text_size` | `float` | `16.0` | Font size of entered or selected text. |
+| `filled` | `—` | `False` | Use a filled input area. |
+| `fill_color` | `—` | `None` | Background color of a filled input area. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `border` | `—` | `None` | Border settings. |
+| `border_radius` | `—` | `None` | Corner radius of the border or background. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

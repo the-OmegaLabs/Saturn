@@ -1,19 +1,19 @@
 # ThemeMode
 
-选择浅色、深色或跟随系统的主题模式。
+Selects light, dark, or system theme mode.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 49 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 49).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `SYSTEM` | `system` |
 | `LIGHT` | `light` |
 | `DARK` | `dark` |
 
-在代码中通过成员名称使用，例如 `saturn.ThemeMode.SYSTEM`。
+Use members by name, for example `saturn.ThemeMode.SYSTEM`.

@@ -1,16 +1,16 @@
 # FilePickerFileType
 
-限定文件选择器可选文件的类型。
+Limits the types of files that can be selected.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/services.py`](../../saturn/services.py)（第 11 行）。
+Source: [`saturn/services.py`](../../saturn/services.py) (line 11).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `ANY` | `any` |
 | `MEDIA` | `media` |
@@ -19,4 +19,4 @@
 | `AUDIO` | `audio` |
 | `CUSTOM` | `custom` |
 
-在代码中通过成员名称使用，例如 `saturn.FilePickerFileType.ANY`。
+Use members by name, for example `saturn.FilePickerFileType.ANY`.

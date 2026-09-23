@@ -1,18 +1,18 @@
 # LabelPosition
 
-设置选择控件标签相对主体的位置。
+Position of a selection control's label.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 62 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 62).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `RIGHT` | `right` |
 | `LEFT` | `left` |
 
-在代码中通过成员名称使用，例如 `saturn.LabelPosition.RIGHT`。
+Use members by name, for example `saturn.LabelPosition.RIGHT`.

@@ -1,16 +1,16 @@
 # FontWeight
 
-选择文字的字重。
+Selects a text font weight.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 35 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 35).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `W_100` | `w100` |
 | `W_200` | `w200` |
@@ -24,4 +24,4 @@
 | `W_800` | `w800` |
 | `W_900` | `w900` |
 
-在代码中通过成员名称使用，例如 `saturn.FontWeight.W_100`。
+Use members by name, for example `saturn.FontWeight.W_100`.

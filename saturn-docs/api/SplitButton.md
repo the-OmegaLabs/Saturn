@@ -1,18 +1,18 @@
 # SplitButton
 
-把主操作和副操作分开的按钮。
+Button with separate primary and secondary actions.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/split_button.py`](../../saturn/widgets/split_button.py)（第 106 行）。
+Source: [`saturn/widgets/split_button.py`](../../saturn/widgets/split_button.py) (line 106).
 
-## 效果图
+## Preview
 
-![SplitButton 控件的深色主题效果](../images/controls/SplitButton.png)
+![SplitButton control in the dark theme](../images/controls/SplitButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,23 +29,23 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.SplitButton(content: 'str' = '', *, icon=None, trailing_icon=<Icons.ARROW_DROP_DOWN: 58821>, on_click=None, on_trailing_click=None, bgcolor=None, color=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `str` | `''` | 要显示的文本或子控件。 |
-| `icon` | `—` | `None` | 要绘制的图标。 |
-| `trailing_icon` | `—` | `<Icons.ARROW_DROP_DOWN: 58821>` | 分段按钮副操作区域的图标。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `on_trailing_click` | `—` | `None` | 点击分段按钮副操作区域时调用的回调。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `str` | `''` | Text or child control to display. |
+| `icon` | `—` | `None` | Icon to draw. |
+| `trailing_icon` | `—` | `<Icons.ARROW_DROP_DOWN: 58821>` | Icon in the secondary action area of a split button. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `on_trailing_click` | `—` | `None` | Callback called when the split button's secondary action is clicked. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

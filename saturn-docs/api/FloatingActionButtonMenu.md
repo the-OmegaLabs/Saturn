@@ -1,18 +1,18 @@
 # FloatingActionButtonMenu
 
-从浮动按钮展开多项操作的菜单。
+Menu of actions expanded from a floating button.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/floating.py`](../../saturn/widgets/floating.py)（第 248 行）。
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 248).
 
-## 效果图
+## Preview
 
-![FloatingActionButtonMenu 控件的深色主题效果](../images/controls/FloatingActionButtonMenu.png)
+![FloatingActionButtonMenu control in the dark theme](../images/controls/FloatingActionButtonMenu.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,27 +29,27 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `toggle(self)` | 切换展开与收起状态。 |
-| `close(self)` | 关闭窗口或展开的菜单。 |
+| `toggle(self)` | Switches between expanded and collapsed states. |
+| `close(self)` | Closes a window or expanded menu. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FloatingActionButtonMenu(items=None, *, icon=<Icons.ADD: 57669>, expanded=False, on_select=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `items` | `—` | `None` | 传给布局、分组或菜单的项目列表。 |
-| `icon` | `—` | `<Icons.ADD: 57669>` | 要绘制的图标。 |
-| `expanded` | `—` | `False` | 浮动组件或菜单当前是否展开。 |
-| `on_select` | `—` | `None` | 选中菜单项或选项时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `items` | `—` | `None` | Items passed to a layout, group, or menu. |
+| `icon` | `—` | `<Icons.ADD: 57669>` | Icon to draw. |
+| `expanded` | `—` | `False` | Whether the floating component or menu is expanded. |
+| `on_select` | `—` | `None` | Callback called when a menu item or option is selected. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

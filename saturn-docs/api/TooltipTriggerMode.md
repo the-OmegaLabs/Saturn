@@ -1,19 +1,19 @@
 # TooltipTriggerMode
 
-选择触发工具提示的交互方式。
+Interaction that triggers a tooltip.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 85 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 85).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `MANUAL` | `manual` |
 | `TAP` | `tap` |
 | `LONG_PRESS` | `long_press` |
 
-在代码中通过成员名称使用，例如 `saturn.TooltipTriggerMode.MANUAL`。
+Use members by name, for example `saturn.TooltipTriggerMode.MANUAL`.

@@ -1,26 +1,26 @@
 # Option
 
-DropdownOption 的简写名称，用来定义下拉选项。
+Short alias for DropdownOption.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py)（第 1386 行）。
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1386).
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-公开名称 `saturn.Option` 指向实现类 `DropdownOption`。
+The public name `saturn.Option` refers to the implementation class `DropdownOption`.
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Option(key=None, *, text=None, content=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `key` | `—` | `None` | 用于定位控件或服务的键。 |
-| `text` | `—` | `None` | 显示在控件上的文字。 |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `key` | `—` | `None` | Key used to locate a control or service. |
+| `text` | `—` | `None` | Text displayed on the control. |
+| `content` | `—` | `None` | Text or child control to display. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

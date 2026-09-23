@@ -1,24 +1,24 @@
 # BorderSide
 
-定义一条边框的宽度和颜色。
+Width and color of one border side.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 271 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 271).
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `none(cls)` | 创建没有可见边框的配置。 |
+| `none(cls)` | Creates settings with no visible border. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.BorderSide(width: 'float' = 1.0, color: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `width` | `float` | `1.0` | 控件的指定宽度。 |
-| `color` | `object` | `None` | 前景、文字或绘制内容的颜色。 |
+| `width` | `float` | `1.0` | Specified control width. |
+| `color` | `object` | `None` | Color of foreground content, text, or drawing. |

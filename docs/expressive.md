@@ -1,20 +1,20 @@
-# Expressive 组件与绘制
+# Expressive controls and rendering
 
-## 组件
+## Controls
 
-- `MaterialExpressiveTheme`：浅色 on-container 配色；深色随 `page.theme_mode` 切换。
-- `ExpressiveButton` / `ExpressiveIconButton`：五档尺寸、按下和选中形状变化。
-- `ToggleButton`、`ElevatedToggleButton`、`FilledTonalToggleButton`、`OutlinedToggleButton`。
-- `SplitButton`：独立主操作与副操作，ripple 使用两段各自的不对称圆角遮罩。
-- `ButtonGroup`：按压项扩大 15%，相邻项缩小；绘制与命中使用相同动画布局。
-- `FloatingActionButton`、Small/Medium/Large/Extended 变体：形状遮罩经双层高斯柔化形成阴影。
-- `ListItem`：一至三行内容、前后槽位、选中及禁用状态。
-- `LoadingIndicator`：SoftBurst → Cookie9Sided → Pentagon → Pill → Sunny → Cookie4Sided → Oval 的七形态 RoundedPolygon morph；每段 650ms、持续旋转。`value` 数值模式为 Circle → SoftBurst，`contained=True` 添加容器。
-- `WavyProgressIndicator` / `LinearWavyProgressIndicator`、`CircularWavyProgressIndicator`：支持数值进度与不确定进度、移动波形、颜色、振幅、波长和波速。
-- `FloatingToolbar` / Horizontal/Vertical 变体：64dp 胶囊容器，可收起 leading/trailing 槽位；隐藏部分不可点击。
-- `FloatingActionButtonMenu` / `FloatingActionButtonMenuItem`：锚定菜单、滚动长列表、选择回调、点击空白处或 Escape 关闭。
+- `MaterialExpressiveTheme`: light on-container colors; dark colors follow `page.theme_mode`.
+- `ExpressiveButton` / `ExpressiveIconButton`: five size levels and shape changes when pressed or selected.
+- `ToggleButton`, `ElevatedToggleButton`, `FilledTonalToggleButton`, and `OutlinedToggleButton`.
+- `SplitButton`: separate primary and secondary actions; each ripple is clipped to its own asymmetric rounded shape.
+- `ButtonGroup`: a pressed item grows by 15% while adjacent items shrink; drawing and hit testing use the same animated layout.
+- `FloatingActionButton` and Small, Medium, Large, and Extended variants: the shape mask is softened in two Gaussian passes to create a shadow.
+- `ListItem`: one to three lines of content, leading and trailing slots, and selected and disabled states.
+- `LoadingIndicator`: a seven-shape RoundedPolygon morph from SoftBurst to Cookie9Sided, Pentagon, Pill, Sunny, Cookie4Sided, and Oval. Each segment lasts 650 ms while the indicator rotates continuously. Numeric `value` morphs Circle to SoftBurst; `contained=True` adds a container.
+- `WavyProgressIndicator`, `LinearWavyProgressIndicator`, and `CircularWavyProgressIndicator`: determinate and indeterminate progress, moving waves, color, amplitude, wavelength, and speed.
+- `FloatingToolbar` and Horizontal and Vertical variants: a 64 dp capsule that can collapse its leading and trailing slots. Hidden portions cannot be clicked.
+- `FloatingActionButtonMenu` / `FloatingActionButtonMenuItem`: anchored menu with long-list scrolling and selection callbacks. Click outside or press Escape to close it.
 
-## 示例
+## Example
 
 ```python
 import saturn
@@ -35,19 +35,19 @@ def main(page):
 saturn.run(main)
 ```
 
-- 基础展板：`uv run python examples/expressive_demo.py`。
-- 动画展板：`uv run python examples/expressive_motion_demo.py`；可加 `--menu`、`--pressed` 查看不同交互状态。
-- 回归检查：`uv run python -m tests.expressive_checks`。
-- 过渡性能回放：`uv run python -m tests.floating_perf software` 或 `opengl`；分别报告首次与缓存命中后的帧耗时，不包含显示同步等待。
+- Basic showcase: `uv run python examples/expressive_demo.py`.
+- Motion showcase: `uv run python examples/expressive_motion_demo.py`; add `--menu` or `--pressed` to inspect interaction states.
+- Regression checks: `uv run python -m tests.expressive_checks`.
+- Transition performance replay: `uv run python -m tests.floating_perf software` or `opengl`. These report the first-frame and cached-frame costs, excluding display synchronization waits.
 
-## 绘制与资源
+## Rendering and resources
 
-所有新形状在共享绘制路径中生成，软件、OpenGL 与 Vulkan 使用同一份轮廓。
-轮廓变换使用预生成的匹配 Bézier 控制点，运行时不需要 JVM；再生成工具为 `tools/ExportLoadingShapes.java`。
-原始参考资料、资源出处和第三方许可证保存在 `references/`。
+All new shapes are generated in a shared drawing path, so software, OpenGL, and Vulkan use the same outlines.
+Outline morphs use pregenerated matching Bézier control points; no JVM is needed at runtime. Regenerate them with `tools/ExportLoadingShapes.java`.
+Original references, asset sources, and third-party licenses are kept in `references/`.
 
-输入框缺口采用分区描边，不覆盖父容器背景；空字段缺口的宽度和深度随标签浮动进度一起变化，有值字段的标签与缺口在焦点切换时保持浮动状态。
-阴影按完整形状模糊并缓存，长标签不会改变阴影的圆角结构。
-柔化在低分辨率中间图上计算，GPU 负责放大；软件路径另行缓存放大结果，避免展开/收起每帧进行整张高分辨率模糊。
-组件形状切换仍使用框架的插值动画；LoadingIndicator 使用阻尼弹簧响应。
-ButtonGroup 的连接模式当前提供 2dp 间距，尚无溢出菜单。
+The text field notch uses segmented strokes without covering its parent background. For an empty field, the notch width and depth follow the label's floating progress. For a field with a value, the label and notch remain floated when focus changes.
+Shadows are blurred and cached from the full shape, so a long label does not change the shadow's rounded structure.
+Softening is computed on a low-resolution intermediate image that the GPU scales up. The software path separately caches the scaled result to avoid a full high-resolution blur on every expansion or collapse frame.
+Control shape transitions still use the framework's interpolated animation; LoadingIndicator uses a damped spring response.
+Connected ButtonGroup currently uses a 2 dp gap and has no overflow menu.

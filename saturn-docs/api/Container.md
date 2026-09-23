@@ -1,18 +1,18 @@
 # Container
 
-为子控件添加间距、背景、边框等装饰。
+Adds spacing, background, borders, and other decoration to a child.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/containers.py`](../../saturn/widgets/containers.py)（第 194 行）。
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 194).
 
-## 效果图
+## Preview
 
-![Container 控件的深色主题效果](../images/controls/Container.png)
+![Container control in the dark theme](../images/controls/Container.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,29 +29,29 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, border_radius=None, alignment=None, gradient=None, shadow=None, ink=False, animate=None, on_click=None, on_hover=None, on_long_press=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `padding` | `—` | `None` | 控件内容四周的内边距。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `border` | `—` | `None` | 边框配置。 |
-| `border_radius` | `—` | `None` | 边框或背景的圆角半径。 |
-| `alignment` | `—` | `None` | 内容在容器内部的对齐位置。 |
-| `gradient` | `—` | `None` | 用于填充背景的渐变。 |
-| `shadow` | `—` | `None` | 控件外侧的阴影设置。 |
-| `ink` | `—` | `False` | 是否绘制点击反馈的水波纹。 |
-| `animate` | `—` | `None` | 属性变化时采用的动画配置。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
-| `on_long_press` | `—` | `None` | 长按控件时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `—` | `None` | Text or child control to display. |
+| `padding` | `—` | `None` | Space around the control's content. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `border` | `—` | `None` | Border settings. |
+| `border_radius` | `—` | `None` | Corner radius of the border or background. |
+| `alignment` | `—` | `None` | Alignment of content inside the container. |
+| `gradient` | `—` | `None` | Gradient used to fill the background. |
+| `shadow` | `—` | `None` | Shadow outside the control. |
+| `ink` | `—` | `False` | Whether to draw ripple feedback on clicks. |
+| `animate` | `—` | `None` | Animation settings applied when a property changes. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `on_long_press` | `—` | `None` | Callback called when the control is long pressed. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

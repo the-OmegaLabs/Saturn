@@ -1,18 +1,18 @@
 # Image
 
-显示本地图片或 SVG。
+Displays a local image or SVG.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/basic.py`](../../saturn/widgets/basic.py)（第 71 行）。
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 71).
 
-## 效果图
+## Preview
 
-![Image 控件的深色主题效果](../images/controls/Image.png)
+![Image control in the dark theme](../images/controls/Image.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,20 +29,20 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Image(src=None, *, fit=None, border_radius=None, color=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `src` | `—` | `None` | 图片来源，可为本地路径、字节数据或 data URI。 |
-| `fit` | `—` | `None` | 图片在给定尺寸内的缩放和裁切方式。 |
-| `border_radius` | `—` | `None` | 边框或背景的圆角半径。 |
-| `color` | `—` | `None` | 可选的图片着色颜色，会与原像素相乘。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `src` | `—` | `None` | Image source: a local path, bytes, or data URI. |
+| `fit` | `—` | `None` | How an image scales and crops within its bounds. |
+| `border_radius` | `—` | `None` | Corner radius of the border or background. |
+| `color` | `—` | `None` | Optional image tint multiplied with the source pixels. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

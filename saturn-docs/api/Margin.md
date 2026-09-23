@@ -1,22 +1,22 @@
 # Margin
 
-定义控件外侧四个方向的留白。
+Space outside a control on each side.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 242 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 242).
 
-**基类：** [Padding](./Padding.md)
+**Base class:** [Padding](./Padding.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Margin(left: 'float' = 0.0, top: 'float' = 0.0, right: 'float' = 0.0, bottom: 'float' = 0.0) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `left` | `float` | `0.0` | 相对 Stack 左边的定位距离。 |
-| `top` | `float` | `0.0` | 相对 Stack 上边的定位距离。 |
-| `right` | `float` | `0.0` | 相对 Stack 右边的定位距离。 |
-| `bottom` | `float` | `0.0` | 相对 Stack 底边的定位距离。 |
+| `left` | `float` | `0.0` | Distance from the left edge of a Stack. |
+| `top` | `float` | `0.0` | Distance from the top edge of a Stack. |
+| `right` | `float` | `0.0` | Distance from the right edge of a Stack. |
+| `bottom` | `float` | `0.0` | Distance from the bottom edge of a Stack. |

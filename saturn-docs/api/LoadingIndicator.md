@@ -1,18 +1,18 @@
 # LoadingIndicator
 
-以动态形状展示正在进行的操作。
+Shows ongoing activity with an animated shape.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py)（第 32 行）。
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 32).
 
-## 效果图
+## Preview
 
-![LoadingIndicator 控件的深色主题效果](../images/controls/LoadingIndicator.png)
+![LoadingIndicator control in the dark theme](../images/controls/LoadingIndicator.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,20 +29,20 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.LoadingIndicator(value=None, *, color=None, bgcolor=None, contained=False, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `value` | `—` | `None` | 控件或数据对象的当前值。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `contained` | `—` | `False` | 加载指示器是否放在容器背景中。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `value` | `—` | `None` | Current value of the control or data object. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `contained` | `—` | `False` | Place the loading indicator on a container background. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,18 +1,18 @@
 # ListView
 
-可滚动的控件列表。
+Scrollable list of controls.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py)（第 27 行）。
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 27).
 
-## 效果图
+## Preview
 
-![ListView 控件的深色主题效果](../images/controls/ListView.png)
+![ListView control in the dark theme](../images/controls/ListView.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,29 +29,29 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `scroll_to(self, offset: 'float' = 0, delta: 'float | None' = None)` | 滚动到指定位置或按给定距离滚动。 |
+| `scroll_to(self, offset: 'float' = 0, delta: 'float | None' = None)` | Scrolls to a position or by a specified distance. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'float' = 0, padding=None, auto_scroll: 'bool' = False, on_scroll=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `*items` | `—` | `额外位置参数` | 传给布局、分组或菜单的项目列表。 |
-| `controls` | `—` | `None` | 按顺序排列的子控件列表。 |
-| `horizontal` | `bool` | `False` | 为 True 时采用水平滚动或水平排布。 |
-| `spacing` | `float` | `0` | 相邻子控件之间的间距。 |
-| `padding` | `—` | `None` | 控件内容四周的内边距。 |
-| `auto_scroll` | `bool` | `False` | 内容增加时是否自动滚动到末尾。 |
-| `on_scroll` | `—` | `None` | 列表滚动时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `*items` | `—` | `additional positional arguments` | Items passed to a layout, group, or menu. |
+| `controls` | `—` | `None` | Child controls in display order. |
+| `horizontal` | `bool` | `False` | Use horizontal scrolling or layout when True. |
+| `spacing` | `float` | `0` | Space between adjacent child controls. |
+| `padding` | `—` | `None` | Space around the control's content. |
+| `auto_scroll` | `bool` | `False` | Scroll to the end automatically as content is added. |
+| `on_scroll` | `—` | `None` | Callback called when the list scrolls. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,39 +1,39 @@
 # App
 
-管理窗口、事件循环和绘制后端的应用对象。
+Application object that manages windows, events, and rendering.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/app.py`](../../saturn/app.py)（第 113 行）。
+Source: [`saturn/app.py`](../../saturn/app.py) (line 113).
 
-> 这些对象通常由 `saturn.run()` 创建和传入，应用代码无需直接构造。
+> `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `start(self)` | 启动应用窗口与事件处理。 |
-| `close(self)` | 关闭窗口或展开的菜单。 |
-| `run_until_closed(self)` | 持续处理窗口事件，直到窗口关闭。 |
+| `start(self)` | Starts the application window and event handling. |
+| `close(self)` | Closes a window or expanded menu. |
+| `run_until_closed(self)` | Processes window events until the window closes. |
 | `call(self, fn, *args)` | Run a user callable off the UI thread (sync: thread, async: loop). |
-| `mark_dirty(self)` | 标记界面需要重新绘制。 |
+| `mark_dirty(self)` | Marks the interface for redrawing. |
 | `post(self, fn)` | Run a callable on the UI thread (required for SDL display calls). |
 | `set_text_input_rect(self, rect: 'pygame.Rect')` | Position SDL text input using a caret-relative exclusion area. |
 | `screenshot(self, path: 'str | None' = None)` | Grab the current frame from any thread; returns a pygame Surface |
-| `physical_size_for_logical(self, width, height)` | 把逻辑尺寸换算为物理像素尺寸。 |
-| `logical_point(self, x, y)` | 把物理坐标换算为逻辑坐标。 |
-| `client_size_for_outer(self, width, height)` | 根据窗口外框尺寸换算客户区域尺寸。 |
+| `physical_size_for_logical(self, width, height)` | Converts logical dimensions to physical pixels. |
+| `logical_point(self, x, y)` | Converts physical coordinates to logical coordinates. |
+| `client_size_for_outer(self, width, height)` | Converts outer window dimensions to client area dimensions. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.App(main, backend: 'Render', width: 'int', height: 'int', title: 'str')
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `main` | `—` | `必填` | 应用入口函数，接收 Page 对象。 |
-| `backend` | `Render` | `必填` | 绘制后端的选择。 |
-| `width` | `int` | `必填` | 控件的指定宽度。 |
-| `height` | `int` | `必填` | 控件的指定高度。 |
-| `title` | `str` | `必填` | 对话框、提示或窗口的标题。 |
+| `main` | `—` | `required` | Application entry point that receives a Page. |
+| `backend` | `Render` | `required` | Rendering backend to use. |
+| `width` | `int` | `required` | Specified control width. |
+| `height` | `int` | `required` | Specified control height. |
+| `title` | `str` | `required` | Title of a dialog, notification, or window. |

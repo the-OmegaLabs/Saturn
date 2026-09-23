@@ -1,18 +1,18 @@
 # Switch
 
-用于开关状态的滑动切换控件。
+Sliding on/off toggle.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py)（第 960 行）。
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 960).
 
-## 效果图
+## Preview
 
-![Switch 控件的深色主题效果](../images/controls/Switch.png)
+![Switch control in the dark theme](../images/controls/Switch.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,15 +29,15 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `_Toggle`
+**Base class:** `_Toggle`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Switch(*args, **kwargs)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `*args` | `—` | `额外位置参数` | 传给父类构造函数的位置参数。 |
-| `**kwargs` | `—` | `额外关键字参数` | 传给父类构造函数的关键字参数。 |
+| `*args` | `—` | `additional positional arguments` | Positional arguments passed to the parent constructor. |
+| `**kwargs` | `—` | `additional keyword arguments` | Keyword arguments passed to the parent constructor. |

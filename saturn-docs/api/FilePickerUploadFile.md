@@ -1,20 +1,20 @@
 # FilePickerUploadFile
 
-上传文件时使用的目标地址与请求方式。
+Upload destination and request method for a file.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/services.py`](../../saturn/services.py)（第 29 行）。
+Source: [`saturn/services.py`](../../saturn/services.py) (line 29).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FilePickerUploadFile(upload_url: 'str', method: 'str' = 'PUT', id: 'int | None' = None, name: 'str | None' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `upload_url` | `str` | `必填` | 文件上传的目标地址。 |
-| `method` | `str` | `'PUT'` | 触发操作的方法名称。 |
-| `id` | `int | None` | `None` | 文件或对象的标识值。 |
-| `name` | `str | None` | `None` | 对象、文件或资源的名称。 |
+| `upload_url` | `str` | `required` | Destination URL for file uploads. |
+| `method` | `str` | `'PUT'` | Name of the method that triggered the operation. |
+| `id` | `int | None` | `None` | Identifier of the file or object. |
+| `name` | `str | None` | `None` | Name of the object, file, or resource. |

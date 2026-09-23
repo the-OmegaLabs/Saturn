@@ -1,30 +1,30 @@
 # FilePicker
 
-调用系统文件选择与保存对话框。
+Opens system file selection and save dialogs.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/services.py`](../../saturn/services.py)（第 63 行）。
+Source: [`saturn/services.py`](../../saturn/services.py) (line 63).
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `pick_files(self, dialog_title=None, initial_directory=None, file_type=<FilePickerFileType.ANY: 'any'>, allowed_extensions=None, allow_multiple=False, with_data=False, compression_quality=0, cancel_upload_on_window_blur=True)` | 打开系统文件选择对话框。 |
-| `get_directory_path(self, dialog_title=None, initial_directory=None)` | 打开系统目录选择对话框。 |
-| `save_file(self, dialog_title=None, file_name=None, initial_directory=None, file_type=<FilePickerFileType.ANY: 'any'>, allowed_extensions=None, src_bytes=None)` | 打开系统文件保存对话框。 |
-| `upload(self, files: 'list[FilePickerUploadFile]')` | 将指定文件上传到给定地址。 |
+| `pick_files(self, dialog_title=None, initial_directory=None, file_type=<FilePickerFileType.ANY: 'any'>, allowed_extensions=None, allow_multiple=False, with_data=False, compression_quality=0, cancel_upload_on_window_blur=True)` | Opens the system file picker. |
+| `get_directory_path(self, dialog_title=None, initial_directory=None)` | Opens the system directory picker. |
+| `save_file(self, dialog_title=None, file_name=None, initial_directory=None, file_type=<FilePickerFileType.ANY: 'any'>, allowed_extensions=None, src_bytes=None)` | Opens the system save-file dialog. |
+| `upload(self, files: 'list[FilePickerUploadFile]')` | Uploads selected files to the given destination. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FilePicker(on_result=None, on_upload=None, *, data=None, key=None, ref=None)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `on_result` | `—` | `None` | 文件选择或保存操作返回结果时调用的回调。 |
-| `on_upload` | `—` | `None` | 文件上传状态变化时调用的回调。 |
-| `data` | `—` | `None` | 附着在控件或事件上的自定义数据。 |
-| `key` | `—` | `None` | 用于定位控件或服务的键。 |
-| `ref` | `—` | `None` | 保存控件或服务引用的位置。 |
+| `on_result` | `—` | `None` | Callback called when a file selection or save returns a result. |
+| `on_upload` | `—` | `None` | Callback called when file upload status changes. |
+| `data` | `—` | `None` | Custom data attached to the control or event. |
+| `key` | `—` | `None` | Key used to locate a control or service. |
+| `ref` | `—` | `None` | Place to store a control or service reference. |

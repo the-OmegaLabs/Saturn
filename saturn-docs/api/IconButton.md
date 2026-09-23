@@ -1,18 +1,18 @@
 # IconButton
 
-以图标呈现的紧凑操作按钮。
+Compact action button presented as an icon.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py)（第 300 行）。
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 300).
 
-## 效果图
+## Preview
 
-![IconButton 控件的深色主题效果](../images/controls/IconButton.png)
+![IconButton control in the dark theme](../images/controls/IconButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,29 +29,29 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.IconButton(icon, *, icon_size: 'float | None' = None, icon_color=None, selected_icon=None, selected=False, bgcolor=None, hover_color=None, tooltip=None, on_click=None, on_hover=None, expressive=False, size=None, shape='round', **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `icon` | `—` | `必填` | 要绘制的图标。 |
-| `icon_size` | `float | None` | `None` | 图标的显示大小。 |
-| `icon_color` | `—` | `None` | 图标的前景颜色。 |
-| `selected_icon` | `—` | `None` | 选中状态下显示的替代图标。 |
-| `selected` | `—` | `False` | 列表项或图标按钮当前是否选中。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `hover_color` | `—` | `None` | 悬停状态使用的颜色。 |
-| `tooltip` | `—` | `None` | 鼠标悬停时显示的简短提示。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
-| `expressive` | `—` | `False` | 是否启用 Expressive 尺寸与形状行为。 |
-| `size` | `—` | `None` | 文字、图标或控件的尺寸等级。 |
-| `shape` | `—` | `'round'` | 按钮的基础形状。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `icon` | `—` | `required` | Icon to draw. |
+| `icon_size` | `float | None` | `None` | Displayed icon size. |
+| `icon_color` | `—` | `None` | Foreground color of the icon. |
+| `selected_icon` | `—` | `None` | Alternate icon shown when selected. |
+| `selected` | `—` | `False` | Whether the list item or icon button is selected. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `hover_color` | `—` | `None` | Color used in the hover state. |
+| `tooltip` | `—` | `None` | Short hint shown on hover. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
+| `size` | `—` | `None` | Size of the text, icon, or control. |
+| `shape` | `—` | `'round'` | Base shape of the button. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,29 +1,29 @@
 # BorderRadius
 
-分别定义四个角的圆角半径。
+Corner radii for each of the four corners.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 246 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 246).
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `all(cls, radius: 'float')` | 用同一个值创建各方向一致的配置。 |
-| `horizontal(cls, left: 'float' = 0.0, right: 'float' = 0.0)` | 设置水平方向的两个值。 |
-| `vertical(cls, top: 'float' = 0.0, bottom: 'float' = 0.0)` | 设置垂直方向的两个值。 |
-| `only(cls, top_left: 'float' = 0.0, top_right: 'float' = 0.0, bottom_right: 'float' = 0.0, bottom_left: 'float' = 0.0)` | 分别设置指定方向的值。 |
+| `all(cls, radius: 'float')` | Creates the same setting for every side. |
+| `horizontal(cls, left: 'float' = 0.0, right: 'float' = 0.0)` | Sets the two horizontal values. |
+| `vertical(cls, top: 'float' = 0.0, bottom: 'float' = 0.0)` | Sets the two vertical values. |
+| `only(cls, top_left: 'float' = 0.0, top_right: 'float' = 0.0, bottom_right: 'float' = 0.0, bottom_left: 'float' = 0.0)` | Sets values for specified sides individually. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.BorderRadius(top_left: 'float' = 0.0, top_right: 'float' = 0.0, bottom_right: 'float' = 0.0, bottom_left: 'float' = 0.0) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `top_left` | `float` | `0.0` | 左上角的圆角大小。 |
-| `top_right` | `float` | `0.0` | 右上角的圆角大小。 |
-| `bottom_right` | `float` | `0.0` | 右下角的圆角大小。 |
-| `bottom_left` | `float` | `0.0` | 左下角的圆角大小。 |
+| `top_left` | `float` | `0.0` | Corner radius at the top left. |
+| `top_right` | `float` | `0.0` | Corner radius at the top right. |
+| `bottom_right` | `float` | `0.0` | Corner radius at the bottom right. |
+| `bottom_left` | `float` | `0.0` | Corner radius at the bottom left. |

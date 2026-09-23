@@ -1,18 +1,18 @@
 # ExpressiveIconButton
 
-支持 Expressive 尺寸和形状变化的图标按钮。
+Icon button with Expressive size and shape changes.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py)（第 405 行）。
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 405).
 
-## 效果图
+## Preview
 
-![ExpressiveIconButton 控件的深色主题效果](../images/controls/ExpressiveIconButton.png)
+![ExpressiveIconButton control in the dark theme](../images/controls/ExpressiveIconButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,16 +29,16 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [IconButton](./IconButton.md)
+**Base class:** [IconButton](./IconButton.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.ExpressiveIconButton(icon, *, size='small', **kwargs)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `icon` | `—` | `必填` | 要绘制的图标。 |
-| `size` | `—` | `'small'` | 文字、图标或控件的尺寸等级。 |
-| `**kwargs` | `—` | `额外关键字参数` | 传给父类构造函数的关键字参数。 |
+| `icon` | `—` | `required` | Icon to draw. |
+| `size` | `—` | `'small'` | Size of the text, icon, or control. |
+| `**kwargs` | `—` | `additional keyword arguments` | Keyword arguments passed to the parent constructor. |

@@ -1,22 +1,22 @@
 # FilePickerUploadEvent
 
-文件上传进度与错误信息事件。
+File upload progress or error event.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/services.py`](../../saturn/services.py)（第 49 行）。
+Source: [`saturn/services.py`](../../saturn/services.py) (line 49).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FilePickerUploadEvent(name: 'str', control: "'FilePicker'", file_name: 'str', progress: 'float | None' = None, error: 'str | None' = None, data: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `name` | `str` | `必填` | 对象、文件或资源的名称。 |
-| `control` | `FilePicker` | `必填` | 产生事件或关联数据的控件。 |
-| `file_name` | `str` | `必填` | 保存时建议使用的文件名。 |
-| `progress` | `float | None` | `None` | 上传或操作的完成进度。 |
-| `error` | `str | None` | `None` | 操作失败时的错误信息。 |
-| `data` | `object` | `None` | 附着在控件或事件上的自定义数据。 |
+| `name` | `str` | `required` | Name of the object, file, or resource. |
+| `control` | `FilePicker` | `required` | Control that produced the event or holds the data. |
+| `file_name` | `str` | `required` | Suggested name for a saved file. |
+| `progress` | `float | None` | `None` | Completion progress of an upload or operation. |
+| `error` | `str | None` | `None` | Error message when an operation fails. |
+| `data` | `object` | `None` | Custom data attached to the control or event. |

@@ -1,18 +1,18 @@
 # ToggleButton
 
-可在选中与未选中状态间切换的按钮。
+Button that switches between selected and unselected states.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/toggle_button.py`](../../saturn/widgets/toggle_button.py)（第 15 行）。
+Source: [`saturn/widgets/toggle_button.py`](../../saturn/widgets/toggle_button.py) (line 15).
 
-## 效果图
+## Preview
 
-![ToggleButton 控件的深色主题效果](../images/controls/ToggleButton.png)
+![ToggleButton control in the dark theme](../images/controls/ToggleButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,19 +29,19 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [ExpressiveButton](./ExpressiveButton.md)
+**Base class:** [ExpressiveButton](./ExpressiveButton.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.ToggleButton(content=None, *, checked=False, on_change=None, variant='filled', size='small', **kwargs)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `checked` | `—` | `False` | 切换按钮当前是否处于选中状态。 |
-| `on_change` | `—` | `None` | 值改变时调用的回调。 |
-| `variant` | `—` | `'filled'` | 选择该控件的视觉变体。 |
-| `size` | `—` | `'small'` | 文字、图标或控件的尺寸等级。 |
-| `**kwargs` | `—` | `额外关键字参数` | 传给父类构造函数的关键字参数。 |
+| `content` | `—` | `None` | Text or child control to display. |
+| `checked` | `—` | `False` | Whether the toggle button is currently selected. |
+| `on_change` | `—` | `None` | Callback called when the value changes. |
+| `variant` | `—` | `'filled'` | Visual variant of this control. |
+| `size` | `—` | `'small'` | Size of the text, icon, or control. |
+| `**kwargs` | `—` | `additional keyword arguments` | Keyword arguments passed to the parent constructor. |

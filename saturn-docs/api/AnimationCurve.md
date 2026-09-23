@@ -1,16 +1,16 @@
 # AnimationCurve
 
-选择动画速度随时间变化的曲线。
+How animation speed changes over time.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 91 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 91).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `BOUNCE_IN` | `bounceIn` |
 | `BOUNCE_IN_OUT` | `bounceInOut` |
@@ -55,4 +55,4 @@
 | `LINEAR_TO_EASE_OUT` | `linearToEaseOut` |
 | `SLOW_MIDDLE` | `slowMiddle` |
 
-在代码中通过成员名称使用，例如 `saturn.AnimationCurve.BOUNCE_IN`。
+Use members by name, for example `saturn.AnimationCurve.BOUNCE_IN`.

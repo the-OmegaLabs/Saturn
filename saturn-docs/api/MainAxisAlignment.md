@@ -1,16 +1,16 @@
 # MainAxisAlignment
 
-设置 Row 或 Column 主轴上的排列方式。
+Arrangement on a Row or Column's main axis.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 9 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 9).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `START` | `start` |
 | `END` | `end` |
@@ -19,4 +19,4 @@
 | `SPACE_AROUND` | `spaceAround` |
 | `SPACE_EVENLY` | `spaceEvenly` |
 
-在代码中通过成员名称使用，例如 `saturn.MainAxisAlignment.START`。
+Use members by name, for example `saturn.MainAxisAlignment.START`.

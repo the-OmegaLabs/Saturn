@@ -1,22 +1,22 @@
 # Duration
 
-以毫秒等形式表示动画或等待时长。
+Animation or wait time in milliseconds and other units.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 137 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 137).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Duration(microseconds: 'int' = 0, milliseconds: 'int' = 0, seconds: 'int' = 0, minutes: 'int' = 0, hours: 'int' = 0, days: 'int' = 0) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `microseconds` | `int` | `0` | 时间值中的微秒数。 |
-| `milliseconds` | `int` | `0` | 时间值中的毫秒数。 |
-| `seconds` | `int` | `0` | 时间值中的秒数。 |
-| `minutes` | `int` | `0` | 时间值中的分钟数。 |
-| `hours` | `int` | `0` | 时间值中的小时数。 |
-| `days` | `int` | `0` | 时间值中的天数。 |
+| `microseconds` | `int` | `0` | Microseconds in the duration. |
+| `milliseconds` | `int` | `0` | Milliseconds in the duration. |
+| `seconds` | `int` | `0` | Seconds in the duration. |
+| `minutes` | `int` | `0` | Minutes in the duration. |
+| `hours` | `int` | `0` | Hours in the duration. |
+| `days` | `int` | `0` | Days in the duration. |

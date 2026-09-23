@@ -1,18 +1,18 @@
 # SnackBar
 
-显示短暂的操作反馈。
+Displays brief feedback about an action.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py)（第 227 行）。
+Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 227).
 
-## 效果图
+## Preview
 
-![SnackBar 控件的深色主题效果](../images/controls/SnackBar.png)
+![SnackBar control in the dark theme](../images/controls/SnackBar.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,23 +29,23 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `DialogControl`
+**Base class:** `DialogControl`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.SnackBar(content, *, action=None, bgcolor=None, duration: 'int' = 4000, on_action=None, open=False, on_dismiss=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `必填` | 要显示的文本或子控件。 |
-| `action` | `—` | `None` | 提示条上的单个操作文本或按钮。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `duration` | `int` | `4000` | 提示条显示的毫秒数。 |
-| `on_action` | `—` | `None` | 点击提示条操作时调用的回调。 |
-| `open` | `—` | `False` | 对话框或提示条当前是否处于打开状态。 |
-| `on_dismiss` | `—` | `None` | 对话框或提示条关闭时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `—` | `required` | Text or child control to display. |
+| `action` | `—` | `None` | Single action label or button on a snackbar. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `duration` | `int` | `4000` | How many milliseconds the snackbar remains visible. |
+| `on_action` | `—` | `None` | Callback called when the snackbar action is clicked. |
+| `open` | `—` | `False` | Whether the dialog or snackbar is open. |
+| `on_dismiss` | `—` | `None` | Callback called when the dialog or snackbar closes. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,18 +1,18 @@
 # FloatingActionButton
 
-用于突出页面主要操作的浮动按钮。
+Floating button that highlights a page's primary action.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/fab.py`](../../saturn/widgets/fab.py)（第 24 行）。
+Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 24).
 
-## 效果图
+## Preview
 
-![FloatingActionButton 控件的深色主题效果](../images/controls/FloatingActionButton.png)
+![FloatingActionButton control in the dark theme](../images/controls/FloatingActionButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,25 +29,25 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `_ConcreteButton`
+**Base class:** `_ConcreteButton`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FloatingActionButton(icon=None, *, text: 'str | None' = None, size: 'str' = 'standard', expanded: 'bool' = True, bgcolor=None, color=None, elevation: 'float' = 6.0, on_click=None, on_hover=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `icon` | `—` | `None` | 要绘制的图标。 |
-| `text` | `str | None` | `None` | 显示在控件上的文字。 |
-| `size` | `str` | `'standard'` | 文字、图标或控件的尺寸等级。 |
-| `expanded` | `bool` | `True` | 浮动组件或菜单当前是否展开。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `elevation` | `float` | `6.0` | 表面高度，对应阴影的视觉强度。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `icon` | `—` | `None` | Icon to draw. |
+| `text` | `str | None` | `None` | Text displayed on the control. |
+| `size` | `str` | `'standard'` | Size of the text, icon, or control. |
+| `expanded` | `bool` | `True` | Whether the floating component or menu is expanded. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `elevation` | `float` | `6.0` | Surface elevation, which determines shadow strength. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

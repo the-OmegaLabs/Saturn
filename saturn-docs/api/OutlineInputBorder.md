@@ -1,19 +1,19 @@
 # OutlineInputBorder
 
-配置表单输入框的描边外观。
+Outline appearance of a form input field.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 281 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 281).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.OutlineInputBorder(border_radius: 'object' = 4.0, side: 'BorderSide' = <factory>, gap_padding: 'float' = 4.0) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `border_radius` | `object` | `4.0` | 边框或背景的圆角半径。 |
-| `side` | `BorderSide` | `<factory>` | 单条边框线的配置。 |
-| `gap_padding` | `float` | `4.0` | 输入框浮动标签两侧的缺口留白。 |
+| `border_radius` | `object` | `4.0` | Corner radius of the border or background. |
+| `side` | `BorderSide` | `<factory>` | Settings for one border side. |
+| `gap_padding` | `float` | `4.0` | Space on either side of a floating label's border gap. |

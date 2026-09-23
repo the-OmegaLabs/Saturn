@@ -1,20 +1,20 @@
 # FilePickerResultEvent
 
-文件选择或保存操作完成时传入的结果事件。
+Result event from a file selection or save operation.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/services.py`](../../saturn/services.py)（第 37 行）。
+Source: [`saturn/services.py`](../../saturn/services.py) (line 37).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.FilePickerResultEvent(name: 'str', control: "'FilePicker'", files: 'list[FilePickerFile]', data: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `name` | `str` | `必填` | 对象、文件或资源的名称。 |
-| `control` | `FilePicker` | `必填` | 产生事件或关联数据的控件。 |
-| `files` | `list[FilePickerFile]` | `必填` | 选择、上传或返回的文件列表。 |
-| `data` | `object` | `None` | 附着在控件或事件上的自定义数据。 |
+| `name` | `str` | `required` | Name of the object, file, or resource. |
+| `control` | `FilePicker` | `required` | Control that produced the event or holds the data. |
+| `files` | `list[FilePickerFile]` | `required` | Files selected, uploaded, or returned. |
+| `data` | `object` | `None` | Custom data attached to the control or event. |

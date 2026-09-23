@@ -1,18 +1,18 @@
 # TextButton
 
-以文字呈现的低强调按钮。
+Low emphasis button presented as text.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py)（第 275 行）。
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 275).
 
-## 效果图
+## Preview
 
-![TextButton 控件的深色主题效果](../images/controls/TextButton.png)
+![TextButton control in the dark theme](../images/controls/TextButton.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,33 +29,33 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Button](./Button.md)
+**Base class:** [Button](./Button.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.TextButton(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, expressive=False, size=None, shape='round', **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `content` | `—` | `None` | 要显示的文本或子控件。 |
-| `icon` | `—` | `None` | 要绘制的图标。 |
-| `icon_color` | `—` | `None` | 图标的前景颜色。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `elevation` | `float` | `1` | 表面高度，对应阴影的视觉强度。 |
-| `style` | `—` | `None` | 附加的按钮样式配置。 |
-| `on_click` | `—` | `None` | 点击控件时调用的回调。 |
-| `on_hover` | `—` | `None` | 指针悬停状态变化时调用的回调。 |
-| `on_long_press` | `—` | `None` | 长按控件时调用的回调。 |
-| `on_focus` | `—` | `None` | 控件获得焦点时调用的回调。 |
-| `on_blur` | `—` | `None` | 控件失去焦点时调用的回调。 |
-| `autofocus` | `—` | `False` | 页面打开时是否尝试自动获得焦点。 |
-| `url` | `—` | `None` | 点击按钮时打开的目标地址。 |
-| `expressive` | `—` | `False` | 是否启用 Expressive 尺寸与形状行为。 |
-| `size` | `—` | `None` | 文字、图标或控件的尺寸等级。 |
-| `shape` | `—` | `'round'` | 按钮的基础形状。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `content` | `—` | `None` | Text or child control to display. |
+| `icon` | `—` | `None` | Icon to draw. |
+| `icon_color` | `—` | `None` | Foreground color of the icon. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `elevation` | `float` | `1` | Surface elevation, which determines shadow strength. |
+| `style` | `—` | `None` | Additional button style settings. |
+| `on_click` | `—` | `None` | Callback called when the control is clicked. |
+| `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `on_long_press` | `—` | `None` | Callback called when the control is long pressed. |
+| `on_focus` | `—` | `None` | Callback called when the control gains focus. |
+| `on_blur` | `—` | `None` | Callback called when the control loses focus. |
+| `autofocus` | `—` | `False` | Try to focus this control when the page opens. |
+| `url` | `—` | `None` | Destination opened when the button is clicked. |
+| `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
+| `size` | `—` | `None` | Size of the text, icon, or control. |
+| `shape` | `—` | `'round'` | Base shape of the button. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

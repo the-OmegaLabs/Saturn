@@ -1,42 +1,43 @@
 # Page
 
-应用页面，管理控件树、主题和对话框。
+Application page that manages controls, themes, and dialogs.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/page.py`](../../saturn/page.py)（第 165 行）。
+Source: [`saturn/page.py`](../../saturn/page.py) (line 165).
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-> 这些对象通常由 `saturn.run()` 创建和传入，应用代码无需直接构造。
+> `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `add(self, *ctrls: 'Control')` | 在页面或控件列表末尾加入子控件。 |
-| `insert(self, index, ctrl)` | 在指定位置插入子控件。 |
-| `remove(self, ctrl)` | 从容器中移除指定控件。 |
-| `remove_at(self, index)` | 按索引移除子控件。 |
-| `clean(self)` | 移除页面中的全部普通控件。 |
-| `show_dialog(self, dialog)` | 在页面上显示对话框或提示条。 |
-| `pop_dialog(self, dialog=None)` | 关闭当前对话框或提示条。 |
-| `update(self)` | 请求重绘本控件及其变化。 |
+| `add(self, *ctrls: 'Control')` | Adds a child control to the end of a page or control list. |
+| `insert(self, index, ctrl)` | Inserts a child control at a specified position. |
+| `remove(self, ctrl)` | Removes a specified control from its container. |
+| `remove_at(self, index)` | Removes a child control by index. |
+| `clean(self)` | Removes all regular controls from the page. |
+| `show_dialog(self, dialog)` | Shows a dialog or snackbar on the page. |
+| `pop_dialog(self, dialog=None)` | Closes the current dialog or snackbar. |
+| `update(self)` | Requests a redraw of this control and its changes. |
+| `repaint(self)` | Redraw when geometry has not changed (scroll, hover, ripple). |
 | `run_task(self, handler, *args)` | flet run_task: schedule a coroutine handler on the app's loop. |
 | `take_screenshot(self, path: 'str | None' = None)` | flet-style async screenshot; returns the frame surface (and saves |
-| `draw(self)` | 请求绘制当前页面内容。 |
-| `handle_event(self, e)` | 处理传入的控件事件。 |
-| `focus(self, control)` | 使控件获得输入焦点。 |
-| `pointer_down(self, x, y, clicks=None)` | 处理指针按下事件。 |
-| `pointer_up(self, x, y)` | 处理指针松开事件。 |
-| `pointer_move(self, x, y)` | 处理指针移动事件。 |
+| `draw(self)` | Requests a draw of the current page. |
+| `handle_event(self, e)` | Handles an incoming control event. |
+| `focus(self, control)` | Gives the control input focus. |
+| `pointer_down(self, x, y, clicks=None)` | Handles a pointer press. |
+| `pointer_up(self, x, y)` | Handles a pointer release. |
+| `pointer_move(self, x, y)` | Handles pointer movement. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Page(app)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `app` | `—` | `必填` | 当前应用实例，由运行时传入。 |
+| `app` | `—` | `required` | Current application instance supplied by the runtime. |

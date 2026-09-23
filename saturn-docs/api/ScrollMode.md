@@ -1,20 +1,20 @@
 # ScrollMode
 
-选择滚动行为模式。
+Selects scrolling behavior.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 67 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 67).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `NONE` | `none` |
 | `AUTO` | `auto` |
 | `HIDDEN` | `hidden` |
 | `ALWAYS` | `always` |
 
-在代码中通过成员名称使用，例如 `saturn.ScrollMode.NONE`。
+Use members by name, for example `saturn.ScrollMode.NONE`.

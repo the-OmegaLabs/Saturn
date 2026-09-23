@@ -1,18 +1,18 @@
 # ProgressRing
 
-以圆环显示已知或不确定进度。
+Shows determinate or indeterminate progress as a ring.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/basic.py`](../../saturn/widgets/basic.py)（第 270 行）。
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 270).
 
-## 效果图
+## Preview
 
-![ProgressRing 控件的深色主题效果](../images/controls/ProgressRing.png)
+![ProgressRing control in the dark theme](../images/controls/ProgressRing.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,20 +29,20 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** [Control](./Control.md)
+**Base class:** [Control](./Control.md)
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.ProgressRing(value: 'float | None' = None, *, stroke_width: 'float' = 4, color=None, bgcolor=None, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `value` | `float | None` | `None` | 进度值，通常在 0 到 1 之间；None 表示不确定进度。 |
-| `stroke_width` | `float` | `4` | 进度环或波形线条的宽度。 |
-| `color` | `—` | `None` | 前景、文字或绘制内容的颜色。 |
-| `bgcolor` | `—` | `None` | 控件或容器的背景颜色。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `value` | `float | None` | `None` | Progress, usually from 0 to 1; None means indeterminate. |
+| `stroke_width` | `float` | `4` | Width of a progress ring or wave stroke. |
+| `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

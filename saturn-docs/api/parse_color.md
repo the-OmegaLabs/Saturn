@@ -1,17 +1,17 @@
 # parse_color
 
-把颜色名称、十六进制值或颜色对象解析为 RGBA 数值。
+Parses a color name, hex value, or color object into RGBA values.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/colors.py`](../../saturn/colors.py)（第 161 行）。
+Source: [`saturn/colors.py`](../../saturn/colors.py) (line 161).
 
-## 调用参数
+## Call parameters
 
 ```python
 saturn.parse_color(value) -> 'tuple[int, int, int, int]'
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `value` | `—` | `必填` | 控件或数据对象的当前值。 |
+| `value` | `—` | `required` | Current value of the control or data object. |

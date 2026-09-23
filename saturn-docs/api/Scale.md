@@ -1,23 +1,23 @@
 # Scale
 
-定义控件沿水平和垂直方向的缩放。
+Horizontal and vertical scale of a control.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 324 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 324).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Scale(scale: 'float | None' = None, scale_x: 'float | None' = None, scale_y: 'float | None' = None, alignment: 'Alignment | None' = None, origin: 'Offset | None' = None, transform_hit_tests: 'bool' = True, filter_quality: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `scale` | `float | None` | `None` | 绘制控件时使用的缩放值。 |
-| `scale_x` | `float | None` | `None` | 水平方向的缩放比例。 |
-| `scale_y` | `float | None` | `None` | 垂直方向的缩放比例。 |
-| `alignment` | `Alignment | None` | `None` | 子内容在容器或布局中的排列方式。 |
-| `origin` | `Offset | None` | `None` | 变换的参考原点。 |
-| `transform_hit_tests` | `bool` | `True` | 几何变换是否同步影响点击命中区域。 |
-| `filter_quality` | `object` | `None` | 图片缩放时使用的采样质量。 |
+| `scale` | `float | None` | `None` | Scale applied when drawing the control. |
+| `scale_x` | `float | None` | `None` | Horizontal scale factor. |
+| `scale_y` | `float | None` | `None` | Vertical scale factor. |
+| `alignment` | `Alignment | None` | `None` | Alignment of child content within a container or layout. |
+| `origin` | `Offset | None` | `None` | Reference origin for the transformation. |
+| `transform_hit_tests` | `bool` | `True` | Apply the geometry transform to the hit area as well. |
+| `filter_quality` | `object` | `None` | Sampling quality used when scaling an image. |

@@ -13,7 +13,7 @@ def check():
     field._key(backspace)
     assert field.value == 'abc'
     field.read_only = False
-    field._composition = '拼'
+    field._composition = '\u62fc'  # A CJK IME composition character.
     field._key(backspace)
     assert field.value == 'abc'
     field._composition = ''

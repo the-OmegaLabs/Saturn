@@ -1,20 +1,20 @@
 # TextOverflow
 
-选择文本超过可用空间时的处理方式。
+How to handle text beyond the available space.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 55 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 55).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `CLIP` | `clip` |
 | `ELLIPSIS` | `ellipsis` |
 | `FADE` | `fade` |
 | `VISIBLE` | `visible` |
 
-在代码中通过成员名称使用，例如 `saturn.TextOverflow.CLIP`。
+Use members by name, for example `saturn.TextOverflow.CLIP`.

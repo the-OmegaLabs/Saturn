@@ -1,27 +1,27 @@
 # Window
 
-原生窗口的尺寸、标题和状态。
+Native window size, title, and state.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/page.py`](../../saturn/page.py)（第 46 行）。
+Source: [`saturn/page.py`](../../saturn/page.py) (line 46).
 
-> 这些对象通常由 `saturn.run()` 创建和传入，应用代码无需直接构造。
+> `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
-## 本类公开方法
+## Public methods
 
-| 方法 | 说明 |
+| Method | Description |
 | --- | --- |
-| `close(self)` | 关闭窗口或展开的菜单。 |
-| `destroy(self)` | 销毁原生窗口并释放资源。 |
-| `center(self)` | 创建位于中心位置的对齐值。 |
+| `close(self)` | Closes a window or expanded menu. |
+| `destroy(self)` | Destroys the native window and releases resources. |
+| `center(self)` | Creates a centered alignment value. |
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Window(app)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `app` | `—` | `必填` | 当前应用实例，由运行时传入。 |
+| `app` | `—` | `required` | Current application instance supplied by the runtime. |

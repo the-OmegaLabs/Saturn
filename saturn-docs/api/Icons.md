@@ -1,18 +1,18 @@
 # Icons
 
-Material 图标名称集合。
+Collection of Material icon names.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/_gen/icons.py`](../../saturn/_gen/icons.py)（第 4 行）。
+Source: [`saturn/_gen/icons.py`](../../saturn/_gen/icons.py) (line 4).
 
-**基类：** `IntEnum`
+**Base class:** `IntEnum`
 
-## 成员
+## Members
 
-共 8272 个名称。以下展示前 20 个；完整列表以源码为准。
+There are 8272 names. The first 20 appear below; see the source for the full list.
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `ABC` | `60308` |
 | `ABC_OUTLINED` | `60308` |
@@ -35,4 +35,4 @@ Material 图标名称集合。
 | `ACCESSIBLE_ROUNDED` | `59668` |
 | `ACCESSIBLE_SHARP` | `59668` |
 
-在代码中通过成员名称使用，例如 `saturn.Icons.ABC`。
+Use members by name, for example `saturn.Icons.ABC`.

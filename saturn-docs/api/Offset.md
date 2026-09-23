@@ -1,20 +1,20 @@
 # Offset
 
-定义二维位移及其命中测试行为。
+Two-dimensional displacement and its hit-test behavior.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 316 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 316).
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Offset(x: 'float' = 0.0, y: 'float' = 0.0, transform_hit_tests: 'bool' = True, filter_quality: 'object' = None) -> None
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `x` | `float` | `0.0` | 水平坐标或位移分量。 |
-| `y` | `float` | `0.0` | 垂直坐标或位移分量。 |
-| `transform_hit_tests` | `bool` | `True` | 几何变换是否同步影响点击命中区域。 |
-| `filter_quality` | `object` | `None` | 图片缩放时使用的采样质量。 |
+| `x` | `float` | `0.0` | Horizontal coordinate or displacement. |
+| `y` | `float` | `0.0` | Vertical coordinate or displacement. |
+| `transform_hit_tests` | `bool` | `True` | Apply the geometry transform to the hit area as well. |
+| `filter_quality` | `object` | `None` | Sampling quality used when scaling an image. |

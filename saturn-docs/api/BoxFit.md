@@ -1,16 +1,16 @@
 # BoxFit
 
-选择图片在给定空间中的缩放与裁切方式。
+How an image scales or crops within a space.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 180 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 180).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `FILL` | `fill` |
 | `CONTAIN` | `contain` |
@@ -18,4 +18,4 @@
 | `NONE` | `none` |
 | `SCALE_DOWN` | `scaleDown` |
 
-在代码中通过成员名称使用，例如 `saturn.BoxFit.FILL`。
+Use members by name, for example `saturn.BoxFit.FILL`.

@@ -1,18 +1,18 @@
 # Row
 
-横向排列子控件。
+Arranges child controls horizontally.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/widgets/containers.py`](../../saturn/widgets/containers.py)（第 168 行）。
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 168).
 
-## 效果图
+## Preview
 
-![Row 控件的深色主题效果](../images/controls/Row.png)
+![Row control in the dark theme](../images/controls/Row.png)
 
-## 示例代码
+## Example
 
-以下代码可从仓库根目录运行，呈现上图中的控件。
+Run this code from the repository root to display the control shown above.
 
 ```python
 import saturn
@@ -29,23 +29,23 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
 ```
 
-**基类：** `_Multi`
+**Base class:** `_Multi`
 
-## 构造参数
+## Constructor parameters
 
 ```python
 saturn.Row(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, vertical_alignment=None, horizontal_alignment=None, spacing: 'float' = 10, tight: 'bool' = False, **base)
 ```
 
-| 参数 | 类型标注 | 默认值 | 作用 |
+| Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `*items` | `—` | `额外位置参数` | 传给布局、分组或菜单的项目列表。 |
-| `controls` | `—` | `None` | 按顺序排列的子控件列表。 |
-| `alignment` | `—` | `<MainAxisAlignment.START: 'start'>` | 子控件沿水平主轴的排列方式。 |
-| `vertical_alignment` | `—` | `None` | 纵向或交叉轴上的对齐方式。 |
-| `horizontal_alignment` | `—` | `None` | 横向或交叉轴上的对齐方式。 |
-| `spacing` | `float` | `10` | 相邻子控件之间的间距。 |
-| `tight` | `bool` | `False` | 使布局尽量贴合子控件的实际尺寸。 |
-| `**base` | `—` | `额外关键字参数` | 传给基础 Control 构造函数的关键字参数，例如 width、height。 |
+| `*items` | `—` | `additional positional arguments` | Items passed to a layout, group, or menu. |
+| `controls` | `—` | `None` | Child controls in display order. |
+| `alignment` | `—` | `<MainAxisAlignment.START: 'start'>` | Arrangement of children along the horizontal main axis. |
+| `vertical_alignment` | `—` | `None` | Alignment on the vertical or cross axis. |
+| `horizontal_alignment` | `—` | `None` | Alignment on the horizontal or cross axis. |
+| `spacing` | `float` | `10` | Space between adjacent child controls. |
+| `tight` | `bool` | `False` | Size the layout closely to its children when True. |
+| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
-`**base` 可传入 [Control 的通用构造参数](./Control.md#构造参数)，例如 `width`、`height`、`visible`。
+`**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

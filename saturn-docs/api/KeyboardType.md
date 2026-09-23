@@ -1,16 +1,16 @@
 # KeyboardType
 
-声明文本框适合的输入键盘类型。
+Preferred input keyboard type for a text field.
 
-[← API 索引](./README.md)
+[← API index](./README.md)
 
-源码：[`saturn/types.py`](../../saturn/types.py)（第 74 行）。
+Source: [`saturn/types.py`](../../saturn/types.py) (line 74).
 
-**基类：** `Enum`
+**Base class:** `Enum`
 
-## 成员
+## Members
 
-| 名称 | 值 |
+| Name | Value |
 | --- | --- |
 | `TEXT` | `text` |
 | `NUMBER` | `number` |
@@ -21,4 +21,4 @@
 | `PASSWORD` | `visiblePassword` |
 | `NONE` | `none` |
 
-在代码中通过成员名称使用，例如 `saturn.KeyboardType.TEXT`。
+Use members by name, for example `saturn.KeyboardType.TEXT`.

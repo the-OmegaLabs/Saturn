@@ -1,6 +1,6 @@
-"""saturn 全功能汇总 demo — 核心集控件一次看全。
+"""Full Saturn demo showing the core controls together.
 
-跑法:
+Run with:
     .venv/Scripts/python.exe examples/demo.py                     # SOFTWARE
     .venv/Scripts/python.exe examples/demo.py --backend opengl    # OPENGL
 """
