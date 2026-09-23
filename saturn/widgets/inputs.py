@@ -1222,7 +1222,7 @@ class Slider(Control):
     def _intrinsic(self, max_w, max_h, scale):
         return (self._width if self._width is not None
                 else min(300.0, max_w or 300.0),
-                self._height if self._height is not None else 40.0)
+                self._height if self._height is not None else 48.0)
 
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
@@ -1244,7 +1244,7 @@ class Slider(Control):
 
     def _track(self):
         x, y, w, h = self._rect
-        return x, w  # track spans full width
+        return x + 2.0, max(0.0, w - 4.0)  # 4dp handle stays inside the bounds
 
     def _drag_start(self, x, y):
         fire(self, "change_start")
@@ -1265,19 +1265,51 @@ class Slider(Control):
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
         cy = y + h / 2
-        r.fill_rect(x, cy - 2, w, 4,
-                    _parse(self.inactive_color or colors.Colors.SURFACE_CONTAINER_HIGHEST),
-                    radius=2)
+        track_x, track_w = x + 2.0, max(0.0, w - 4.0)
         k = self._k()
-        if k > 0:
-            r.fill_rect(x, cy - 2, w * k, 4,
-                        _parse(self.active_color or colors.Colors.PRIMARY), radius=2)
-        thumb_x = x + w * k
-        state_color = self.thumb_color or self.active_color or colors.Colors.PRIMARY
-        draw_state_layer(self, r, (thumb_x - 20, cy - 20, 40, 40),
-                         state_color, 20)
-        thumb_radius = 10.0 - 2.0 * self._thumb_press_progress
-        r.circle(thumb_x, cy, thumb_radius, _parse(state_color))
+        thumb_x = track_x + track_w * k
+        handle_w = max(2.0, min(4.0, 4.0 - 2.0 * self._thumb_press_progress))
+        gap = handle_w / 2 + 6.0
+        default_color = (colors.Colors.ON_SURFACE if self.disabled
+                         else colors.Colors.PRIMARY)
+        active = _parse(self.active_color or default_color)
+        inactive = _parse(self.inactive_color or
+                          (colors.Colors.ON_SURFACE if self.disabled else
+                           colors.Colors.SECONDARY_CONTAINER))
+        handle = _parse(self.thumb_color or self.active_color or default_color)
+        if self.disabled:
+            active = (*active[:3], round(active[3] * 0.38))
+            inactive = (*inactive[:3], round(inactive[3] * 0.12))
+            handle = (*handle[:3], round(handle[3] * 0.38))
+
+        active_end = max(track_x, thumb_x - gap)
+        active_w = active_end - track_x
+        if active_w > 8.0:
+            r.fill_rect(track_x, cy - 8, active_w, 16, active,
+                        radius=min(8, active_w / 2))
+            if active_w >= 20.0 and active[3] == 255:
+                r.fill_rect(active_end - 10, cy - 8, 10, 16, active, radius=2)
+        inactive_x = min(track_x + track_w, thumb_x + gap)
+        inactive_w = track_x + track_w - inactive_x
+        if inactive_w > 8.0:
+            r.fill_rect(inactive_x, cy - 8, inactive_w, 16, inactive,
+                        radius=min(8, inactive_w / 2))
+            if inactive_w >= 20.0 and inactive[3] == 255:
+                r.fill_rect(inactive_x, cy - 8, 10, 16, inactive, radius=2)
+            r.circle(track_x + track_w - 8, cy, 2, active)
+        if self.divisions and self.divisions > 1:
+            for step in range(1, self.divisions):
+                tick_x = track_x + track_w * step / self.divisions
+                if abs(tick_x - thumb_x) > gap:
+                    r.circle(tick_x, cy, 2,
+                             inactive if tick_x < thumb_x else active)
+
+        if not self.disabled:
+            draw_state_layer(self, r, (thumb_x - 20, cy - 20, 40, 40),
+                             self.thumb_color or self.active_color or default_color,
+                             20)
+        r.fill_rect(thumb_x - handle_w / 2, cy - 22, handle_w, 44,
+                    handle, radius=handle_w / 2)
         if self.label is not None and self._label_progress > 0:
             raw = str(self.label)
             value = f"{self.value:.{self.round}f}" if self.round else str(self.value)
