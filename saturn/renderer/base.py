@@ -13,6 +13,8 @@ from abc import ABC, abstractmethod
 class Renderer(ABC):
     scale: float = 1.0  # supersampling factor (software backend sets 2)
     native_texture_scaling = False
+    native_shape_overlay = False
+    native_state_layer = False
 
     def _init_effect_stacks(self):
         self._opacity_stack = [1.0]
@@ -71,9 +73,17 @@ class Renderer(ABC):
     @abstractmethod
     def blit(self, surface, x, y, alpha=1.0) -> None: ...
 
+    def blit_cached(self, surface, x, y, alpha=1.0) -> None:
+        """Blit a source surface that callers keep unchanged."""
+        self.blit(surface, x, y, alpha)
+
     @abstractmethod
     def blit_scaled(self, surface, x, y, width, height,
                     alpha=1.0) -> None: ...
+
+    def blit_cached_scaled(self, surface, x, y, width, height,
+                           alpha=1.0) -> None:
+        self.blit_scaled(surface, x, y, width, height, alpha)
 
     @abstractmethod
     def clip_push(self, x, y, w, h) -> None: ...

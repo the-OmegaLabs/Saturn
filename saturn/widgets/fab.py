@@ -33,21 +33,30 @@ class FloatingActionButton(Button):
     variant_fg = colors.Colors.ON_PRIMARY_CONTAINER
     variant_elevation = 6.0
 
-    def __init__(self, icon=None, *, text: str | None = None,
+    def __init__(self, icon=None, *, content: str | None = None,
+                 text: str | None = None, mini: bool = False,
                  size: str = "standard", expanded: bool = True,
-                 bgcolor=None, color=None, elevation: float = 6.0,
+                 bgcolor=None, color=None, foreground_color=None,
+                 elevation: float = 6.0,
                  on_click=None, on_hover=None, **base):
+        if text is None:
+            text = content
+        if text is not None and not isinstance(text, str):
+            raise TypeError("FAB content must be text")
+        if mini and size == "standard":
+            size = "small"
         if size not in _SIZES:
             raise ValueError(f"invalid FAB size: {size!r}")
-        if icon is None and not text:
-            raise ValueError("a FAB needs an icon or text")
         if not expanded and icon is None:
             raise ValueError("a collapsed extended FAB needs an icon")
+        self.mini = mini
+        self.foreground_color = foreground_color
         self.size = size
         self.text = text
         self.expanded = expanded
         self._base_elevation = max(0.0, float(elevation))
-        super().__init__(content=text, icon=icon, bgcolor=bgcolor, color=color,
+        super().__init__(content=text, icon=icon, bgcolor=bgcolor,
+                         color=color if color is not None else foreground_color,
                          elevation=elevation, on_click=on_click, on_hover=on_hover,
                          **base)
         self._elevation_progress = self._base_elevation
@@ -115,11 +124,11 @@ class FloatingActionButton(Button):
             cx = x + (w - total_w) / 2
         cy = y + h / 2
         if icon_surf is not None:
-            r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
+            r.blit_cached(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
             cx += icon_w + (gap if label_surf is not None else 0.0)
         if label_surf is not None:
-            r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
+            r.blit_cached(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
 
     def _set_hover(self, on: bool):

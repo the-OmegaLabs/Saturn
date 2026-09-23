@@ -194,6 +194,10 @@ class Page(Control):
         self._last_click_pos = None
         self._last_click_target = None
         self._click_count = 0
+        self._layout_dirty = True
+        self._layout_key = None
+        self._active_animations = set()
+        self._animation_scan_needed = True
 
     # -- flet API ---------------------------------------------------------
     @property
@@ -318,6 +322,12 @@ class Page(Control):
         for control in [*getattr(self, "controls", []),
                         *getattr(self, "overlay", [])]:
             control._prepare_animation_tree(now)
+        self._layout_dirty = True
+        self._animation_scan_needed = True
+        self._app.mark_dirty()
+
+    def repaint(self):
+        """Redraw when geometry has not changed (scroll, hover, ripple)."""
         self._app.mark_dirty()
 
     def run_task(self, handler, *args):
@@ -351,18 +361,32 @@ class Page(Control):
     def draw(self):
         now = time.perf_counter()
         animating = False
-        for control in [*self.controls, *self.overlay]:
-            animating = control._tick_animation_tree(now) or animating
+        if self._animation_scan_needed:
+            for control in [*self.controls, *self.overlay]:
+                animating = control._tick_animation_tree(now) or animating
+            self._animation_scan_needed = False
+        else:
+            for control in tuple(self._active_animations):
+                if control._tick_animations(now):
+                    animating = True
+                else:
+                    self._active_animations.discard(control)
         if animating:
             self._app.mark_dirty()
         r = self._app.renderer
         r.clear(self.bgcolor or colors.Colors.SURFACE)
         from .widgets.containers import Column
         p = self.padding
-        col = Column(*self.controls, alignment=self.vertical_alignment,
-                     horizontal_alignment=self.horizontal_alignment,
-                     spacing=self.spacing)
-        col._place(p, p, self.width - 2 * p, self.height - 2 * p, r.scale)
+        layout_key = (self.width, self.height, r.scale, p,
+                      self.vertical_alignment, self.horizontal_alignment,
+                      self.spacing, tuple(self.controls))
+        if self._layout_dirty or layout_key != self._layout_key:
+            col = Column(*self.controls, alignment=self.vertical_alignment,
+                         horizontal_alignment=self.horizontal_alignment,
+                         spacing=self.spacing)
+            col._place(p, p, self.width - 2 * p, self.height - 2 * p, r.scale)
+            self._layout_key = layout_key
+            self._layout_dirty = False
         self._draw_all(r)
         for c in self.overlay:
             if getattr(c, "_overlay_fill", False):
@@ -556,4 +580,4 @@ class Page(Control):
                 fire(target, "hover", "true")
         self._hovered = target
         if prev is not None or target is not None:
-            self.update()
+            self.repaint()

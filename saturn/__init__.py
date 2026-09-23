@@ -1,4 +1,4 @@
-"""saturn — a Flet-1.0-compatible, self-drawn GUI framework.
+"""Saturn is a lightweight, GPU-accelerated UI frameworks.
 
 Usage:
     import saturn as ft
@@ -6,12 +6,14 @@ Usage:
     def main(page: ft.Page):
         page.add(ft.Text("Hello"))
 
-    ft.run(main, backend=ft.Render.SOFTWARE)
+    ft.run(main, backend=ft.Renderer.SOFTWARE)
 """
 from types import SimpleNamespace
 
 from .event import ControlEvent
-from .app import App, Render, run
+from .app import App, Renderer, run
+
+Render = Renderer
 from ._gen.icons import Icons
 from .colors import BASELINE_DARK, BASELINE_LIGHT, Colors, parse_color, theme_dark
 from .control import Control
@@ -111,9 +113,10 @@ from .widgets import (
     TextField,
     TextButton,
 )
+from .compose import Compose
 
 __all__ = [
-    "App", "Render", "run", "ControlEvent",
+    "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
     "Colors", "Icons", "parse_color",
     "Control", "Page", "Window", "Text", "Row", "Column", "Container",
     "Stack", "Divider", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",

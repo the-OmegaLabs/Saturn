@@ -103,7 +103,20 @@ class Control:
 
     def update(self):
         if self.page is not None:
-            self.page.update()
+            self._prepare_animation_tree(time.perf_counter())
+            self.page._layout_dirty = True
+            self.page._animation_scan_needed = True
+            if hasattr(self.page, "repaint"):
+                self.page.repaint()
+            else:
+                self.page.update()
+
+    def repaint(self):
+        if self.page is not None:
+            if hasattr(self.page, "repaint"):
+                self.page.repaint()
+            else:
+                self.page.update()
 
     def _attach(self, page, parent: "Control | None" = None):
         self.page = page
@@ -180,6 +193,10 @@ class Control:
         with self._animation_lock:
             animations = object.__getattribute__(self, "_animations")
             overrides = object.__getattribute__(self, "_animation_overrides")
+            layout_changed = any(name in {
+                "_width", "_height", "left", "top", "right", "bottom",
+                "align", "margin", "padding", "alignment",
+            } for name in animations)
             completed = set()
             for name, tween in list(animations.items()):
                 p = (now - tween.started) / tween.duration
@@ -193,6 +210,8 @@ class Control:
                         ease(tween.curve, p), name)
             active_groups = {a.group for a in animations.values()}
             active = bool(animations)
+        if layout_changed and self.page is not None:
+            self.page._layout_dirty = True
         if completed and self.page is not None:
             from .event import fire
             for group in completed - active_groups:
@@ -220,6 +239,8 @@ class Control:
             overrides[name] = copy.deepcopy(current)
             animations[name] = _Tween(current, target, now, duration, curve, "")
         if self.page is not None:
+            if hasattr(self.page, "_active_animations"):
+                self.page._active_animations.add(self)
             self.page._app.mark_dirty()
 
     def _prepare_animation_tree(self, now: float):
@@ -229,6 +250,8 @@ class Control:
 
     def _tick_animation_tree(self, now: float) -> bool:
         active = self._tick_animations(now)
+        if active and self.page is not None and hasattr(self.page, "_active_animations"):
+            self.page._active_animations.add(self)
         for child in self._children():
             active = child._tick_animation_tree(now) or active
         return active

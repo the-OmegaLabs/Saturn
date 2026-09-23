@@ -50,11 +50,6 @@ class _Multi(Control):
         self.spacing = spacing
         self.tight = tight
 
-    def _attach(self, page, parent=None):
-        super()._attach(page, parent)
-        for c in self.controls:
-            c._attach(page, self)
-
     def _children(self):
         return self.controls
 
@@ -228,7 +223,7 @@ class Container(Control):
             set_hover(self, on)
         else:
             self._hovered = on
-        self.update()
+        self.repaint()
         from ..event import fire
         fire(self, "hover", "true" if on else "false")
 
@@ -258,11 +253,6 @@ class Container(Control):
     def _tick_animations(self, now: float) -> bool:
         waiting = tick_state_layer(self, now) if self.ink else False
         return super()._tick_animations(now) or waiting
-
-    def _attach(self, page, parent=None):
-        super()._attach(page, parent)
-        if self.content is not None:
-            self.content._attach(page, self)
 
     def _children(self):
         return [self.content] if self.content is not None else []
@@ -354,11 +344,6 @@ class Stack(Control):
             items = tuple(items[0])
         super().__init__(**base)
         self.controls = list(items)
-
-    def _attach(self, page, parent=None):
-        super()._attach(page, parent)
-        for c in self.controls:
-            c._attach(page, self)
 
     def _children(self):
         return self.controls

@@ -24,14 +24,19 @@ from pathlib import Path
 import pygame
 
 from .renderer import create_renderer
-from .renderer.base import Renderer
+from .renderer.base import Renderer as _RendererBase
 
 
-class Render(enum.Enum):
+class Renderer(enum.Enum):
     """Rendering backend."""
     SOFTWARE = "software"
+
     OPENGL = "opengl"
+
     VULKAN = "vulkan"
+
+
+Render = Renderer
 
 def _system_refresh_rate() -> int:
     """Return the active display refresh rate, with a conservative fallback."""
@@ -108,7 +113,7 @@ def _set_gl_swap_interval(interval: int = 1) -> bool:
 
 
 class App:
-    def __init__(self, main, backend: Render, width: int, height: int, title: str):
+    def __init__(self, main, backend: Renderer, width: int, height: int, title: str):
         self._main = main
         self._backend = backend
         # Flet Window.width/height describe the native outer window. Page
@@ -125,7 +130,7 @@ class App:
         self._loop = asyncio.new_event_loop()
         threading.Thread(target=self._loop.run_forever, daemon=True,
                          name="saturn-async").start()
-        self.renderer: Renderer | None = None
+        self.renderer: _RendererBase | None = None
         self.page = None  # set in start()
         self._live_resize_dll = None
         self._live_resize_callback = None
@@ -148,7 +153,7 @@ class App:
         # pygame disables key repeat by default. SDL owns the held-key timer
         # and stops it on key release; text entry still uses TEXTINPUT events.
         pygame.key.set_repeat(400, 35)
-        if self._backend is Render.OPENGL:
+        if self._backend is Renderer.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
         self._pixel_ratio = _system_pixel_ratio()
         creation_size = self.physical_size_for_logical(*self._size)
@@ -156,12 +161,12 @@ class App:
             title=self._title,
             size=creation_size,
             resizable=True,
-            opengl=self._backend is Render.OPENGL,
-            vulkan=self._backend is Render.VULKAN,
+            opengl=self._backend is Renderer.OPENGL,
+            vulkan=self._backend is Renderer.VULKAN,
             allow_high_dpi=True,
         )
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
-        if self._backend is Render.OPENGL:
+        if self._backend is Renderer.OPENGL:
             _set_gl_swap_interval(1)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
@@ -474,7 +479,7 @@ def _swallow(fn, *args):
         traceback.print_exc()
 
 
-def run(main, *, backend: Render | None = None, width: int = 800,
+def run(main, *, backend: Renderer | None = None, width: int = 800,
         height: int = 600, title: str = "saturn", **_flet_ignored):
     """Open a window, run `main(page)` and block until the window closes.
 
@@ -482,8 +487,9 @@ def run(main, *, backend: Render | None = None, width: int = 800,
     accepted and ignored so flet programs port with a one-line change.
     Returns the App handle (after the window closes).
     """
-    if backend is None:  # test hook: pick renderer from the environment
-        backend = Render(os.environ.get("SATURN_BACKEND", "software").lower())
+    if backend is None:  # explicit selection and test hook via environment
+        backend = Renderer(os.environ.get("SATURN_BACKEND", "opengl").lower())
+
     app = App(main, backend, width, height, title)
     app.start()
     app.run_until_closed()

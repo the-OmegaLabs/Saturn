@@ -6,12 +6,15 @@ auto_scroll, scroll_to()); GestureDetector(content, on_tap, on_hover...).
 from __future__ import annotations
 
 import time
+from bisect import bisect_left, bisect_right
+from collections import OrderedDict
 
 from .. import colors
 from .. import motion
 from ..control import Control
 from ..event import TapEvent, fire
-from .containers import _margins
+from ..types import as_padding
+from .containers import Container, _margins
 
 
 _SCROLLBAR_THICKNESS = 8.0
@@ -22,11 +25,12 @@ _MIN_THUMB_SIZE = 32.0
 _SCROLLBAR_FADE_DELAY = 0.6
 _SCROLLBAR_IDLE_OPACITY = 0.48
 _SCROLLBAR_ACTIVE_OPACITY = 0.64
+_OVERSCAN = 96.0  # logical pixels for shadows and nearby incoming rows
 
 
 class ListView(Control):
     def __init__(self, *items, controls=None, horizontal: bool = False,
-                 spacing: float = 0,
+                 spacing: float = 0, item_extent: float | None = None,
                  padding=None, auto_scroll: bool = False, on_scroll=None,
                  **base):
         if controls is not None:
@@ -39,22 +43,35 @@ class ListView(Control):
         self.controls = list(items)
         self.horizontal = horizontal
         self.spacing = spacing
+        if item_extent is not None and item_extent <= 0:
+            raise ValueError("item_extent must be positive")
+        self.item_extent = item_extent
         self.padding = padding  # resolved lazily via as_padding
         self.auto_scroll = auto_scroll
         self.on_scroll = on_scroll
         self._offset = 0.0
         self._content_size = 0.0
+        self._placed_controls = []
+        self._item_starts = []
+        self._item_ends = []
+        self._ordered_items = True
+        self._lazy_items = set()
+        self._lazy_layout_version = {}
+        self._layout_version = 0
+        self._fixed_axis_layout = False
+        self._layout_controls = ()
+        self._layout_scale = None
+        self._layout_padding = None
+        self._layout_spacing = None
+        self._layout_item_extent = None
+        self._intrinsic_cache = OrderedDict()
+        self._geometry_cache = OrderedDict()
         self._scrollbar_dragging = False
         self._scrollbar_drag_delta = 0.0
         self._scrollbar_hovered = False
         self._scrollbar_thickness = _SCROLLBAR_THICKNESS
         self._scrollbar_opacity = 0.0
         self._scrollbar_hide_at = None
-
-    def _attach(self, page, parent=None):
-        super()._attach(page, parent)
-        for c in self.controls:
-            c._attach(page, self)
 
     def _children(self):
         return self.controls
@@ -70,33 +87,193 @@ class ListView(Control):
                 self._height if self._height is not None else (max_h or 0))
 
     def _place(self, x, y, w, h, scale):
-        self._rect = (x, y, w, h)
+        self._layout_version += 1
         p = self._pad()
+        controls = tuple(self.controls)
+        layout_dirty = (self.page is None or
+                        getattr(self.page, "_layout_dirty", True))
+        # A paint-only resize may change the viewport without changing row
+        # content. Content updates mark the page layout dirty and invalidate
+        # these variable-height measurements.
+        if layout_dirty or self._layout_controls != controls:
+            self._intrinsic_cache.clear()
+            self._geometry_cache.clear()
+        # A window resize changes the viewport width and height, but fixed
+        # height rows keep their axis positions. Reuse those positions and
+        # place only the rows near the new viewport.
+        if (self._fixed_axis_layout and not self.horizontal and
+                self.page is not None and
+                not getattr(self.page, "_layout_dirty", True) and
+                self._rect[:2] == (x, y) and
+                self._layout_controls == controls and
+                self._layout_scale == scale and
+                self._layout_padding == p and
+                self._layout_spacing == self.spacing and
+                self._layout_item_extent == self.item_extent):
+            self._rect = (x, y, w, h)
+            view = h - p.top - p.bottom
+            self._offset = max(0.0, min(self._offset,
+                                       max(0.0, self._content_size - view)))
+            if self.auto_scroll:
+                self._offset = max(0.0, self._content_size - view)
+            self._lazy_layout_version.clear()
+            self._layout_lazy_candidates(scale)
+            return
+        # A drag often revisits the last few widths. For variable-height
+        # rows, their exact offsets were already measured at those widths.
+        # Restore the geometry and place only visible rows again.
+        geometry_key = (x, y, w, scale, p.left, p.top, p.right, p.bottom,
+                        self.spacing, self.item_extent)
+        cached_geometry = (None if layout_dirty or self.horizontal else
+                           self._geometry_cache.get(geometry_key))
+        if cached_geometry is not None:
+            placed, starts, ends, ordered, total, rects = cached_geometry
+            self._geometry_cache.move_to_end(geometry_key)
+            self._rect = (x, y, w, h)
+            for child, rect in zip(placed, rects):
+                child._rect = rect
+            self._placed_controls = placed
+            self._item_starts = starts
+            self._item_ends = ends
+            self._ordered_items = ordered
+            self._lazy_items = set(placed)
+            self._lazy_layout_version.clear()
+            self._fixed_axis_layout = False
+            self._layout_controls = controls
+            self._layout_scale = scale
+            self._layout_padding = p
+            self._layout_spacing = self.spacing
+            self._layout_item_extent = self.item_extent
+            self._content_size = total
+            view = h - p.top - p.bottom
+            self._offset = max(0.0, min(self._offset,
+                                       max(0.0, total - view)))
+            if self.auto_scroll:
+                self._offset = max(0.0, total - view)
+            self._layout_lazy_candidates(scale)
+            return
+        self._rect = (x, y, w, h)
         ix, iy = x + p.left, y + p.top
         iw, ih = w - p.left - p.right, h - p.top - p.bottom
         total = 0.0
-        for k in self.controls:
-            if not k.visible:
+        placed, starts, ends, lazy = [], [], [], set()
+        fixed_axis_layout = not self.horizontal
+        horizontal = self.horizontal
+        item_extent = self.item_extent
+        spacing = self.spacing
+        intrinsic_cache = self._intrinsic_cache
+        cache_limit = max(512, len(controls) * 4)
+        for k in controls:
+            # Control attribute reads check animation overrides. A large list
+            # needs only these few animated layout fields per row; reading
+            # them together avoids that check for every intermediate value.
+            raw = k.__dict__
+            overrides = k._animation_overrides
+            if not overrides.get("visible", raw["visible"]):
                 continue
-            ml, mt, mr, mb = _margins(k)
-            kw, kh = k._intrinsic(iw - ml - mr, None, scale)
-            if k._width is not None:
-                kw = k._width
-            if k._height is not None:
-                kh = k._height
-            if self.horizontal:
-                k._place(ix + total + ml, iy + mt, kw, ih - mt - mb, scale)
-                total += kw + ml + mr + self.spacing
+            margin = overrides.get("margin", raw["margin"])
+            if margin is None:
+                ml = mt = mr = mb = 0.0
             else:
-                k._place(ix + ml, iy + total + mt, iw - ml - mr, kh, scale)
-                total += kh + mt + mb + self.spacing
+                m = as_padding(margin)
+                ml, mt, mr, mb = m.left, m.top, m.right, m.bottom
+            row_width = overrides.get("_width", raw["_width"])
+            row_height = overrides.get("_height", raw["_height"])
+            # Fixed-height vertical rows know their footprint without
+            # measuring all descendants. Their content is placed on demand.
+            fixed_row = (not horizontal and
+                         (item_extent is not None or row_height is not None))
+            if not fixed_row:
+                fixed_axis_layout = False
+            if fixed_row:
+                kw, kh = iw - ml - mr, (item_extent if
+                                       item_extent is not None else row_height)
+            elif horizontal and item_extent is not None:
+                kw, kh = item_extent, ih - mt - mb
+            else:
+                measure_width = iw - ml - mr
+                measure_key = (k, measure_width, scale)
+                cached = intrinsic_cache.get(measure_key)
+                if cached is not None:
+                    intrinsic_cache.move_to_end(measure_key)
+                    kw, kh = cached
+                else:
+                    # Containers whose natural content fits the available
+                    # width cannot acquire extra wrapped lines when the
+                    # window grows or shrinks within that range. Their
+                    # unbounded measurement serves all such widths. Only
+                    # use the built-in Container implementation here so
+                    # custom row measurements retain their exact contract.
+                    natural = None
+                    if not horizontal and \
+                            type(k)._intrinsic is Container._intrinsic:
+                        natural_key = (k, None, scale)
+                        natural = intrinsic_cache.get(natural_key)
+                        if natural is None:
+                            natural = k._intrinsic(None, None, scale)
+                            intrinsic_cache[natural_key] = natural
+                        else:
+                            intrinsic_cache.move_to_end(natural_key)
+                    if (natural is not None and 0 < natural[0] <= measure_width):
+                        kw, kh = natural
+                    else:
+                        kw, kh = k._intrinsic(measure_width, None, scale)
+                        intrinsic_cache[measure_key] = (kw, kh)
+                    if len(intrinsic_cache) > cache_limit:
+                        intrinsic_cache.popitem(last=False)
+            if row_width is not None:
+                kw = row_width
+            if row_height is not None:
+                kh = row_height
+            if item_extent is not None:
+                if horizontal:
+                    kw = item_extent
+                else:
+                    kh = item_extent
+            if horizontal:
+                k._place(ix + total + ml, iy + mt, kw, ih - mt - mb, scale)
+                child_rect = k._rect
+                total += kw + ml + mr + spacing
+            else:
+                child_rect = (ix + ml, iy + total + mt,
+                              iw - ml - mr, kh)
+                k._rect = child_rect
+                lazy.add(k)
+                total += kh + mt + mb + spacing
+            start = child_rect[0 if horizontal else 1]
+            extent = child_rect[2 if horizontal else 3]
+            placed.append(k)
+            starts.append(start)
+            ends.append(start + extent)
+        self._placed_controls = placed
+        self._lazy_items = lazy
+        self._lazy_layout_version = {}
+        self._fixed_axis_layout = fixed_axis_layout
+        self._layout_controls = controls
+        self._layout_scale = scale
+        self._layout_padding = p
+        self._layout_spacing = self.spacing
+        self._layout_item_extent = self.item_extent
+        self._item_starts = starts
+        self._item_ends = ends
+        self._ordered_items = all(
+            starts[i] >= starts[i - 1] and ends[i] >= ends[i - 1]
+            for i in range(1, len(starts)))
         self._content_size = max(0.0, total - self.spacing)
+        if not self.horizontal and not fixed_axis_layout:
+            self._geometry_cache[geometry_key] = (
+                placed, starts, ends, self._ordered_items,
+                self._content_size, [child._rect for child in placed])
+            self._geometry_cache.move_to_end(geometry_key)
+            while len(self._geometry_cache) > 3:
+                self._geometry_cache.popitem(last=False)
         view = ih if not self.horizontal else iw
         # clamp offset after content shrinks
         self._offset = max(0.0, min(self._offset,
                                     max(0.0, self._content_size - view)))
         if self.auto_scroll:
             self._offset = max(0.0, self._content_size - view)
+        self._layout_lazy_candidates(scale)
 
     def _max_offset(self) -> float:
         p = self._pad()
@@ -109,7 +286,8 @@ class ListView(Control):
         if new != self._offset:
             self._offset = new
             self._show_scrollbar()
-            self.update()
+            if self.page is not None:
+                self.page.repaint()
             fire(self, "scroll", self._offset)
 
     def _show_scrollbar(self, *, active: bool = False):
@@ -131,6 +309,7 @@ class ListView(Control):
             self._scrollbar_hide_at = (
                 time.perf_counter() + _SCROLLBAR_FADE_DELAY)
             if self.page is not None:
+                self.page._active_animations.add(self)
                 self.page._app.mark_dirty()
 
     def _scrollbar_geometry(self):
@@ -182,24 +361,62 @@ class ListView(Control):
         new = max(0.0, min(self._max_offset(), fraction * self._max_offset()))
         if new != self._offset:
             self._offset = new
-            self.update()
+            if self.page is not None:
+                self.page.repaint()
             fire(self, "scroll", self._offset)
 
     def scroll_to(self, offset: float = 0, delta: float | None = None):
         self._scroll_by(delta if delta is not None
                         else offset - self._offset)
 
+    def _candidates(self, low, high):
+        if not self._ordered_items:
+            return self._placed_controls
+        first = bisect_left(self._item_ends, low)
+        last = bisect_right(self._item_starts, high)
+        return self._placed_controls[first:last]
+
+    def _layout_lazy_candidates(self, scale):
+        x, y, w, h = self._rect
+        p = self._pad()
+        guard = _OVERSCAN
+        start = (x if self.horizontal else y) + self._offset
+        size = w if self.horizontal else h
+        for child in self._candidates(start - guard, start + size + guard):
+            if (child in self._lazy_items and
+                    self._lazy_layout_version.get(child) != self._layout_version):
+                ml, _mt, mr, _mb = _margins(child)
+                child._rect = (x + p.left + ml, child._rect[1],
+                               w - p.left - p.right - ml - mr,
+                               child._rect[3])
+                child._place(*child._rect, scale)
+                self._lazy_layout_version[child] = self._layout_version
+
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
             return
+        self._layout_lazy_candidates(r.scale)
         self._effects_begin(r)
         try:
             x, y, w, h = self._rect
             r.clip_push(x + ox, y + oy, w, h)
             off_x = self._offset if self.horizontal else 0.0
             off_y = self._offset if not self.horizontal else 0.0
-            for c in self.controls:
+            # Clipping alone still runs every child renderer. The generous
+            # guard keeps ordinary shadows and small paint overflow intact.
+            guard = _OVERSCAN
+            left, top = x + off_x - guard, y + off_y - guard
+            right, bottom = x + off_x + w + guard, y + off_y + h + guard
+            axis_start = (x if self.horizontal else y) + self._offset
+            axis_size = w if self.horizontal else h
+            for c in self._candidates(axis_start - guard,
+                                      axis_start + axis_size + guard):
                 if c.visible:
+                    cx, cy, cw, ch = c._rect
+                    if (cw > 0 and ch > 0 and
+                            (cx + cw < left or cx > right or
+                             cy + ch < top or cy > bottom)):
+                        continue
                     c._draw_all(r, ox - off_x, oy - off_y)
             r.clip_pop()
             self._draw_scrollbar(r, ox, oy)
@@ -233,12 +450,16 @@ class ListView(Control):
         # the viewport itself handles wheel; taps pass through to children
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
+        if self.page is not None and self.page._app.renderer is not None:
+            self._layout_lazy_candidates(self.page._app.renderer.scale)
         geometry = self._scrollbar_geometry()
         if geometry is not None and self._point_in(geometry[0], x, y):
             return self
         off_x = self._offset if self.horizontal else 0.0
         off_y = self._offset if not self.horizontal else 0.0
-        for c in reversed(self.controls):
+        guard = _OVERSCAN
+        axis = (x + off_x) if self.horizontal else (y + off_y)
+        for c in reversed(self._candidates(axis - guard, axis + guard)):
             hit = c._hit_test(x + off_x, y + off_y)
             if hit is not None:
                 return hit
@@ -247,12 +468,16 @@ class ListView(Control):
     def _hit_test_hover(self, x, y):
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
+        if self.page is not None and self.page._app.renderer is not None:
+            self._layout_lazy_candidates(self.page._app.renderer.scale)
         geometry = self._scrollbar_geometry()
         if geometry is not None and self._point_in(geometry[0], x, y):
             return self
         off_x = self._offset if self.horizontal else 0.0
         off_y = self._offset if not self.horizontal else 0.0
-        for c in reversed(self.controls):
+        guard = _OVERSCAN
+        axis = (x + off_x) if self.horizontal else (y + off_y)
+        for c in reversed(self._candidates(axis - guard, axis + guard)):
             hit = c._hit_test_hover(x + off_x, y + off_y)
             if hit is not None:
                 return hit
@@ -273,14 +498,19 @@ class ListView(Control):
                     "_scrollbar_opacity", _SCROLLBAR_IDLE_OPACITY,
                     motion.SHORT2, motion.STANDARD)
                 self._schedule_scrollbar_hide()
-        self.update()
+        if self.page is not None:
+            self.page.repaint()
 
     def _find_scrollable(self, x, y):
         if not self.visible or not self._contains(x, y):
             return None
+        if self.page is not None and self.page._app.renderer is not None:
+            self._layout_lazy_candidates(self.page._app.renderer.scale)
         off_x = self._offset if self.horizontal else 0.0
         off_y = self._offset if not self.horizontal else 0.0
-        for c in reversed(self.controls):
+        guard = _OVERSCAN
+        axis = (x + off_x) if self.horizontal else (y + off_y)
+        for c in reversed(self._candidates(axis - guard, axis + guard)):
             found = c._find_scrollable(x + off_x, y + off_y)
             if found is not None:
                 return found
@@ -350,11 +580,6 @@ class GestureDetector(Control):
         self.on_click = self._clicked  # internal routing
         self._hovered = False
         self._pressed = False
-
-    def _attach(self, page, parent=None):
-        super()._attach(page, parent)
-        if self.content is not None:
-            self.content._attach(page, self)
 
     def _children(self):
         return [self.content] if self.content is not None else []

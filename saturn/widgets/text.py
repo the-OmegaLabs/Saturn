@@ -1,7 +1,10 @@
 """Text control. Icon/Image/Divider join this module in the widgets milestone."""
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from .. import colors
+from .. import text as font_state
 from ..control import Control
 from ..text import (family_for, line_height, line_width, measure,
                     render_line_cached, wrap)
@@ -28,6 +31,8 @@ class Text(Control):
         self.font_family = font_family
         self._lines: list[str] = []
         self._line_h = 0.0
+        self._measure_cache = OrderedDict()
+        self._wrap_cache = OrderedDict()
 
     # -- style helpers -----------------------------------------------------
     def _style(self, scale: float):
@@ -37,14 +42,25 @@ class Text(Control):
 
     # -- layout hooks (flex engine drives these) ---------------------------
     def _intrinsic(self, max_w, max_h, scale):
+        key = (self.value, self.size, self.weight, self.italic,
+               self.font_family, font_state.default_family,
+               font_state.font_revision, self.no_wrap, self.max_lines,
+               max_w, scale, self._width, self._height)
+        cached = self._measure_cache.get(key)
+        if cached is not None:
+            self._measure_cache.move_to_end(key)
+            return cached
         kw = self._style(scale)
         if self.no_wrap:
-            w = line_width(self.value, self.size, **kw)
+            # Explicit newlines still create lines when soft wrapping is off.
+            lines = self.value.split("\n")[:self.max_lines]
+            w = max((line_width(line, self.size, **kw) for line in lines),
+                    default=0.0)
             h = line_height(self.size, scale=scale,
-                            family=family_for(self.value, self.font_family))
+                            family=family_for(self.value, self.font_family)) * len(lines)
         else:
-            lines = wrap(self.value, max_w if max_w is not None else 10_000,
-                         self.size, max_lines=self.max_lines, **kw) or [""]
+            lines = self._wrapped(max_w if max_w is not None else 10_000,
+                                  scale, kw)
             w = max((line_width(l, self.size, **kw) for l in lines),
                     default=0.0)
             h = line_height(self.size, scale=scale,
@@ -53,21 +69,41 @@ class Text(Control):
             w = self._width
         if self._height is not None:
             h = self._height
+        self._measure_cache[key] = (w, h)
+        if len(self._measure_cache) > 4:
+            self._measure_cache.popitem(last=False)
         return w, h
+
+    def _wrapped(self, width, scale, kw):
+        key = (self.value, self.size, self.weight, self.italic,
+               self.font_family, font_state.default_family,
+               font_state.font_revision, self.max_lines, width, scale)
+        cached = self._wrap_cache.get(key)
+        if cached is None:
+            cached = wrap(
+                self.value, width, self.size,
+                max_lines=self.max_lines, **kw) or [""]
+            self._wrap_cache[key] = cached
+            if len(self._wrap_cache) > 4:
+                self._wrap_cache.popitem(last=False)
+        else:
+            self._wrap_cache.move_to_end(key)
+        return cached
 
     def _place(self, x, y, w, h, scale):
         kw = self._style(scale)
-        if not self.no_wrap:
-            self._lines = wrap(self.value, w, self.size,
-                               max_lines=self.max_lines, **kw) or [""]
-            self._line_h = line_height(self.size, scale=scale,
-                                       family=self._style(scale)["family"])
+        self._lines = (self.value.split("\n")[:self.max_lines]
+                       if self.no_wrap else self._wrapped(w, scale, kw))
+        self._line_h = line_height(self.size, scale=scale,
+                                   family=kw["family"])
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
         color = colors.parse_color(self.color or colors.Colors.ON_SURFACE)
         align = self.text_align or TextAlign.START
         w = self._rect[2]
+        if self.no_wrap:
+            r.clip_push(x, y, self._rect[2], self._rect[3])
         for line in self._lines:
             surf = render_line_cached(
                 line, self.size, color=color, **self._style(r.scale))
@@ -78,5 +114,7 @@ class Text(Control):
                 ox = w - lw
             else:
                 ox = 0.0
-            r.blit(surf, x + ox, y)
+            r.blit_cached(surf, x + ox, y)
             y += self._line_h
+        if self.no_wrap:
+            r.clip_pop()

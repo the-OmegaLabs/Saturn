@@ -175,7 +175,7 @@ class AlertDialog(DialogControl):
             r.clip_push(cx, cy, cw, visible_h)
             r.opacity_push(content_alpha)
             if isinstance(self.title, str) and self.title:
-                r.blit(txt.render_line_cached(
+                r.blit_cached(txt.render_line_cached(
                     self.title, 24, scale=r.scale, bold=True,
                     color=colors.parse_color(colors.Colors.ON_SURFACE)),
                     self._title_rect[0], self._title_rect[1])
@@ -296,7 +296,7 @@ class SnackBar(DialogControl):
                                        colors.Colors.INVERSE_SURFACE),
                     radius=0)
         if isinstance(self.content, str):
-            r.blit(txt.render_line_cached(
+            r.blit_cached(txt.render_line_cached(
                    str(self.content), 14, scale=r.scale,
                    color=colors.parse_color(colors.Colors.ON_INVERSE_SURFACE)),
                    bx + 24, by + (bh - 20) / 2)

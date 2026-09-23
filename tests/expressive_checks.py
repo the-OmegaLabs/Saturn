@@ -38,6 +38,36 @@ def check_regressions():
     assert len(set(alphas)) > 8, alphas
 
 
+def check_native_hover_layer():
+    overlays = []
+    native = SimpleNamespace(
+        native_shape_overlay=True,
+        overlay_rect=lambda *args, **kwargs: overlays.append((args, kwargs)))
+    state = SimpleNamespace(_state_hover_alpha=.08, _state_press_alpha=0)
+    with patch('saturn.widgets._material.pygame.Surface',
+               side_effect=AssertionError('hover allocated a Surface')):
+        draw_state_layer(state, native, (2, 3, 100, 40), '#FFFFFF', 12)
+    assert overlays == [(((2, 3, 100, 40, (255, 255, 255, 20)),
+                         {'radius': 12}))]
+
+
+def check_native_press_layer():
+    layers = []
+    native = SimpleNamespace(
+        scale=2, native_shape_overlay=True, native_state_layer=True,
+        state_layer=lambda *args: layers.append(args))
+    state = SimpleNamespace(
+        _state_hover_alpha=.08, _state_press_alpha=.12,
+        _state_press_origin=(50, 20), _state_ripple_progress=.5)
+    with patch('saturn.widgets._material.pygame.Surface',
+               side_effect=AssertionError('press allocated a Surface')):
+        draw_state_layer(state, native, (0, 0, 100, 40), '#FFFFFF',
+                         (20, 4, 4, 20))
+    assert len(layers) == 1
+    assert layers[0][5] == (20, 4, 4, 20)
+    assert layers[0][7] == .12
+
+
 def check_label_cutout():
     r = renderer()
     field = ft.TextField('', label='Transition label')
@@ -154,6 +184,8 @@ def check_floating():
 
 if __name__ == '__main__':
     check_regressions()
+    check_native_hover_layer()
+    check_native_press_layer()
     check_label_cutout()
     check_progress()
     check_shadow_work()

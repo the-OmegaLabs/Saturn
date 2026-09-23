@@ -188,11 +188,11 @@ class Button(Control):
         cx = x + pad_start + (content_w - total) / 2
         cy = y + h / 2
         if icon_surf is not None:
-            r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
+            r.blit_cached(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
             cx += icon_w + (gap if label_w else 0)
         if label_surf is not None:
-            r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
+            r.blit_cached(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
                    alpha=0.38 if self.disabled else 1.0)
 
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
@@ -221,7 +221,7 @@ class Button(Control):
             self._animate_internal(
                 "_elevation_progress", 3.0 if on else self.variant_elevation,
                 motion.SHORT3, motion.EMPHASIZED)
-        self.update()
+        self.repaint()
         fire(self, "hover", "true" if on else "false")
 
     def _pressed_hook(self, x, y):
@@ -360,7 +360,7 @@ class IconButton(Control):
             draw_state_layer(self, r, (x, y, w, h), state_color, radius)
         surf = render_icon_cached(
             self._current_icon(), round(self.icon_size * r.scale), fg)
-        r.blit(surf, x + (w - surf.get_width() / r.scale) / 2,
+        r.blit_cached(surf, x + (w - surf.get_width() / r.scale) / 2,
                y + (h - surf.get_height() / r.scale) / 2,
                alpha=.38 if self.disabled else 1.0)
 
@@ -374,7 +374,7 @@ class IconButton(Control):
 
     def _set_hover(self, on: bool):
         set_hover(self, on)
-        self.update()
+        self.repaint()
         fire(self, "hover", "true" if on else "false")
 
     def _pressed_hook(self, x, y):

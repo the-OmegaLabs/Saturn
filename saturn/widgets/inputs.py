@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from functools import lru_cache
 
 import pygame
 import pyperclip
@@ -31,6 +32,24 @@ _IME_OFFSET_X = -6.0
 _IME_OFFSET_Y = -4.0
 _FIELD_TRANSITION_MS = 150
 _FIELD_TRANSITION_CURVE = AnimationCurve.EASE_IN_OUT_CUBIC_EMPHASIZED
+
+
+@lru_cache(maxsize=128)
+def _font_ink_offset(family, size, scale, default_family, font_revision):
+    """Center stable reference ink on the caret without per-value jumps."""
+    sample = txt.render_line(
+        "0123456789", size, scale=scale, family=family,
+        color=(255, 255, 255, 255))
+    ink = sample.get_bounding_rect(min_alpha=24)
+    if not ink.height:
+        return 0.0
+    return (sample.get_height() / 2 - (ink.y + ink.height / 2)) / scale
+
+
+def _text_ink_offset(family, size, scale):
+    return _font_ink_offset(
+        family, float(size), float(scale), txt.default_family,
+        txt.font_revision)
 
 
 def _parse(c):
@@ -77,6 +96,9 @@ class TextField(Control):
     def __init__(self, value: str = "", *, label=None, hint_text=None,
                  password: bool = False, multiline: bool = False,
                  max_lines: int | None = None, read_only: bool = False,
+                 max_length: int | None = None, shift_enter: bool = False,
+                 show_cursor: bool = True,
+                 obscuring_character: str = "•",
                  text_size: float | None = None, on_change=None, on_submit=None,
                  on_focus=None, on_blur=None, on_click=None,
                  filled: bool = False, bgcolor=None, border_color=None,
@@ -84,6 +106,10 @@ class TextField(Control):
                  border=None, text_style=None,
                  can_reveal_password: bool = False, on_hover=None, **base):
         super().__init__(**base)
+        if max_length is not None and (max_length == 0 or max_length < -1):
+            raise ValueError("max_length must be positive or -1")
+        if len(obscuring_character) != 1:
+            raise ValueError("obscuring_character must be one character")
         self.value = value
         self.label = label
         self.hint_text = hint_text
@@ -91,6 +117,10 @@ class TextField(Control):
         self.multiline = multiline
         self.max_lines = max_lines
         self.read_only = read_only
+        self.max_length = max_length
+        self.shift_enter = shift_enter
+        self.show_cursor = show_cursor
+        self.obscuring_character = obscuring_character
         self.text_size = text_size or 16.0
         self.on_change = on_change
         self.on_submit = on_submit
@@ -142,7 +172,8 @@ class TextField(Control):
     def _render_cached(self, slot, text, size, scale, family, color):
         """Reuse immutable text rasters across short state animations."""
         color = tuple(_parse(color))
-        key = (slot, text, float(size), float(scale), family, color)
+        key = (slot, text, float(size), float(scale), family, color,
+               txt.default_family, txt.font_revision)
         surface = self._line_cache.get(key)
         if surface is None:
             surface = txt.render_line(
@@ -181,12 +212,12 @@ class TextField(Control):
 
     # -- text helpers ----------------------------------------------------------
     def _visible_text(self) -> str:
-        return ("•" * len(self.value)
+        return (self.obscuring_character * len(self.value)
                 if self.password and not self._password_revealed else self.value)
 
     def _visible_composition(self) -> str:
         if self.password and not self._password_revealed:
-            return "•" * len(self._composition)
+            return self.obscuring_character * len(self._composition)
         return self._composition
 
     def _pressed_hook(self, x, y):
@@ -236,6 +267,10 @@ class TextField(Control):
         timer = self._cursor_timer
         if timer is not None:
             timer.cancel()
+        self._cursor_timer = None
+        if not self.show_cursor:
+            self._cursor_visible = False
+            return
         self._cursor_visible = True
 
         def blink():
@@ -452,9 +487,19 @@ class TextField(Control):
         selected = self._selection()
         start, end = selected if selected is not None else (
             self._caret, self._caret)
-        self.value = self.value[:start] + value + self.value[end:]
+        if self.max_length is not None and self.max_length >= 0:
+            available = max(0, self.max_length - (len(self.value) - (end - start)))
+            value = value[:available]
+        next_value = self.value[:start] + value + self.value[end:]
+        if next_value == self.value:
+            if selected is not None:
+                self._caret = start + len(value)
+                self._clear_selection()
+            return False
+        self.value = next_value
         self._caret = start + len(value)
         self._clear_selection()
+        return True
 
     def _previous_word_boundary(self, index: int) -> int:
         value = self.value
@@ -489,9 +534,9 @@ class TextField(Control):
         if self.read_only:
             return
         self._clear_composition(update=False)
-        self._replace_selection(t)
-        self._update_ime_rect()
-        self._changed()
+        if self._replace_selection(t):
+            self._update_ime_rect()
+            self._changed()
 
     def _text_editing(self, text: str, start: int = 0, length: int = 0):
         """Update SDL IME preedit state without committing it to ``value``."""
@@ -584,8 +629,8 @@ class TextField(Control):
                     if not self.multiline:
                         pasted = pasted.replace("\n", "")
                     self._clear_composition(update=False)
-                    self._replace_selection(pasted)
-                    self._changed()
+                    if self._replace_selection(pasted):
+                        self._changed()
             return
         if self._composition:
             # The platform IME owns editing/navigation keys until it emits a
@@ -607,9 +652,10 @@ class TextField(Control):
                 self.value = v[:c] + v[end:]
                 self._changed()
         elif k in (pygame.K_RETURN, pygame.K_KP_ENTER):
-            if self.multiline and not self.read_only:
-                self._replace_selection("\n")
-                self._changed()
+            if self.multiline and not self.read_only and (
+                    not self.shift_enter or extend):
+                if self._replace_selection("\n"):
+                    self._changed()
             else:
                 fire(self, "submit", self.value)
         elif k == pygame.K_LEFT:
@@ -728,7 +774,7 @@ class TextField(Control):
         if self.label:
             if label_progress <= 0.0 or floating_width <= 0.0:
                 inline_y = y + (h - inline_label.get_height() / scale) / 2
-                r.blit(inline_label, x + _FIELD_PAD, inline_y)
+                r.blit_cached(inline_label, x + _FIELD_PAD, inline_y)
             else:
                 # Scale cached label rasters, keeping placement and cutout on
                 # the same geometry rather than on the focus target state.
@@ -755,7 +801,8 @@ class TextField(Control):
         if displayed:
             surf = self._render_cached(
                 "value", displayed, vsize, scale, family, _parse(vcolor))
-            text_y = ty + (th - surf.get_height() / scale) / 2
+            text_y = (ty + (th - surf.get_height() / scale) / 2
+                      + _text_ink_offset(family, vsize, scale))
             r.clip_push(text_left, y, viewport_w, h)
             selected = self._selection()
             if selected is not None and not composition:
@@ -769,7 +816,7 @@ class TextField(Control):
                     surf.get_height() / scale,
                     _parse(colors.with_opacity(0.36, colors.Colors.PRIMARY)),
                     radius=2)
-            r.blit(surf, draw_x, text_y)
+            r.blit_cached(surf, draw_x, text_y)
             if composition:
                 comp_x = draw_x + txt.line_width(
                     prefix, vsize, scale=scale, family=family)
@@ -802,8 +849,9 @@ class TextField(Control):
                 "hint", self.hint_text, self.text_size, scale, family,
                 _parse(colors.Colors.ON_SURFACE_VARIANT))
             r.clip_push(text_left, y, viewport_w, h)
-            r.blit(surf, text_left,
-                   ty + (th - surf.get_height() / scale) / 2,
+            r.blit_cached(surf, text_left,
+                   ty + (th - surf.get_height() / scale) / 2
+                   + _text_ink_offset(family, self.text_size, scale),
                    alpha=hint_progress)
             r.clip_pop()
         if self.password and self.can_reveal_password:
@@ -813,7 +861,7 @@ class TextField(Control):
                             _parse(colors.Colors.ON_SURFACE_VARIANT))
             r.blit(eye, x + w - 32,
                    y + (h - eye.get_height() / scale) / 2)
-        if self._focused and self._cursor_visible:
+        if self._focused and self._cursor_visible and self.show_cursor:
             ime_cursor = min(len(composition),
                              self._composition_start + self._composition_length)
             caret_text = prefix + composition[:ime_cursor]
@@ -895,7 +943,7 @@ class _Toggle(Control):
             surf = txt.render_line_cached(
                 self.label, 14, scale=r.scale,
                 color=_parse(colors.Colors.ON_SURFACE))
-            r.blit(surf, lx, cy - surf.get_height() / (2 * r.scale))
+            r.blit_cached(surf, lx, cy - surf.get_height() / (2 * r.scale))
 
     def _hit_test(self, x, y):
         if not self.visible or self.disabled:
@@ -1174,7 +1222,7 @@ class Radio(Control):
             surf = txt.render_line_cached(
                 self.label, 14, scale=r.scale,
                 color=_parse(colors.Colors.ON_SURFACE))
-            r.blit(surf, x + 28, cy - surf.get_height() / (2 * r.scale))
+            r.blit_cached(surf, x + 28, cy - surf.get_height() / (2 * r.scale))
 
     def _group_value(self):
         g = self.parent
@@ -1257,7 +1305,7 @@ class Slider(Control):
         v = self.min + k * (self.max - self.min)
         if self.divisions:
             step = (self.max - self.min) / self.divisions
-            v = round(v / step) * step
+            v = self.min + round((v - self.min) / step) * step
         v = max(self.min, min(self.max, v))
         return round(v, self.round) if self.round else v
 
@@ -1343,7 +1391,7 @@ class Slider(Control):
             r.fill_rect(thumb_x - label_w / 2, label_y - label_h,
                         label_w, label_h, _parse(colors.Colors.PRIMARY),
                         radius=label_h / 2)
-            r.blit(surface, thumb_x - surface.get_width() / (2 * r.scale),
+            r.blit_cached(surface, thumb_x - surface.get_width() / (2 * r.scale),
                    label_y - label_h / 2 - surface.get_height() / (2 * r.scale))
             r.opacity_pop()
 
@@ -1612,7 +1660,7 @@ class Dropdown(Control):
         surf = txt.render_line_cached(
             shown, self.text_size, scale=r.scale, color=c)
         r.clip_push(x, y, w, h)
-        r.blit(surf, x + _FIELD_PAD,
+        r.blit_cached(surf, x + _FIELD_PAD,
                y + (h - surf.get_height() / r.scale) / 2)
         r.clip_pop()
         af = get_icon_font(round(24 * r.scale))

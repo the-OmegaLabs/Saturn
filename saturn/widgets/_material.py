@@ -54,6 +54,8 @@ def release(control, *, now: float | None = None, minimum_ms=225,
     minimum_end = control._state_press_started + minimum_ms / 1000.0
     if now < minimum_end:
         control._state_release_deadline = minimum_end
+        if control.page is not None and hasattr(control.page, "_active_animations"):
+            control.page._active_animations.add(control)
     else:
         control._animate_internal(
             "_state_press_alpha", 0.0, fade_duration,
@@ -79,11 +81,16 @@ def draw_state_layer(control, renderer, rect, color, radius=0.0):
     pressed = control._state_press_alpha
     if (hover <= 0 and pressed <= 0) or w <= 0 or h <= 0:
         return
+    if (pressed <= 0 and hover > 0 and
+            renderer.native_shape_overlay and isinstance(radius, (int, float))):
+        # GL already draws rounded translucent rects in a batch. A hover-only
+        # layer needs no CPU mask, temporary bitmap, hashing or texture upload.
+        renderer.overlay_rect(x, y, w, h,
+                              (red, green, blue, round(255 * hover)),
+                              radius=max(0.0, radius))
+        return
     scale = renderer.scale
     pw, ph = max(1, round(w * scale)), max(1, round(h * scale))
-    mask = shape_mask(pw, ph, corners(radius, scale, pw, ph))
-    layer = pygame.Surface((pw, ph), pygame.SRCALPHA)
-    layer.fill((red, green, blue, round(255 * max(0, hover))))
     ox, oy = control._state_press_origin
     ox = max(x, min(x + w, ox))
     oy = max(y, min(y + h, oy))
@@ -97,6 +104,18 @@ def draw_state_layer(control, renderer, rect, color, radius=0.0):
     ) + 10.0
     start_radius = 0.1 * max(w, h)
     ripple_radius = start_radius + (end_radius - start_radius) * progress
+
+    radii = corners(radius, scale, pw, ph)
+    if pressed > 0 and renderer.native_state_layer:
+        renderer.state_layer(
+            x, y, w, h, (red, green, blue, 255),
+            tuple(value / scale for value in radii), hover, pressed,
+            ripple_x, ripple_y, ripple_radius)
+        return
+
+    mask = shape_mask(pw, ph, radii)
+    layer = pygame.Surface((pw, ph), pygame.SRCALPHA)
+    layer.fill((red, green, blue, round(255 * max(0, hover))))
     if pressed > 0:
         ripple = pygame.Surface((pw, ph), pygame.SRCALPHA)
         pygame.draw.circle(ripple, (red, green, blue, round(255 * pressed)),

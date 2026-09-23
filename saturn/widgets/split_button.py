@@ -85,11 +85,11 @@ class _SplitSegment(Button):
         cx = x + (w - icon_w - gap - label_w) / 2
         cy = y + h / 2
         if icon_surf is not None:
-            r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
+            r.blit_cached(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
                    alpha=.38 if self.disabled else 1.0)
             cx += icon_w + gap
         if label_surf is not None:
-            r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
+            r.blit_cached(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
                    alpha=.38 if self.disabled else 1.0)
 
     def _pressed_hook(self, x, y):

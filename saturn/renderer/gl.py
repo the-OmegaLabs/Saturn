@@ -1,8 +1,8 @@
 """OpenGL renderer (moderngl): SDF rounded rects + textured quads.
 
-Draw calls execute immediately into the default framebuffer; blending is
-standard alpha. Clip = scissor stack. Coordinates arrive in logical px with
-origin top-left and are flipped on the GPU side.
+Draw calls target a supersampled framebuffer and resolve into the window;
+blending is standard alpha. Clip = scissor stack. Coordinates arrive in
+logical px with origin top-left and are flipped on the GPU side.
 """
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ import hashlib
 import math
 import os
 import struct
+from array import array
+from collections import OrderedDict
 
 import pygame
 import moderngl
@@ -103,9 +105,55 @@ void main() {
 }
 """
 
+STATE_VS = """
+#version 330
+in vec2 in_pos;
+in vec2 in_uv;
+uniform vec2 u_size;
+out vec2 v_uv;
+void main() {
+    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+    v_uv = in_uv;
+}
+"""
+
+STATE_FS = """
+#version 330
+in vec2 v_uv;
+uniform vec2 u_rect_size;
+uniform vec4 u_radii;
+uniform vec2 u_ripple_center;
+uniform float u_ripple_radius;
+uniform vec4 u_color;
+uniform float u_hover;
+uniform float u_pressed;
+out vec4 frag;
+void main() {
+    vec2 p = v_uv * u_rect_size;
+    float radius = p.y < u_rect_size.y * 0.5
+        ? (p.x < u_rect_size.x * 0.5 ? u_radii.x : u_radii.y)
+        : (p.x < u_rect_size.x * 0.5 ? u_radii.w : u_radii.z);
+    vec2 local = p - u_rect_size * 0.5;
+    vec2 q = abs(local) - u_rect_size * 0.5 + radius;
+    float shape_dist = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+    float shape_aa = max(fwidth(shape_dist), 0.001);
+    float shape = 1.0 - smoothstep(-shape_aa, shape_aa, shape_dist);
+    float circle_dist = length(p - u_ripple_center) - u_ripple_radius;
+    float circle_aa = max(fwidth(circle_dist), 0.001);
+    float ripple = 1.0 - smoothstep(-circle_aa, circle_aa, circle_dist);
+    float press_alpha = u_pressed * ripple;
+    float alpha = shape * (u_hover + press_alpha * (1.0 - u_hover));
+    if (alpha <= 0.0) discard;
+    frag = vec4(u_color.rgb, alpha * u_color.a);
+}
+"""
+
 
 class GLRenderer(Renderer):
     native_texture_scaling = True
+    native_shape_overlay = True
+    native_state_layer = True
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
     _ssaa = 2
@@ -128,10 +176,27 @@ class GLRenderer(Renderer):
                             for v in self._pixel_size))
         self._prog = self.ctx.program(vertex_shader=RECT_VS, fragment_shader=RECT_FS)
         self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
+        self._prog_state = self.ctx.program(vertex_shader=STATE_VS, fragment_shader=STATE_FS)
         self._prog["u_size"].value = self._fb_size()
         self._prog_tex["u_size"].value = self._fb_size()
+        self._prog_state["u_size"].value = self._fb_size()
         self._prog_tex["u_tex"].value = 0
+        self._rect_vertices = array("f")
+        self._rect_vbo = self.ctx.buffer(reserve=65536)
+        self._rect_vao = self.ctx.vertex_array(
+            self._prog,
+            [(self._rect_vbo, "2f 2f 2f 2f 4f 4f", "in_pos", "in_center",
+              "in_half", "in_rb", "in_color", "in_border_color")])
+        self._tex_vbo = self.ctx.buffer(reserve=192)
+        self._tex_vao = self.ctx.vertex_array(
+            self._prog_tex,
+            [(self._tex_vbo, "2f 2f 4f", "in_pos", "in_uv", "in_color")])
+        self._state_vbo = self.ctx.buffer(reserve=96)
+        self._state_vao = self.ctx.vertex_array(
+            self._prog_state,
+            [(self._state_vbo, "2f 2f", "in_pos", "in_uv")])
         self._tex_cache: dict = {}  # surface digest -> texture
+        self._immutable_tex_cache: OrderedDict = OrderedDict()
         self._clip_stack: list = []
         self._frame_color = None
         self._frame_target = None
@@ -169,6 +234,17 @@ class GLRenderer(Renderer):
                              max(1, int(self._pixel_size[1]) * self._ssaa))
         self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
 
+    def _flush_rects(self):
+        vertices = self._rect_vertices
+        if not vertices:
+            return
+        data = vertices.tobytes()
+        if len(data) > self._rect_vbo.size:
+            self._rect_vbo.orphan(max(len(data), self._rect_vbo.size * 2))
+        self._rect_vbo.write(data)
+        self._rect_vao.render(moderngl.TRIANGLES, vertices=len(vertices) // 16)
+        vertices.clear()
+
     def _draw_rect(self, corners, center, half, radius, border_w, color,
                    border_color):
         """corners: 6 (x, y) tuples (two triangles, any winding)."""
@@ -179,17 +255,12 @@ class GLRenderer(Renderer):
             br = bg = bb = ba = 0.0
         color4 = (r / 255, g / 255, b / 255, a / 255)
         border4 = (br / 255, bg / 255, bb / 255, ba / 255)
-        data = []
+        data = self._rect_vertices
         for (px, py) in corners:
-            data += [px, py, *center, *half, radius, border_w, *color4, *border4]
-        vbo = self.ctx.buffer(data=struct.pack(f"{len(data)}f", *data))
-        vao = self.ctx.vertex_array(
-            self._prog,
-            [(vbo, "2f 2f 2f 2f 4f 4f", "in_pos", "in_center", "in_half",
-              "in_rb", "in_color", "in_border_color")])
-        vao.render(moderngl.TRIANGLES)
-        vao.release()
-        vbo.release()
+            data.extend((px, py, *center, *half, radius, border_w,
+                         *color4, *border4))
+        if len(data) >= 16 * 6 * 256:
+            self._flush_rects()
 
     def _rect_call(self, x, y, w, h, color, radius=0.0, border_w=0.0,
                    border_color=(0, 0, 0, 0)):
@@ -218,6 +289,11 @@ class GLRenderer(Renderer):
 
     # -- Renderer API ---------------------------------------------------------
     def clear(self, color):
+        self._flush_rects()
+        # SDL may call glViewport with the native window size after a resize,
+        # outside ModernGL's cached state. Rebind the supersampled target and
+        # restore its actual viewport at the start of every new frame.
+        self._use_frame_target()
         r, g, b, a = parse_color(color)
         self.ctx.clear(r / 255, g / 255, b / 255, a / 255)
 
@@ -295,14 +371,38 @@ class GLRenderer(Renderer):
                 self._tex_cache.pop(old).release()
         return tex, raw
 
+    def _cached_texture(self, surface):
+        key = id(surface)
+        entry = self._immutable_tex_cache.get(key)
+        if entry is not None and entry[0] is surface:
+            self._immutable_tex_cache.move_to_end(key)
+            return entry[1]
+        raw = pygame.image.tobytes(surface, "RGBA")
+        tex = self.ctx.texture(surface.get_size(), 4, raw)
+        tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        tex.repeat_x = False
+        tex.repeat_y = False
+        self._immutable_tex_cache[key] = (surface, tex)
+        if len(self._immutable_tex_cache) > 600:
+            _, (_, old) = self._immutable_tex_cache.popitem(last=False)
+            old.release()
+        return tex
+
     def blit(self, surface, x, y, alpha=1.0):
         s = self.scale
         self.blit_scaled(surface, x, y,
                          surface.get_width() / s,
                          surface.get_height() / s, alpha)
 
+    def blit_cached(self, surface, x, y, alpha=1.0):
+        s = self.scale
+        self.blit_cached_scaled(surface, x, y,
+                                surface.get_width() / s,
+                                surface.get_height() / s, alpha)
+
     def _draw_texture(self, tex, x, y, width, height, alpha=1.0, *,
                       framebuffer_texture=False):
+        self._flush_rects()
         device_scale = self.scale
         x0 = round(x * device_scale) / device_scale
         y0 = round(y * device_scale) / device_scale
@@ -319,13 +419,9 @@ class GLRenderer(Renderer):
         data = []
         for vx, vy, u, v in verts:
             data += [vx, vy, u, v, 1.0, 1.0, 1.0, alpha]
-        vbo = self.ctx.buffer(data=struct.pack(f"{len(data)}f", *data))
-        vao = self.ctx.vertex_array(self._prog_tex,
-                                    [(vbo, "2f 2f 4f", "in_pos", "in_uv", "in_color")])
+        self._tex_vbo.write(struct.pack(f"{len(data)}f", *data))
         tex.use(0)
-        vao.render(moderngl.TRIANGLES)
-        vao.release()
-        vbo.release()
+        self._tex_vao.render(moderngl.TRIANGLES)
 
     def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
         x, y = self._translate(x, y)
@@ -333,11 +429,49 @@ class GLRenderer(Renderer):
         tex, _ = self._texture(surface)
         self._draw_texture(tex, x, y, width, height, alpha)
 
+    def blit_cached_scaled(self, surface, x, y, width, height, alpha=1.0):
+        x, y = self._translate(x, y)
+        alpha *= self.opacity
+        self._draw_texture(self._cached_texture(surface), x, y,
+                           width, height, alpha)
+
     def overlay_rect(self, x, y, w, h, color, radius=0):
         self._rect_call(x, y, w, h, color, radius=radius)  # blend handles alpha
 
+    def state_layer(self, x, y, w, h, color, radii, hover, pressed,
+                    ripple_x, ripple_y, ripple_radius):
+        """Draw a clipped Material ripple without allocating a CPU bitmap."""
+        if w <= 0 or h <= 0:
+            return
+        self._flush_rects()
+        original_x, original_y = x, y
+        x, y = self._translate(x, y)
+        s = self.scale
+        x0 = round(x * s) / s
+        y0 = round(y * s) / s
+        x1 = round((x + w) * s) / s
+        y1 = round((y + h) * s) / s
+        vertices = (
+            x0, y0, 0.0, 0.0, x1, y0, 1.0, 0.0,
+            x1, y1, 1.0, 1.0, x0, y0, 0.0, 0.0,
+            x1, y1, 1.0, 1.0, x0, y1, 0.0, 1.0)
+        self._state_vbo.write(struct.pack("24f", *vertices))
+        r, g, b, a = self._effect_color(color)
+        program = self._prog_state
+        program["u_rect_size"].value = (x1 - x0, y1 - y0)
+        program["u_radii"].value = tuple(float(v) for v in radii)
+        program["u_ripple_center"].value = (
+            ripple_x - original_x + x - x0,
+            ripple_y - original_y + y - y0)
+        program["u_ripple_radius"].value = float(ripple_radius)
+        program["u_color"].value = (r / 255, g / 255, b / 255, a / 255)
+        program["u_hover"].value = max(0.0, min(1.0, hover))
+        program["u_pressed"].value = max(0.0, min(1.0, pressed))
+        self._state_vao.render(moderngl.TRIANGLES)
+
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):
+        self._flush_rects()
         x, y = self._translate(x, y)
         _sw, sh = self._fb_size()
         device_scale = self.scale
@@ -354,6 +488,7 @@ class GLRenderer(Renderer):
         self.ctx.scissor = rect
 
     def clip_pop(self):
+        self._flush_rects()
         if self._clip_stack:
             self._clip_stack.pop()
         self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
@@ -361,6 +496,7 @@ class GLRenderer(Renderer):
     # -- present -------------------------------------------------------------
     def screenshot(self):
         """Current framebuffer contents (must run on the UI thread, pre-swap)."""
+        self._flush_rects()
         w, h = int(self._pixel_size[0]), int(self._pixel_size[1])
         if w <= 0 or h <= 0:
             return pygame.Surface((1, 1), pygame.SRCALPHA)
@@ -372,12 +508,22 @@ class GLRenderer(Renderer):
         return pygame.transform.smoothscale(full, (w, h))
 
     def _resolve_to_window(self):
+        self._flush_rects()
         self.ctx.screen.use()
         self.ctx.viewport = (
             0, 0, int(self._pixel_size[0]), int(self._pixel_size[1]))
         self.ctx.scissor = None
-        self._draw_texture(self._frame_color, 0, 0, self._size[0], self._size[1],
-                           framebuffer_texture=True)
+        # The frame target already contains the finished page. Its alpha can
+        # be below 1 after translucent controls, so blending it over the
+        # previous window backbuffer leaves trails from hidden controls and
+        # old caret positions. The resolve must replace every window pixel.
+        self.ctx.disable(moderngl.BLEND)
+        try:
+            self._draw_texture(self._frame_color, 0, 0,
+                               self._size[0], self._size[1],
+                               framebuffer_texture=True)
+        finally:
+            self.ctx.enable(moderngl.BLEND)
 
     def flip(self):
         self._resolve_to_window()
@@ -388,14 +534,36 @@ class GLRenderer(Renderer):
 
     def on_resize(self, width, height, *, pixel_size=None,
                   pixel_ratio: float | None = None):
+        target_ratio = (max(1.0, float(pixel_ratio)) if pixel_ratio is not None
+                        else self.pixel_ratio)
+        target_size = (int(width), int(height))
+        target_pixels = (tuple(int(v) for v in pixel_size)
+                         if pixel_size is not None else self._query_size())
+        if (target_ratio == self.pixel_ratio and target_size == self._size
+                and target_pixels == self._pixel_size):
+            return
+        self._flush_rects()
         if pixel_ratio is not None:
-            self.pixel_ratio = max(1.0, float(pixel_ratio))
+            self.pixel_ratio = target_ratio
             self._ssaa = 1 if self.pixel_ratio >= 1.5 else 2
             self.scale = self._ssaa * self.pixel_ratio
-        self._size = (int(width), int(height))
-        self._pixel_size = (tuple(int(v) for v in pixel_size)
-                            if pixel_size is not None
-                            else self._query_size())
+        self._size = target_size
+        self._pixel_size = target_pixels
         self._prog["u_size"].value = (float(width), float(height))
         self._prog_tex["u_size"].value = (float(width), float(height))
+        self._prog_state["u_size"].value = (float(width), float(height))
         self._create_frame_target()
+
+    def close(self):
+        self._flush_rects()
+        for resource in (self._rect_vao, self._tex_vao, self._state_vao,
+                         self._rect_vbo, self._tex_vbo, self._state_vbo,
+                         self._frame_target, self._frame_color,
+                         self._prog, self._prog_tex, self._prog_state):
+            resource.release()
+        for tex in self._tex_cache.values():
+            tex.release()
+        self._tex_cache.clear()
+        for _, tex in self._immutable_tex_cache.values():
+            tex.release()
+        self._immutable_tex_cache.clear()

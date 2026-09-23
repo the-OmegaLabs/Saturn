@@ -227,7 +227,7 @@ class ListItem(Control):
                     for index, line in enumerate(lines):
                         surf = txt.render_line_cached(line, size, scale=r.scale,
                                                       weight=weight, color=color)
-                        r.blit(surf, sx + ox, sy + oy + index * line_height
+                        r.blit_cached(surf, sx + ox, sy + oy + index * line_height
                                + (line_height - surf.get_height() / r.scale) / 2)
             finally:
                 r.opacity_pop()
