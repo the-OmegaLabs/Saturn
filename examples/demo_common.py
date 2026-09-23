@@ -7,7 +7,7 @@ import saturn
 
 DEMO_WIDTH = 960
 DEMO_HEIGHT = 800
-LOGO = Path(__file__).resolve().parents[1] / "saturn-logo-transparent.png"
+LOGO = Path(__file__).resolve().parents[1] / ".static" / "saturn-logo-transparent.png"
 
 
 def brand_header(title: str, *, detail: str | None = None) -> saturn.Row:

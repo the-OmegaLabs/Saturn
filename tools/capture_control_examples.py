@@ -14,7 +14,7 @@ from control_examples import EXAMPLES  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DESTINATION = ROOT / "saturn-docs" / "images" / "controls"
+DESTINATION = ROOT / ".static" / "controls"
 FAILURES = []
 
 
@@ -64,6 +64,6 @@ def main(page: saturn.Page) -> None:
 
 
 if __name__ == "__main__":
-    saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)
+    saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
     if FAILURES:
         raise SystemExit(f"Control captures failed: {FAILURES}")

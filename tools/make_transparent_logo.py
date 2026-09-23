@@ -13,7 +13,7 @@ import pygame
 
 
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT / "saturn-logo.svg").read_text(encoding="utf-8")
+source = (ROOT / ".static" / "saturn-logo.svg").read_text(encoding="utf-8")
 source = source.replace('width="152"', 'width="608"', 1)
 source = source.replace('height="152"', 'height="608"', 1)
 # SDL_image's SVG path renderer skips <use>; inline both front-ring paths.
@@ -39,13 +39,13 @@ right = min(mark.get_width(), max_x + margin + 1)
 bottom = min(mark.get_height(), max_y + margin + 1)
 mark = mark.subsurface((left, top, right - left, bottom - top)).copy()
 
-destination = ROOT / "saturn-logo-transparent.png"
+destination = ROOT / ".static" / "saturn-logo-transparent.png"
 pygame.image.save(mark, str(destination))
 preview = pygame.Surface((640, 360))
 preview.fill((85, 65, 145))
 sample = pygame.transform.smoothscale(mark, (270, 200))
 preview.blit(sample, ((640 - 270) // 2, (360 - 200) // 2))
-preview_path = ROOT / "saturn-docs" / "assets" / "logo-transparent-preview.png"
+preview_path = ROOT / ".static" / "logo-transparent-preview.png"
 preview_path.parent.mkdir(parents=True, exist_ok=True)
 pygame.image.save(preview, str(preview_path))
 print(destination)

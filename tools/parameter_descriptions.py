@@ -23,6 +23,7 @@ DESCRIPTIONS = {
     "rotate": "Rotation applied when drawing the control.",
     "scale": "Scale applied when drawing the control.",
     "spacing": "Space between adjacent child controls.",
+    "item_extent": "Fixed item height, or width for a horizontal list; enables lazy layout.",
     "tight": "Size the layout closely to its children when True.",
     "top": "Distance from the top edge of a Stack.",
     "vertical_alignment": "Alignment on the vertical or cross axis.",
@@ -163,7 +164,7 @@ DESCRIPTIONS = {
     # App, events, and file picker data.
     "app": "Current application instance supplied by the runtime.",
     "main": "Application entry point that receives a Page.",
-    "backend": "Rendering backend to use.",
+    "backend": "Rendering backend to use. For saturn.run(), omission selects OpenGL unless SATURN_BACKEND overrides it.",
     "control": "Control that produced the event or holds the data.",
     "error": "Error message when an operation fails.",
     "message": "Text of the event or result message.",

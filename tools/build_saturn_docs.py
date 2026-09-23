@@ -1,7 +1,7 @@
 """Generate source-backed Saturn API pages and a browsable index.
 
 Run from any directory with: python tools/build_saturn_docs.py
-The hand-written guides in saturn-docs/ are left untouched.
+The hand-written guides in docs/ are left untouched.
 """
 
 from __future__ import annotations
@@ -20,11 +20,12 @@ from parameter_descriptions import describe
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "saturn-docs"
+OUT = ROOT / "docs"
 API = OUT / "api"
 
 CATEGORIES = {
-    "App and page": "App Render run ControlEvent Control Page Window",
+    "App and page": "App Renderer Render run ControlEvent Control Page Window",
+    "Expressive namespace": "Compose",
     "Layout and content": "Text Row Column Container Stack Divider Icon Image Card ListView GestureDetector ListItem",
     "Buttons and actions": "Button ElevatedButton FilledButton FilledTonalButton OutlinedButton TextButton IconButton ExpressiveButton ExpressiveIconButton SplitButton ButtonGroup ToggleButton ElevatedToggleButton FilledTonalToggleButton OutlinedToggleButton FloatingActionButton SmallFloatingActionButton MediumFloatingActionButton LargeFloatingActionButton ExtendedFloatingActionButton FloatingToolbar HorizontalFloatingToolbar VerticalFloatingToolbar FloatingActionButtonMenu FloatingActionButtonMenuItem",
     "Input and feedback": "TextField Checkbox Switch Radio RadioGroup Dropdown DropdownOption Option Slider AlertDialog SnackBar ProgressBar ProgressRing LoadingIndicator WavyProgressIndicator LinearWavyProgressIndicator CircularWavyProgressIndicator",
@@ -33,8 +34,10 @@ CATEGORIES = {
 }
 
 DESCRIPTIONS = {
+    "Compose": "Namespace for Saturn's Material 3 Expressive controls and theme; see the Compose guide for migration details.",
     "App": "Application object that manages windows, events, and rendering.",
-    "Render": "Selects the software, OpenGL, or Vulkan renderer.",
+    "Renderer": "Selects the software, OpenGL, or Vulkan backend.",
+    "Render": "Compatibility alias for Renderer.",
     "run": "Starts a Saturn app and passes its Page to the entry point.",
     "ControlEvent": "Event data received by a control callback.",
     "Control": "Base class for visual controls, with size, state, and update methods.",
@@ -274,7 +277,7 @@ def page_for(name: str, category: str) -> str:
         lines += [f"Source: [{markdown_code(relative)}]({source})" + (f" (line {line})" if line else "") + ".", ""]
 
     if name in EXAMPLES:
-        screenshot = f"../images/controls/{name}.png"
+        screenshot = f"../../.static/controls/{name}.png"
         snippet = textwrap.indent(EXAMPLES[name], "    ")
         lines += [
             "## Preview", "", f"![{name} control in the dark theme]({screenshot})", "",
@@ -283,7 +286,7 @@ def page_for(name: str, category: str) -> str:
             "    page.theme_mode = saturn.ThemeMode.DARK",
             "    page.bgcolor = saturn.Colors.SURFACE",
             "    page.padding = 40", snippet, "    page.update()", "",
-            "", "saturn.run(main, backend=saturn.Render.SOFTWARE, width=720, height=360)",
+            "", "saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)",
             "```", "",
         ]
 
@@ -341,7 +344,7 @@ def main() -> None:
                            ("Layout and content", "Buttons and actions", "Input and feedback"))) - {"DropdownOption", "Option"}
     if set(EXAMPLES) != visual:
         raise SystemExit(f"Control examples mismatch: missing={sorted(visual - set(EXAMPLES))}, extra={sorted(set(EXAMPLES) - visual)}")
-    missing_images = [name for name in EXAMPLES if not (OUT / "images" / "controls" / f"{name}.png").exists()]
+    missing_images = [name for name in EXAMPLES if not (ROOT / ".static" / "controls" / f"{name}.png").exists()]
     if missing_images:
         raise SystemExit(f"Control images missing: {missing_images}")
     for category, names in CATEGORIES.items():

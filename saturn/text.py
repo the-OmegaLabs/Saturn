@@ -34,16 +34,17 @@ from pathlib import Path
 
 import pygame
 import pygame.freetype as _freetype
+from saturn_fonts_cjk import BOLD_FONT as NOTO_BOLD
+from saturn_fonts_cjk import REGULAR_FONT as NOTO_REGULAR
+from saturn_fonts_cjk import VARIABLE_FONT as NOTO
+from saturn_icons_material import FILLED_FONT as ICON_FONT_PATH
 
-# bundled UI fonts (SIL OFL 1.1 — see saturn/assets/OFL.txt)
+# bundled UI fonts (SIL OFL 1.1; each distribution ships its own license)
 # DEFAULT = Inter (variable; real weights via runtime instancing). CJK
 # fallback = Noto Sans SC (variable, same mechanism). Italic = real Inter Italic.
 INTER = Path(__file__).parent / "assets" / "Inter-VariableFont_opsz,wght.woff2"
 INTER_ITALIC = Path(__file__).parent / "assets" / "Inter-Italic-VariableFont_opsz,wght.woff2"
 INTER_BOLD = Path(__file__).parent / "assets" / "Inter-Bold.woff2"
-NOTO = Path(__file__).parent / "assets" / "NotoSansSC-VariableFont_wght.woff2"
-NOTO_REGULAR = NOTO.parent / "NotoSansSC-Regular.woff2"
-NOTO_BOLD = NOTO.parent / "NotoSansSC-Bold.woff2"
 
 # CJK-capable system fonts (extra fallback chain; windows/mac/linux picklist)
 CJK_FAMILY = "microsoftyahei,msyh,pingfangsc,hiraginosansgb,notosanscjk,wqymicrohei,simhei"
@@ -52,7 +53,11 @@ _CJK_RE = re.compile(r"[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]")
 # pre-instanced hot-path weights shipped with the framework: zero instancing
 # on a cold start for 400/700 text (Inter@400 needs none — its fvar default
 # IS 400; Noto's default master is 100/Thin and MUST be instanced or static)
-_STATIC_WEIGHTS: dict[object, dict[int, object]] = {}
+_STATIC_WEIGHTS: dict[object, dict[int, object]] = {
+    str(NOTO): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
+    str(NOTO_REGULAR): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
+    str(NOTO_BOLD): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
+}
 
 # instancing a big CJK variable font takes seconds; for fonts above this size
 # snap un-shipped weights to the nearest shipped static instead
@@ -64,6 +69,7 @@ _fvar_cache: dict[str, float | None] = {}  # path -> default wght (None: static)
 default_family: str | None = None
 # aliases registered via page.fonts = {"name": path} (flet API)
 registered_fonts: dict[str, str] = {}
+font_revision = 0
 
 _font_cache: dict = {}
 _line_surface_cache: OrderedDict = OrderedDict()
@@ -75,8 +81,6 @@ _cover_cache: dict[tuple, bool] = {}
 # Flet renders the default ``Icons`` family filled. Saturn's generated icon
 # values are Material Symbols codepoints, so use the FILL=1 static instance of
 # that same font rather than Flet's runtime-ID based Material Icons asset.
-ICON_FONT_PATH = Path(__file__).parent / "assets" / "MaterialSymbolsFilled.ttf"
-
 # Regular-first async instancing (see module docstring)
 on_weight_ready = None                          # set by App.start(): mark_dirty
 _pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
@@ -87,8 +91,10 @@ _woff2_lock = threading.RLock()
 
 
 def register_fonts(fonts: dict[str, str]):
+    global font_revision
     registered_fonts.clear()
     registered_fonts.update(fonts)
+    font_revision += 1
     _cover_cache.clear()
     with _line_surface_lock:
         _line_surface_cache.clear()
@@ -138,7 +144,20 @@ def _decode_woff2(path: str, modified_ns: int, size: int):
     return io.BytesIO(sfnt)
 
 
+@lru_cache(maxsize=3)
+def _bundled_font_source(path: str):
+    # Bundled files are immutable during a process lifetime. Resolving a
+    # WOFF2 path on Windows is surprisingly expensive in text measurement.
+    return _resolve_font_source(path)
+
+
 def _font_source(path: str):
+    if path in (str(INTER), str(INTER_ITALIC), str(INTER_BOLD)):
+        return _bundled_font_source(path)
+    return _resolve_font_source(path)
+
+
+def _resolve_font_source(path: str):
     if Path(path).suffix.lower() != ".woff2":
         return path
     resolved = Path(path).resolve()
@@ -337,6 +356,8 @@ def _instance_bg(path: str, wnum: int, dest: Path):
             _font_cache.pop(k, None)
     with _line_surface_lock:
         _line_surface_cache.clear()
+    global font_revision
+    font_revision += 1
     if on_weight_ready is not None:
         on_weight_ready()
 
@@ -363,7 +384,15 @@ def _default_link(wnum: int, italic: bool) -> tuple:
     return ("file", _font_source(str(INTER)), wnum, False)
 
 
-def _chain(family: str | None, wnum: int, italic: bool) -> list[tuple]:
+def _chain(family: str | None, wnum: int, italic: bool) -> tuple[tuple, ...]:
+    # Measuring many distinct rows used to resolve the same bundled sources
+    # once for every word and glyph run. Theme/font revisions invalidate the
+    # small shared chain cache without changing callers.
+    return _chain_cached(family, wnum, italic, default_family, font_revision)
+
+
+@lru_cache(maxsize=256)
+def _chain_cached(family, wnum, italic, _default, _revision):
     """Primary link first, then fallbacks: the other bundled fonts (Inter /
     Inter-Italic / Noto), then the CJK system chain. Deduped by priority."""
     links = [_primary_link(family, wnum, italic)]
@@ -377,7 +406,7 @@ def _chain(family: str | None, wnum: int, italic: bool) -> list[tuple]:
         if key not in seen:
             seen.add(key)
             out.append(link)
-    return out
+    return tuple(out)
 
 
 def _probe(link: tuple) -> _freetype.Font:
@@ -554,6 +583,14 @@ def line_width(text: str, size: float, *, scale: float = 1.0,
                italic: bool = False, family: str | None = None) -> float:
     """Width of a line in logical px under per-glyph fallback."""
     wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
+    return _line_width_cached(text, float(size), float(scale), wnum,
+                              bool(italic), family, default_family,
+                              font_revision)
+
+
+@lru_cache(maxsize=32768)
+def _line_width_cached(text, size, scale, wnum, italic, family,
+                       _default, _revision):
     px = max(1, round(size * scale))
     total = sum(f.size(part)[0] for f, part in _segment(text, px, wnum, italic, family))
     return total / scale
@@ -590,6 +627,10 @@ def wrap(text: str, max_width: float, size: float, *, scale: float = 1.0,
     def width(s: str) -> float:
         return line_width(s, size, scale=scale, weight=wnum, italic=italic,
                           family=family)
+
+    if "\n" not in text and (max_lines is None or max_lines >= 1) and \
+            width(text) <= max_width:
+        return [text]
 
     lines: list[str] = []
     for para in text.split("\n"):

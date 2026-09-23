@@ -48,5 +48,5 @@ class Application:
 
 
 if __name__ == "__main__":
-    saturn.run(main=Application().create_window, backend=saturn.Render.SOFTWARE,
+    saturn.run(main=Application().create_window, backend=saturn.Renderer.VULKAN,
            width=DEMO_WIDTH, height=DEMO_HEIGHT)

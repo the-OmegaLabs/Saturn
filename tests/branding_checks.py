@@ -12,7 +12,7 @@ class Capture:
 
 
 def check():
-    image = ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo.svg'),
+    image = ft.Image(str(Path(__file__).resolve().parents[1] / '.static' / 'saturn-logo.svg'),
                      width=36, height=36, fit=ft.BoxFit.CONTAIN)
     image._place(0, 0, 36, 36, 1)
     capture = Capture()
@@ -32,7 +32,7 @@ def check():
         colors.theme_dark = False
 
     transparent = ft.Image(
-        str(Path(__file__).resolve().parents[1] / 'saturn-logo-transparent.png'),
+        str(Path(__file__).resolve().parents[1] / '.static' / 'saturn-logo-transparent.png'),
         width=52, height=40, color=ft.Colors.PRIMARY,
     )
     transparent._place(0, 0, 52, 40, 1)

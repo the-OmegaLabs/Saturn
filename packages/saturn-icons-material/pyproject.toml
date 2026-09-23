@@ -1,0 +1,30 @@
+[project]
+name = "saturn-icons-material"
+version = "0.1.0"
+description = "Material Symbols font assets for the Saturn UI framework."
+requires-python = ">=3.10"
+license = "OFL-1.1"
+license-files = ["OFL.txt"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+[[project.authors]]
+name = "Stevesuk"
+email = "stevesukawa@outlook.com"
+
+[project.urls]
+Homepage = "https://github.com/the-OmegaLabs/Saturn"
+Repository = "https://github.com/the-OmegaLabs/Saturn"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "saturn_icons_material"
+module-root = "src"

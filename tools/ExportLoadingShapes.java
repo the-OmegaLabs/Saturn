@@ -35,7 +35,7 @@ class ExportLoadingShapes {
             scale=Math.min(scale,Math.max((b[2]-b[0])/(m[2]-m[0]),(b[3]-b[1])/(m[3]-m[1])));
         }
         String determinate=transition(MaterialShapes.Companion.getCircle(), shapes[0]);
-        Files.writeString(Path.of(args[0]), "{\"scale\":" + scale + ",\"sequence\":" + all
+        Files.writeString(Path.of(args[0]), "{\"_provenance\":\"Generated from AndroidX Compose Material 3 and Graphics Shapes; transformed by Saturn. See NOTICE.md and LICENSE-APACHE-2.0.txt.\",\"scale\":" + scale + ",\"sequence\":" + all
             + ",\"determinate\":" + determinate + "}\n");
         System.out.println("Exported seven matched rounded-polygon transitions");
     }

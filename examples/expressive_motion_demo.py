@@ -49,4 +49,4 @@ def main(page):
 
 
 if __name__ == '__main__':
-    saturn.run(main,width=DEMO_WIDTH,height=DEMO_HEIGHT)
+    saturn.run(main,width=DEMO_WIDTH,height=DEMO_HEIGHT, backend=saturn.Renderer.VULKAN)

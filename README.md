@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./saturn-logo.svg" width="112" alt="Saturn logo">
+  <img src="./.static/saturn-logo.svg" width="112" alt="Saturn logo">
 </p>
 
 <h1 align="center">Saturn</h1>
@@ -11,20 +11,26 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-000000?style=flat-square&logo=python&logoColor=white">
   <img alt="Status: Alpha" src="https://img.shields.io/badge/status-alpha-000000?style=flat-square">
-  <img alt="Software and OpenGL renderers" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan-000000?style=flat-square">
+  <img alt="Software, OpenGL, and Vulkan renderers" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan-000000?style=flat-square">
 </p>
 
 > **Saturn** is currently in **alpha** stages. Everything may change, some controls are still being completed, and production use should be evaluated carefully.
 
 Saturn provides a familiar, declarative API for building native desktop interfaces while keeping rendering and the event loop local to the application.
 
-Browse the [Saturn documentation](./saturn-docs/README.md) for API pages and a screenshot gallery.
+Browse the [Saturn documentation](./docs/README.md) for API pages and a screenshot gallery.
+
+Material 3 Expressive controls are grouped under `saturn.Compose`; see the [Compose API and Flet verification](./docs/compose.md).
 
 Inspired by the simplicity of [Flet](https://flet.dev/), Saturn takes a **lighter and more local approach** to desktop UI development. It uses almost the same concepts and API patterns, while remaining an independent, minimal, and lightweight native UI framework with its own architecture and direction.
 
-Because this compatibility is built into the API design, most Flet desktop applications can be migrated to Saturn with minimal changes, without depending on Flet's underlying implementation.
+Saturn implements a subset of Flet-style desktop APIs. When migrating a Flet application, check constructor parameters and behavior against the [Flet mapping](./docs/flet-mapping.md) and [verified API gaps](./docs/compose.md).
 
 If you're looking to build a **web application**, [use Flet instead](https://flet.dev/).
+
+## Third-party expressive geometry
+
+The generated loading shapes in `saturn/_gen/loading_shapes.json` derive from AndroidX Compose Material 3 and Graphics Shapes. Their source files carry Android Open Source Project copyright notices; Saturn transformed the geometry into matching Bézier curves using JetBrains Compose Material 3 desktop and AndroidX Graphics Shapes. The derived geometry is distributed under Apache License 2.0. See the [source attribution and exact versions](./saturn/_gen/NOTICE.md) and the [full license text](./saturn/_gen/LICENSE-APACHE-2.0.txt).
 
 ## Preview
 
@@ -32,51 +38,51 @@ If you're looking to build a **web application**, [use Flet instead](https://fle
   <tr>
     <td align="center">
       <strong>Demo</strong><br>
-      <img src="./shots/demo.png" width="440" alt="Saturn controls demo">
+      <img src="./.static/shots/demo.png" width="440" alt="Saturn controls demo">
     </td>
     <td align="center">
       <strong>Layout</strong><br>
-      <img src="./shots/layout-demo.png" width="440" alt="Saturn layout demo">
+      <img src="./.static/shots/layout-demo.png" width="440" alt="Saturn layout demo">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Text</strong><br>
-      <img src="./shots/text-demo.png" width="440" alt="Saturn text demo">
+      <img src="./.static/shots/text-demo.png" width="440" alt="Saturn text demo">
     </td>
     <td align="center">
       <strong>Widgets</strong><br>
-      <img src="./shots/widgets-demo.png" width="440" alt="Saturn widgets demo">
+      <img src="./.static/shots/widgets-demo.png" width="440" alt="Saturn widgets demo">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Buttons</strong><br>
-      <img src="./shots/buttons-demo.png" width="440" alt="Saturn button variants">
+      <img src="./.static/shots/buttons-demo.png" width="440" alt="Saturn button variants">
     </td>
     <td align="center">
       <strong>Inputs</strong><br>
-      <img src="./shots/inputs-demo.png" width="440" alt="Saturn input controls">
+      <img src="./.static/shots/inputs-demo.png" width="440" alt="Saturn input controls">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Expressive</strong><br>
-      <img src="./shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
+      <img src="./.static/shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
     </td>
     <td align="center">
       <strong>Demo</strong><br>
-      <img src="./shots/demo.png" width="440" alt="Saturn controls with dark theme">
+      <img src="./.static/shots/demo.png" width="440" alt="Saturn controls with dark theme">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Motion</strong><br>
-      <img src="./shots/expressive-motion.png" width="440" alt="Expressive loading and motion controls">
+      <img src="./.static/shots/expressive-motion.png" width="440" alt="Expressive loading and motion controls">
     </td>
     <td align="center">
       <strong>FAB Menu</strong><br>
-      <img src="./shots/expressive-menu.png" width="440" alt="Expanded floating action button menu">
+      <img src="./.static/shots/expressive-menu.png" width="440" alt="Expanded floating action button menu">
     </td>
   </tr>
 </table>
@@ -169,17 +175,20 @@ The API is intentionally simple and familiar, so writing Saturn applications fee
 
 ## Rendering backends
 
-Select a renderer when starting the application:
+OpenGL is the default renderer for `saturn.run(main)`. Select another renderer explicitly when needed:
 
 ```python
-# Portable CPU renderer
-saturn.run(main, backend=saturn.Render.SOFTWARE)
+# CPU renderer
+saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 
-# GPU-accelerated renderer
-saturn.run(main, backend=saturn.Render.OPENGL)
+# Explicit GPU renderer
+saturn.run(main, backend=saturn.Renderer.OPENGL)
+
+# Vulkan GPU renderer
+saturn.run(main, backend=saturn.Renderer.VULKAN)
 ```
 
-The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:
+The Vulkan backend draws geometry and composites textures on the GPU with batched draw calls and scissor clipping. Text and some effects are prepared as surfaces before texture upload; the full frame is not rasterized on the CPU. A Vulkan-capable driver is required. The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:
 
 ```powershell
 $env:SATURN_BACKEND = "opengl"

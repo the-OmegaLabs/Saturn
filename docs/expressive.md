@@ -21,13 +21,13 @@ import saturn
 
 def main(page):
     page.theme_mode = saturn.ThemeMode.DARK
-    page.theme = saturn.MaterialExpressiveTheme()
+    page.theme = saturn.Compose.Theme()
     page.add(
-        saturn.LoadingIndicator(contained=True),
-        saturn.WavyProgressIndicator(.6),
-        saturn.FloatingToolbar(saturn.IconButton(saturn.Icons.EDIT), saturn.IconButton(saturn.Icons.SHARE)),
-        saturn.FloatingActionButtonMenu([
-            saturn.FloatingActionButtonMenuItem("Create", icon=saturn.Icons.ADD,
+        saturn.Compose.LoadingIndicator(contained=True),
+        saturn.Compose.WavyProgressIndicator(.6),
+        saturn.Compose.FloatingToolbar(saturn.IconButton(saturn.Icons.EDIT), saturn.IconButton(saturn.Icons.SHARE)),
+        saturn.Compose.FloatingActionButtonMenu([
+            saturn.Compose.FloatingActionButtonMenuItem("Create", icon=saturn.Icons.ADD,
                                            on_click=lambda e: print("create")),
         ]),
     )
@@ -43,8 +43,8 @@ saturn.run(main)
 ## Rendering and resources
 
 All new shapes are generated in a shared drawing path, so software, OpenGL, and Vulkan use the same outlines.
-Outline morphs use pregenerated matching Bézier control points; no JVM is needed at runtime. Regenerate them with `tools/ExportLoadingShapes.java`.
-Original references, asset sources, and third-party licenses are kept in `references/`.
+Outline morphs use pregenerated matching Bézier control points; no JVM is needed at runtime. `tools/ExportLoadingShapes.java` regenerates the JSON when the matching JetBrains Compose Material 3 desktop, AndroidX Graphics Shapes desktop, and their JVM dependencies are on the classpath. The source archives are not stored in this repository.
+The generated loading-shape geometry in `saturn/_gen/loading_shapes.json` derives from AndroidX Compose Material 3 and Graphics Shapes. See the [attribution, exact versions, and source details](../saturn/_gen/NOTICE.md) and [Apache License 2.0 text](../saturn/_gen/LICENSE-APACHE-2.0.txt).
 
 The text field notch uses segmented strokes without covering its parent background. For an empty field, the notch width and depth follow the label's floating progress. For a field with a value, the label and notch remain floated when focus changes.
 Shadows are blurred and cached from the full shape, so a long label does not change the shadow's rounded structure.

@@ -16,6 +16,5 @@ class Application:
 
 
 if __name__ == "__main__":
-    app = saturn.run(main=Application().create_window, backend=saturn.Render.SOFTWARE,
+    saturn.run(main=Application().create_window, backend=saturn.Renderer.OPENGL,
            width=DEMO_WIDTH, height=DEMO_HEIGHT)
-    print("window closed, app returned:", type(app).__name__)

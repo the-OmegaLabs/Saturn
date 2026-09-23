@@ -49,12 +49,12 @@ def main() -> None:
         page.theme_mode = saturn.ThemeMode.DARK
         entry(page)
         time.sleep(0.8)
-        destination = ROOT / "shots" / image_name
+        destination = ROOT / ".static" / "shots" / image_name
         page._app.screenshot(str(destination))
         print(destination)
         page.window.destroy()
 
-    saturn.run(capture, backend=saturn.Render.SOFTWARE,
+    saturn.run(capture, backend=saturn.Renderer.SOFTWARE,
                width=DEMO_WIDTH, height=DEMO_HEIGHT)
 
 
