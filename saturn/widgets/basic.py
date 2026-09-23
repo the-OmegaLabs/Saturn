@@ -125,7 +125,7 @@ class Image(Control):
 
 
 class Card(Container):
-    """Flet Card with Compose Material 3 elevated/filled/outlined surfaces."""
+    """Card with elevated, filled and outlined Expressive surfaces."""
 
     def __init__(self, content=None, *, elevation: float = 1,
                  variant: str = "elevated", **base):

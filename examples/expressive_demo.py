@@ -1,4 +1,4 @@
-"""Compose M3 Expressive gallery. Run with --dark or --check."""
+"""Expressive gallery. Run with --dark or --check."""
 import sys
 
 import saturn as ft
@@ -36,12 +36,12 @@ def check():
 
 
 def main(page):
-    page.title = "Saturn · Compose Material 3 Expressive"
+    page.title = "Saturn · Expressive"
     page.theme = ft.MaterialExpressiveTheme()
     page.theme_mode = ft.ThemeMode.DARK if "--dark" in sys.argv else ft.ThemeMode.LIGHT
     page.padding = 24
     page.spacing = 16
-    status = ft.Text("Compose Material 3 · 1.5.0-alpha28", size=14,
+    status = ft.Text("Expressive components", size=14,
                      color=ft.Colors.ON_SURFACE_VARIANT)
 
     def clicked(event):
@@ -96,7 +96,7 @@ def main(page):
                             leading=ft.Icon(ft.Icons.LOCK), disabled=True, width=430),
             ], spacing=4, tight=True),
             ft.Column([
-                ft.TextField("Compose", label="Outlined", width=430),
+                ft.TextField("Expressive", label="Outlined", width=430),
                 ft.TextField("Material 3", label="Filled", filled=True, width=430),
                 ft.Slider(value=.55, width=430, divisions=10),
                 ft.Row([ft.ProgressRing(.65), ft.ProgressBar(.6, width=360)],

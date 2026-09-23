@@ -11,3 +11,11 @@
 这是研究资料，不是 Saturn 的运行时依赖。
 
 本机 Gradle 缓存另有 JetBrains `material3-desktop:1.9.0-alpha04` 源码；本次实现以此处固定的 AndroidX 版本为准。
+
+## 生成形状资源
+
+`saturn/_gen/loading_shapes.json` 的七个形状定义与此源码包中 `MaterialShapes.kt` 对应。
+匹配曲线数据由本机缓存的 JetBrains `material3-desktop:1.9.0-alpha04` 与
+AndroidX `graphics-shapes-desktop:1.0.1` 生成，使用 `RoundedPolygon` / `Morph` API。
+这些库和派生几何数据适用 Apache-2.0；原始版权属于 Android Open Source Project。
+`tools/ExportLoadingShapes.java` 可在配置这些 JAR 及 Kotlin/UI 支持库的 classpath 后再生成数据。

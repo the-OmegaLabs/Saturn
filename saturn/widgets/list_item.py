@@ -1,9 +1,4 @@
-"""Compose Material 3 Expressive list item.
-
-Metrics and state colors follow androidx.compose.material3 1.5.0-alpha28
-ListItem.kt, ListItemDefaults.kt and tokens/ListTokens.kt. The Python slots
-accept text or an existing Saturn control.
-"""
+"""Expressive list item with text or existing-control content slots."""
 from __future__ import annotations
 
 from .. import colors, motion, text as txt

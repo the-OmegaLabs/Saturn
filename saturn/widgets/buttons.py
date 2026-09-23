@@ -21,10 +21,9 @@ _LABEL_SIZE = 14.0
 _LABEL_WEIGHT = 500
 _ICON_SIZE = 18.0
 
-# Compose M3 1.5.0-alpha28 ButtonDefaults.  Each entry is
+# Expressive button dimensions. Each entry is
 # (height, horizontal padding, icon, gap, text size, weight,
-#  square corner, pressed corner).  The source overrides its generated
-# extra-small padding/spacing tokens with 12/4.
+#  square corner, pressed corner). Extra-small padding/spacing is 12/4.
 _EXPRESSIVE_SIZES = {
     "xsmall": (32.0, 12.0, 20.0, 4.0, 14.0, 500, 12.0, 8.0),
     "small": (40.0, 16.0, 20.0, 8.0, 14.0, 500, 12.0, 8.0),
@@ -279,7 +278,7 @@ class TextButton(Button):
 
 
 class ExpressiveButton(Button):
-    """Compose M3 Button with size tokens and pressed shape morph."""
+    """Expressive button with size tokens and pressed shape morph."""
     variant_bg = colors.Colors.PRIMARY
     variant_fg = colors.Colors.ON_PRIMARY
 

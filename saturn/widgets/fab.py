@@ -1,8 +1,4 @@
-"""Compose Material 3 Expressive floating action buttons.
-
-Dimensions and shapes follow AndroidX FloatingActionButton.kt and its Fab*/
-ExtendedFab* tokens. All measurements are Saturn logical pixels (Compose dp).
-"""
+"""Expressive floating action buttons, measured in logical pixels."""
 from __future__ import annotations
 
 from .. import colors, motion, text as txt
@@ -15,8 +11,7 @@ from .buttons import Button
 
 # (square side, corner radius, icon size, extended height, leading/trailing
 # padding, icon-label gap, label size, label weight). The medium and large
-# icon-label gaps and the large icon size use the explicit AndroidX overrides,
-# since the generated tokens are marked incorrect in FloatingActionButton.kt.
+# icon-label gaps and the large icon size are explicit per-size values.
 _SIZES = {
     "small": (40.0, 12.0, 24.0, 56.0, 16.0, 8.0, 16.0, 500),
     "standard": (56.0, 16.0, 24.0, 56.0, 16.0, 12.0, 14.0, 500),
@@ -72,7 +67,7 @@ class FloatingActionButton(Button):
             label_w, _ = txt.measure(self.text, label_size, scale=scale,
                                      weight=label_weight)
             if self.icon is None:
-                # AndroidX's text-only extended FAB has 20dp horizontal padding
+                # Text-only extended FAB has 20dp horizontal padding
                 # and an 80dp minimum width.
                 pad = 20.0 if self.size == "standard" else pad
                 width = max(80.0 if self.size == "standard" else extended_h,

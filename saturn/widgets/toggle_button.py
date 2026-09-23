@@ -1,4 +1,4 @@
-"""Compose M3 Expressive toggle buttons (AndroidX 1.5.0-alpha28)."""
+"""Expressive toggle buttons with selected and pressed shapes."""
 from .. import colors, motion
 from ..event import fire
 from .buttons import ExpressiveButton

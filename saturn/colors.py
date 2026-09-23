@@ -103,9 +103,8 @@ INDIGO_DARK = {
     "surfacebright": "39393F",
 }
 
-# Compose Material 3 1.5.0-alpha28 expressiveLightColorScheme(): only these
-# four on-container roles differ from lightColorScheme(). Custom seed schemes
-# supply their own colors, as in Compose's MaterialExpressiveTheme(colorScheme=).
+# Expressive light colors change four on-container roles to tone 30.
+# Custom seed schemes supply their own colors.
 EXPRESSIVE_LIGHT = {
     "onprimarycontainer": "4F378B",
     "onsecondarycontainer": "4A4458",

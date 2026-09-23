@@ -96,8 +96,16 @@ class FloatingToolbar(Control):
             r.clip_push(*rect)
             for child, (cx,cy,cw,ch) in self._clips.items():
                 r.clip_push(cx+ox,cy+oy,cw,ch)
-                child._draw_all(r,ox,oy)
-                r.clip_pop()
+                attr = 'icon_color' if hasattr(child,'icon_color') else 'color' if hasattr(child,'color') else None
+                old = getattr(child,attr) if attr else None
+                if attr and old is None:
+                    setattr(child,attr,colors.Colors.ON_PRIMARY_CONTAINER if self.vibrant else colors.Colors.ON_SURFACE_VARIANT)
+                try:
+                    child._draw_all(r,ox,oy)
+                finally:
+                    if attr and old is None:
+                        setattr(child,attr,None)
+                    r.clip_pop()
             r.clip_pop()
         finally:
             self._effects_end(r)

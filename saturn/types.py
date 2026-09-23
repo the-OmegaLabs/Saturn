@@ -173,7 +173,7 @@ class Theme:
 
 @dataclass
 class MaterialExpressiveTheme(Theme):
-    """Compose MaterialExpressiveTheme's default light color roles."""
+    """Expressive default light color roles."""
     expressive: bool = True
 
 

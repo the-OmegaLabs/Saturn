@@ -1,9 +1,4 @@
-"""Material 3 Expressive button group layout.
-
-Based on androidx.compose.material3 1.5.0-alpha28 ButtonGroup.kt and its
-ButtonGroupSmallTokens/ConnectedButtonGroupSmallTokens. Existing Saturn
-buttons remain the actual children and receive their animated hit rectangles.
-"""
+"""Expressive button groups with shared animated paint and hit rectangles."""
 from __future__ import annotations
 
 from .. import motion
@@ -14,9 +9,9 @@ from ..types import CrossAxisAlignment
 class ButtonGroup(Control):
     """A horizontal row whose pressed button grows into its neighbors.
 
-    ``connected=True`` uses the Compose connected group's 2 dp gap instead
+    ``connected=True`` uses the connected group's 2 dp gap instead
     of the standard 12 dp gap. Children may use ``expand`` as a width weight.
-    ``expanded_ratio`` defaults to Compose's 15 percent.
+    ``expanded_ratio`` defaults to 15 percent.
     """
 
     def __init__(self, *items, controls=None, connected=False, spacing=None,
@@ -78,7 +73,7 @@ class ButtonGroup(Control):
             self._animate_internal("_press_progress", 1.0, motion.SHORT3,
                                    motion.EMPHASIZED, now=now)
         elif self._press_progress < 0.75:
-            # Compose waits until its press animation is visible before release.
+            # Let a short press become visible before release.
             self._release_pending = True
         else:
             self._animate_internal("_press_progress", 0.0, motion.SHORT3,
@@ -119,8 +114,7 @@ class ButtonGroup(Control):
             widths = [w + extra * weight / sum(weights)
                       for w, weight in zip(widths, weights)]
         elif used > available and used > 0:
-            # Compose moves excess items into its overflow menu. Until Saturn
-            # has that menu, keep every child's paint and hitbox inside the row.
+            # Keep every child's paint and hitbox inside the row.
             widths = [w * available / used for w in widths]
         return widths, sizes
 

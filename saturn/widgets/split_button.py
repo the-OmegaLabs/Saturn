@@ -1,7 +1,6 @@
 """Small filled Material 3 Expressive split button.
 
-Geometry follows AndroidX SplitButton.kt / SplitButtonSmallTokens.kt: 40dp
-height, 2dp gap, full outer corners, and 4dp inner corners (12dp pressed).
+40dp height, 2dp gap, full outer corners, and 4dp inner corners (12dp pressed).
 """
 from __future__ import annotations
 
