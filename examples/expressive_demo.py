@@ -55,10 +55,9 @@ def main(page):
 
     page.add(
         ft.Row([
-            ft.Container(
-                ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
-                         width=48, height=29, fit=ft.BoxFit.CONTAIN),
-                padding=6, bgcolor='#242424', border_radius=8),
+            ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
+                     width=55, height=33, fit=ft.BoxFit.CONTAIN,
+                     color=ft.Colors.PRIMARY),
             ft.Text("Material 3 Expressive", size=28, weight=ft.FontWeight.W_500),
         ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         status,

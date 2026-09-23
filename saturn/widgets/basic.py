@@ -69,13 +69,17 @@ class Icon(Control):
 
 
 class Image(Control):
-    def __init__(self, src=None, *, fit=None, border_radius=None, **base):
+    def __init__(self, src=None, *, fit=None, border_radius=None, color=None,
+                 **base):
         super().__init__(**base)
         self.src = src              # file path, bytes, or data:base64 URI
         self.fit = fit              # v1: None/BoxFit.FILL stretch, CONTAIN fits
         self.border_radius = border_radius
+        self.color = color
         self._surface = None
         self._loaded_key = None
+        self._tinted_key = None
+        self._tinted_surface = None
 
     def _load(self):
         if self.src is None:
@@ -92,6 +96,7 @@ class Image(Control):
             s = pygame.image.load(self.src)
         self._surface = _as_alpha_surface(s)
         self._loaded_key = key
+        self._tinted_key = None
         return self._surface
 
     def _intrinsic(self, max_w, max_h, scale):
@@ -110,6 +115,14 @@ class Image(Control):
         s = self._load()
         if s is None:
             return
+        if self.color is not None:
+            rgba = colors.parse_color(self.color)
+            key = (self._loaded_key, rgba)
+            if key != self._tinted_key:
+                self._tinted_surface = s.copy()
+                self._tinted_surface.fill(rgba, special_flags=pygame.BLEND_RGBA_MULT)
+                self._tinted_key = key
+            s = self._tinted_surface
         _, _, w, h = self._rect
         tw, th = int(w * r.scale), int(h * r.scale)
         if tw <= 0 or th <= 0:

@@ -49,10 +49,9 @@ class Application:
 
         page.add(
             ft.Row(controls=[
-                ft.Container(
-                    ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
-                             width=48, height=29, fit=ft.BoxFit.CONTAIN),
-                    padding=6, bgcolor='#242424', border_radius=8),
+                ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
+                         width=55, height=33, fit=ft.BoxFit.CONTAIN,
+                         color=ft.Colors.PRIMARY),
                 ft.Text("Saturn", size=26, weight=ft.FontWeight.BOLD,
                         color=ft.Colors.PRIMARY),
                 ft.Text(f"v{ft.__version__}", size=12,
