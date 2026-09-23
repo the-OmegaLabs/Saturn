@@ -21,10 +21,10 @@ from ..text import get_font, get_icon_font
 from ..types import (Alignment, AnimationCurve, LabelPosition,
                      OutlineInputBorder, Padding, as_border_radius)
 
-_FIELD_H = 48.0
-_FIELD_PAD = 12.0
+_FIELD_H = 56.0
+_FIELD_PAD = 16.0
 _RADIUS = 4.0
-_ITEM_H = 36.0
+_ITEM_H = 48.0
 _IME_OFFSET_X = -6.0
 _IME_OFFSET_Y = -4.0
 _FIELD_TRANSITION_MS = 150
@@ -89,7 +89,7 @@ class TextField(Control):
         self.multiline = multiline
         self.max_lines = max_lines
         self.read_only = read_only
-        self.text_size = text_size or 14.0
+        self.text_size = text_size or 16.0
         self.on_change = on_change
         self.on_submit = on_submit
         self.on_focus = on_focus
@@ -531,6 +531,8 @@ class TextField(Control):
         cx = max(text_left, min(text_left + viewport_w, cx))
         text_y = (self._rect[1] + self._paint_offset[1]
                   + (self._rect[3] - vsize) / 2)
+        if self.filled and self.label and not isinstance(self.border, OutlineInputBorder):
+            text_y += 8 * self._label_progress
         # SDL's Windows backend treats this as both the current composition
         # point and an exclusion area. Start at the visual caret but extend to
         # the field bottom so the candidate UI sits below, never over the next
@@ -640,6 +642,7 @@ class TextField(Control):
         self._paint_offset = (x - rx, y - ry)
         scale = r.scale
         outline = self.border if isinstance(self.border, OutlineInputBorder) else None
+        filled_style = self.filled and outline is None
         radius_value = (outline.border_radius if outline is not None
                         else self.border_radius)
         radius = as_border_radius(
@@ -652,7 +655,13 @@ class TextField(Control):
             if hover:
                 field_bg = _mix(field_bg, colors.Colors.ON_SURFACE,
                                 0.04 * hover)
-            r.fill_rect(x, y, w, h, field_bg, radius=radius)
+            if filled_style:
+                r.clip_push(x, y, w, h / 2)
+                r.fill_rect(x, y, w, h, field_bg, radius=radius)
+                r.clip_pop()
+                r.fill_rect(x, y + h / 2, w, h / 2, field_bg)
+            else:
+                r.fill_rect(x, y, w, h, field_bg, radius=radius)
         border_width = 0.0
         border_draw_color = None
         if outline is not None:
@@ -676,10 +685,17 @@ class TextField(Control):
                 inactive, colors.Colors.PRIMARY, focus)
             border_width = 1 + focus
         if border_width > 0:
-            r.stroke_rect(x, y, w, h, border_draw_color,
-                          width=border_width, radius=radius)
+            if filled_style:
+                r.fill_rect(x, y + h - border_width, w, border_width,
+                            border_draw_color)
+            else:
+                r.stroke_rect(x, y, w, h, border_draw_color,
+                              width=border_width, radius=radius)
         label_progress = self._label_progress if self.label else 0.0
         ty, th = y, h
+        if filled_style and self.label:
+            ty += 16 * label_progress
+            th -= 16 * label_progress
         family, vsize, vcolor = self._style()
         if self.label:
             inactive_color = _parse(colors.Colors.ON_SURFACE_VARIANT)
@@ -688,15 +704,15 @@ class TextField(Control):
                 "label-inline", self.label, vsize, scale, family,
                 inactive_color)
             floating_inactive = self._render_cached(
-                "label-floating-inactive", self.label, 10.0, scale, family,
+                "label-floating-inactive", self.label, 12.0, scale, family,
                 inactive_color)
             floating_active = self._render_cached(
-                "label-floating-active", self.label, 10.0, scale, family,
+                "label-floating-active", self.label, 12.0, scale, family,
                 active_color)
             inline_width = inline_label.get_width() / scale
             floating_width = floating_active.get_width() / scale
             floating_height = floating_active.get_height() / scale
-            if label_progress > 0.0:
+            if label_progress > 0.0 and not filled_style:
                 notch_width = (floating_width + 8.0) * label_progress
                 notch_bg = _parse(
                     self.page.bgcolor if self.page and self.page.bgcolor
@@ -716,7 +732,7 @@ class TextField(Control):
                 draw_width = floating_width * label_scale
                 draw_height = floating_height * label_scale
                 resting_y = y + (h - floating_height * resting_scale) / 2
-                floating_y = y - floating_height / 2
+                floating_y = y + 8 if filled_style else y - floating_height / 2
                 draw_y = resting_y + (
                     floating_y - resting_y) * label_progress
                 r.blit_scaled(
@@ -1448,7 +1464,7 @@ class _DropdownMenu(Control):
 
 class Dropdown(Control):
     def __init__(self, value=None, *, options=None, hint_text=None, label=None,
-                 on_select=None, text_size: float = 14.0, filled=False,
+                 on_select=None, text_size: float = 16.0, filled=False,
                  fill_color=None, bgcolor=None, border=None,
                  border_radius=None, **base):
         super().__init__(**base)
