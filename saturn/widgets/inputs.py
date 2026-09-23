@@ -3,6 +3,7 @@ Dropdown (+ legacy Option alias).
 """
 from __future__ import annotations
 
+import math
 import threading
 import time
 
@@ -942,7 +943,8 @@ class Checkbox(_Toggle):
             r.fill_rect(selected_x, selected_y, selected_box, selected_box,
                         _parse(self.active_color or colors.Colors.PRIMARY), radius=2)
             f = get_icon_font(round(14 * r.scale))
-            surf = f.render(chr(int(Icons.CHECK)), True, (255, 255, 255, 255))
+            surf = f.render(chr(int(Icons.CHECK)), True,
+                            _parse(colors.Colors.ON_PRIMARY))
             icon_w = surf.get_width() / r.scale * (0.6 + 0.4 * progress)
             icon_h = surf.get_height() / r.scale * (0.6 + 0.4 * progress)
             r.blit_scaled(surf, x + (box - icon_w) / 2,
@@ -1166,7 +1168,7 @@ class Radio(Control):
         draw_state_layer(self, r, (x - 10, cy - 20, 40, 40),
                          active if selected else colors.Colors.ON_SURFACE,
                          20)
-        r.circle(x + 10, cy, 10, outline, fill=False)
+        r.arc(x + 10, cy, 10, 0, 2 * math.pi, outline, width=2)
         if progress > 0:
             r.circle(x + 10, cy, 5 * progress, active)
         if self.label:
