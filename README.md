@@ -200,6 +200,26 @@ uv run python examples/hello.py
 
 The public API also includes theme, alignment, padding, border, shadow, animation, transform, text-style, and scrolling types.
 
+## Custom fonts
+
+Register local `.ttf`, `.otf`, or `.woff2` files with `page.fonts`, then use the alias in a theme or individual control:
+
+```python
+from pathlib import Path
+import saturn as ft
+
+font = Path(__file__).parent / "assets" / "Brand.woff2"
+
+def main(page: ft.Page):
+    page.fonts = {"brand": str(font)}
+    page.theme = ft.Theme(font_family="brand")
+    page.add(ft.Text("Hello Saturn", font_family="brand", size=24))
+
+ft.run(main)
+```
+
+WOFF2 is decoded on first use and cached as a native font. Variable WOFF2 fonts use the existing weight selection and glyph fallback paths. A local font file path can also be passed directly as `font_family`.
+
 ## Examples
 
 | Example | Description |

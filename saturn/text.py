@@ -22,11 +22,14 @@ baseline-aligned into one surface. Coverage probing uses pygame.freetype
 from __future__ import annotations
 
 import io
+import hashlib
 import os
 import re
+import tempfile
 import threading
 import warnings
 from collections import OrderedDict
+from functools import lru_cache
 from pathlib import Path
 
 import pygame
@@ -81,13 +84,71 @@ _pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
 _inst_failed: set[tuple[str, int]] = set()      # instancing impossible
 _mem_instances: dict[tuple[str, int], io.BytesIO] = {}  # disk write failed
 _optimizing_notice = False                      # the notice prints only once
+_woff2_lock = threading.RLock()
 
 
 def register_fonts(fonts: dict[str, str]):
+    registered_fonts.clear()
     registered_fonts.update(fonts)
     _cover_cache.clear()
     with _line_surface_lock:
         _line_surface_cache.clear()
+
+
+@lru_cache(maxsize=64)
+def _decode_woff2(path: str, modified_ns: int, size: int):
+    """Decode a local web font once; use a stable SFNT file across runs."""
+    from fontTools.ttLib import TTFont
+
+    digest = hashlib.sha256(f"{path}:{modified_ns}:{size}".encode()).hexdigest()[:20]
+    name = f"{Path(path).stem}.{digest}.ttf"
+    for directory in (Path.home() / ".cache" / "saturn" / "font-cache",
+                      Path(tempfile.gettempdir()) / "saturn-font-cache"):
+        cached = directory / name
+        if cached.is_file():
+            return str(cached)
+
+    try:
+        font = TTFont(path)
+        try:
+            font.flavor = None
+            data = io.BytesIO()
+            font.save(data)
+            sfnt = data.getvalue()
+        finally:
+            font.close()
+    except Exception as exc:
+        raise ValueError(f"cannot decode WOFF2 font: {path}") from exc
+
+    for directory in (Path.home() / ".cache" / "saturn" / "font-cache",
+                      Path(tempfile.gettempdir()) / "saturn-font-cache"):
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            cached = directory / name
+            with tempfile.NamedTemporaryFile(dir=directory, suffix=".ttf",
+                                             delete=False) as temporary:
+                temporary.write(sfnt)
+                staged = Path(temporary.name)
+            try:
+                os.replace(staged, cached)
+            finally:
+                staged.unlink(missing_ok=True)
+            return str(cached)
+        except OSError:
+            continue
+    return io.BytesIO(sfnt)
+
+
+def _font_source(path: str):
+    if Path(path).suffix.lower() != ".woff2":
+        return path
+    resolved = Path(path).resolve()
+    with resolved.open("rb") as stream:
+        if stream.read(4) != b"wOF2":
+            raise ValueError(f"not a WOFF2 font: {path}")
+    stat = resolved.stat()
+    with _woff2_lock:
+        return _decode_woff2(str(resolved), stat.st_mtime_ns, stat.st_size)
 
 
 def weight_num(weight) -> int:
@@ -120,7 +181,8 @@ def _instance_weight(path: str, wght: int) -> bytes | None:
         from fontTools.ttLib import TTFont
         from fontTools.varLib import instancer
 
-        font = TTFont(path, lazy=True)
+        source = io.BytesIO(path.getvalue()) if isinstance(path, io.BytesIO) else path
+        font = TTFont(source, lazy=True)
         if "fvar" not in font:
             return None
         axes = {a.axisTag: a.defaultValue for a in font["fvar"].axes}
@@ -128,6 +190,7 @@ def _instance_weight(path: str, wght: int) -> bytes | None:
         instancer.instantiateVariableFont(font, axes, inplace=True)
         buf = io.BytesIO()
         font.save(buf)
+        font.close()
         return buf.getvalue()
     except Exception:
         return None
@@ -137,14 +200,16 @@ def _fvar_default_wght(path: str) -> float | None:
     """Default wght of a variable font; None when static (cached).
     Raw sfnt/fvar binary parse — deliberately avoids importing fontTools on
     the cold start path (fontTools only loads for actual instancing)."""
-    key = f"{path}:{int(os.path.getmtime(path)) if os.path.exists(path) else 0}"
+    memory = isinstance(path, io.BytesIO)
+    key = f"memory:{id(path)}" if memory else \
+        f"{path}:{int(os.path.getmtime(path)) if os.path.exists(path) else 0}"
     if key in _fvar_cache:
         return _fvar_cache[key]
     value: float | None = None
     try:
         import struct
 
-        with open(path, "rb") as fh:
+        with (io.BytesIO(path.getvalue()) if memory else open(path, "rb")) as fh:
             header = fh.read(12)
             if len(header) >= 12 and header[3:4] in (b"\x00", b"O", b"t"):  # sfnt
                 num_tables = int.from_bytes(header[4:6], "big")
@@ -184,8 +249,10 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
     if static and os.path.exists(static):
         return static, True
     table = _STATIC_WEIGHTS.get(path, {})
+    memory = isinstance(path, io.BytesIO)
     try:
-        big_font = os.path.getsize(path) > _SNAP_TO_STATIC_LIMIT
+        source_size = len(path.getbuffer()) if memory else os.path.getsize(path)
+        big_font = source_size > _SNAP_TO_STATIC_LIMIT
     except OSError:
         return path, False
     if big_font and table:
@@ -200,11 +267,10 @@ def _weighted_source(path: str, wnum: int) -> tuple[object, bool]:
         return path, False                      # static font: synthetic bold
     if int(default_wght) == wnum:
         return path, True                       # var file at its default weight
-    try:
-        mtime = int(os.path.getmtime(path))
-    except OSError:
-        return path, False
-    key = f"{Path(path).stem}.{wnum}.{mtime}.{os.path.getsize(path)}"
+    mtime = 0 if memory else int(os.path.getmtime(path))
+    stem = (hashlib.sha256(path.getbuffer()).hexdigest()[:20]
+            if memory else Path(path).stem)
+    key = f"{stem}.{wnum}.{mtime}.{source_size}"
     cache = Path.home() / ".cache" / "saturn" / "font-cache"
     inst = cache / f"{key}.ttf"
     slot = (path, wnum)
@@ -267,13 +333,16 @@ def _instance_bg(path: str, wnum: int, dest: Path):
 
 # -- chain (per-glyph fallback) --------------------------------------------------
 def _primary_link(family: str | None, wnum: int, italic: bool) -> tuple:
-    resolved = family_for(family)
+    resolved = family_for("", family)
     if resolved:
         reg = registered_fonts.get(resolved)
         if reg is not None:
             if os.path.exists(reg):
-                return ("file", reg, wnum, italic)
+                return ("file", _font_source(reg), wnum, italic)
             return _default_link(wnum, italic)
+        if os.path.isfile(resolved) and Path(resolved).suffix.lower() in \
+                (".ttf", ".otf", ".woff2"):
+            return ("file", _font_source(resolved), wnum, italic)
         return ("sys", resolved, wnum, italic)
     return _default_link(wnum, italic)
 
@@ -309,7 +378,9 @@ def _probe(link: tuple) -> _freetype.Font:
             _freetype.init()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            f = _freetype.Font(link[1], 16) if link[0] == "file" \
+            source = (io.BytesIO(link[1].getvalue())
+                      if isinstance(link[1], io.BytesIO) else link[1])
+            f = _freetype.Font(source, 16) if link[0] == "file" \
                 else _freetype.SysFont(link[1], 16)
         _probe_cache[key] = f
     return f
@@ -337,6 +408,8 @@ def _render_font(link: tuple, px: int) -> pygame.font.Font:
     if f is None:
         if kind == "file":
             path, is_var = _weighted_source(ident, wnum)
+            if isinstance(path, io.BytesIO):
+                path = io.BytesIO(path.getvalue())
             f = pygame.font.Font(path, px)
             # real weight already instanced; synthetic bold only for
             # non-variable files that cannot express the requested weight
