@@ -39,17 +39,34 @@ def _shadow(w, h, radii, elevation, scale):
     return result, pad
 
 
+@lru_cache(maxsize=96)
+def _scaled_shadow(w, h, radii, elevation, scale, output_scale):
+    surface, pad = _shadow(w, h, radii, elevation, scale)
+    size = tuple(max(1, round(v * output_scale / scale)) for v in surface.get_size())
+    return pygame.transform.smoothscale(surface, size), pad
+
+
 def draw_shadow(renderer, rect, radius, elevation):
     if elevation <= 0:
         return
     x, y, width, height = rect
-    scale = renderer.scale
+    # Soft shadows contain no sharp detail outside the covered silhouette.
+    # Blur a reduced intermediate and upscale at presentation; animation must
+    # not run two full-resolution Gaussian filters for every new width/radius.
+    scale = min(renderer.scale, .5 if elevation >= 4 else 1.0)
     w, h = round(width * scale), round(height * scale)
     if w <= 0 or h <= 0:
         return
-    surface, pad = _shadow(w, h, corners(radius, scale, w, h),
-                           round(elevation * 4) / 4, scale)
-    renderer.blit(surface, x - pad / scale, y - pad / scale)
+    args = (w, h, corners(radius, scale, w, h), round(elevation * 4) / 4, scale)
+    if renderer.native_texture_scaling:
+        surface, pad = _shadow(*args)
+        renderer.blit_scaled(surface, x - pad / scale, y - pad / scale,
+                             surface.get_width() / scale, surface.get_height() / scale)
+    else:
+        # Software presentation needs device-sized pixels. Reuse the upscale
+        # too, especially for menu items whose opacity changes every frame.
+        surface, pad = _scaled_shadow(*args, renderer.scale)
+        renderer.blit(surface, x - pad / scale, y - pad / scale)
 
 
 def draw_notched_outline(renderer, rect, color, width, radius, left, gap, *, depth=None):

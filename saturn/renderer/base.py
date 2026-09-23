@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 
 class Renderer(ABC):
     scale: float = 1.0  # supersampling factor (software backend sets 2)
+    native_texture_scaling = False
 
     def _init_effect_stacks(self):
         self._opacity_stack = [1.0]

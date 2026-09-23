@@ -105,6 +105,7 @@ void main() {
 
 
 class GLRenderer(Renderer):
+    native_texture_scaling = True
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
     _ssaa = 2

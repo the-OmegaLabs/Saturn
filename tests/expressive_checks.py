@@ -5,7 +5,7 @@ import pygame
 import saturn as ft
 from saturn.renderer.software import SoftwareRenderer
 from saturn.widgets._material import draw_state_layer
-from saturn.painting import _shadow
+from saturn.painting import _shadow, _scaled_shadow, draw_shadow
 from saturn.widgets.expressive_progress import _shapes, _morph_points
 import math
 import time
@@ -100,6 +100,21 @@ def check_progress():
             assert first != pygame.image.tobytes(r._buf, 'RGBA')
 
 
+def check_shadow_work():
+    r = renderer(1100,120)
+    _shadow.cache_clear()
+    _scaled_shadow.cache_clear()
+    with patch('pygame.transform.gaussian_blur', wraps=pygame.transform.gaussian_blur) as blur:
+        for opacity in (1,.8,.4,.1):
+            r.opacity_push(opacity)
+            draw_shadow(r,(20,20,1000,64),32,6)
+            r.opacity_pop()
+        assert blur.call_count == 2  # Opacity must not invalidate the silhouette.
+        for call in blur.call_args_list:
+            w,h = call.args[0].get_size()
+            assert w*h < 1000*64  # Animation filters never operate at display resolution.
+
+
 def check_floating():
     a,b,c = [ft.IconButton(ft.Icons.ADD) for _ in range(3)]
     toolbar = ft.FloatingToolbar(b,leading=a,trailing=c)
@@ -141,5 +156,6 @@ if __name__ == '__main__':
     check_regressions()
     check_label_cutout()
     check_progress()
+    check_shadow_work()
     check_floating()
     print('EXPRESSIVE REGRESSION CHECKS PASS')

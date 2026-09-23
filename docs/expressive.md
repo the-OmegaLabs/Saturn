@@ -37,6 +37,7 @@ ft.run(main)
 - 基础展板：`uv run python examples/expressive_demo.py`。
 - 动画展板：`uv run python examples/expressive_motion_demo.py`；可加 `--dark`、`--menu`、`--pressed`。
 - 回归检查：`uv run python -m tests.expressive_checks`。
+- 过渡性能回放：`uv run python -m tests.floating_perf software` 或 `opengl`；分别报告首次与缓存命中后的帧耗时，不包含显示同步等待。
 
 ## 绘制与资源
 
@@ -46,5 +47,6 @@ ft.run(main)
 
 输入框缺口采用分区描边，不覆盖父容器背景；空字段缺口的宽度和深度随标签浮动进度一起变化，有值字段的标签与缺口在焦点切换时保持浮动状态。
 阴影按完整形状模糊并缓存，长标签不会改变阴影的圆角结构。
+柔化在低分辨率中间图上计算，GPU 负责放大；软件路径另行缓存放大结果，避免展开/收起每帧进行整张高分辨率模糊。
 组件形状切换仍使用框架的插值动画；LoadingIndicator 使用阻尼弹簧响应。
 ButtonGroup 的连接模式当前提供 2dp 间距，尚无溢出菜单。
