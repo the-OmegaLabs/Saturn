@@ -1,32 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
-     width="1000" height="1000" viewBox="0 0 1000 1000"
-     role="img" aria-labelledby="title desc">
+     width="980" height="586" viewBox="140 308 980 586"
+     fill="#fff" role="img" aria-labelledby="title desc">
   <title id="title">Saturn A2</title>
-  <desc id="desc">A bold white planet crossed by a tilted orbit on charcoal.</desc>
-  <defs>
-    <radialGradient id="background" cx="50%" cy="48%" r="72%">
-      <stop stop-color="#272727"/>
-      <stop offset="1" stop-color="#1e1e1e"/>
-    </radialGradient>
-    <clipPath id="planet-clip">
-      <circle cx="497" cy="479" r="219"/>
-    </clipPath>
-    <path id="front-orbit" d="M 839 359 A 360 115 -19 0 1 159 593"/>
-  </defs>
+  <desc id="desc">Hand-drawn white Saturn silhouette with an open orbital gap and transparent background.</desc>
 
-  <rect width="1000" height="1000" fill="url(#background)"/>
+  <!-- Upper planet: the lower edge follows the near side of the orbit. -->
+  <path d="M 397 754
+           C 366 710 349 657 349 601
+           C 349 450 474 327 628 327
+           C 762 327 874 425 890 554
+           C 750 647 565 722 397 754 Z"/>
 
-  <!-- Rear orbit disappears behind the planet. -->
-  <ellipse cx="499" cy="476" rx="360" ry="115"
-           transform="rotate(-19 499 476)"
-           fill="none" stroke="#fff" stroke-width="70"/>
-  <circle cx="497" cy="479" r="219" fill="#fff"/>
-
-  <!-- A narrow dark edge separates the near orbit from the planet. -->
-  <use href="#front-orbit" transform="translate(0 -8)"
-       clip-path="url(#planet-clip)"
-       fill="none" stroke="#242424" stroke-width="72"/>
-  <use href="#front-orbit" fill="none" stroke="#fff"
-       stroke-width="70" stroke-linecap="round"/>
+  <!-- Orbit and lower planet share one contour; all gaps are unpainted. -->
+  <path d="M 336 610
+           C 253 657 185 713 164 763
+           C 157 780 155 800 164 812
+           C 190 856 311 865 459 822
+           C 505 856 561 874 622 874
+           C 758 874 867 778 894 649
+           C 1038 566 1105 484 1099 439
+           C 1093 372 992 370 838 408
+           L 859 436
+           C 931 423 983 426 989 451
+           C 1003 505 853 614 696 674
+           C 551 737 418 769 333 770
+           C 286 769 260 756 264 731
+           C 267 708 296 677 340 646 Z"/>
 </svg>
