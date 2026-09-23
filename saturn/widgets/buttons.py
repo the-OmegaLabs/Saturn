@@ -222,7 +222,7 @@ class Button(Control):
         set_hover(self, on)
         if self.variant_elevation:
             self._animate_internal(
-                "_elevation_progress", 2.0 if on else self.variant_elevation,
+                "_elevation_progress", 3.0 if on else self.variant_elevation,
                 motion.SHORT3, motion.EMPHASIZED)
         self.update()
         fire(self, "hover", "true" if on else "false")
@@ -245,7 +245,7 @@ class Button(Control):
         if self.variant_elevation:
             self._animate_internal(
                 "_elevation_progress",
-                2.0 if self._hovered else self.variant_elevation,
+                3.0 if self._hovered else self.variant_elevation,
                 motion.SHORT3, motion.EMPHASIZED)
 
     def _tick_animations(self, now: float) -> bool:
@@ -271,8 +271,8 @@ class ElevatedButton(Button):
 
 class OutlinedButton(Button):
     variant_bg = None
-    variant_fg = colors.Colors.PRIMARY
-    variant_border = colors.Colors.OUTLINE
+    variant_fg = colors.Colors.ON_SURFACE_VARIANT
+    variant_border = colors.Colors.OUTLINE_VARIANT
 
 
 class TextButton(Button):
