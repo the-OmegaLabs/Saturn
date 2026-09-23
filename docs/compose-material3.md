@@ -16,6 +16,7 @@
 - `FloatingActionButton` 家族：依据 `FloatingActionButton.kt`，小/标准/中/大尺寸 40/56/80/96dp，圆角 12/16/20/28dp；支持扩展文字形式。大号图标采用源码覆盖值 36dp。
 - `ListItem`：依据 `ListItem.kt` 和 `ListItemDefaults.kt`，支持一/二/三行 56/72/88dp 最小高度、前后内容、选中配色及状态圆角。
 - `Slider`：依据 `Slider.kt`，16dp 轨道、4×44dp 滑块（按下宽 2dp）、6dp 间隙、4dp 停止点和刻度。
+- `TextField`：56dp 默认高度、16dp 内边距、16sp 输入文字、12sp 浮动标签；filled 采用仅顶部圆角与底部指示线，标签保留在容器内。Checkbox 勾选色使用 onPrimary，Radio 使用 2dp 描边。
 - `ProgressBar` / `ProgressRing`：依据 `ProgressIndicator.kt`，轨道色为 secondaryContainer，活动色为 primary；确定态有轨道间隙，线性末端停止点，圆形使用同宽轨道和圆端帽。
 
 ## 用法
@@ -36,6 +37,10 @@ def main(page):
 
 ft.run(main)
 ```
+
+完整交互展板：`uv run python examples/expressive_demo.py`（深色加 `--dark`）。
+布局和命中检查：`uv run python examples/expressive_demo.py --check`。
+已完成 SOFTWARE 浅色和 OPENGL 深色窗口截图检查；软件圆弧方向与 GL 统一为屏幕坐标顺时针。
 
 ## 当前精度边界
 
