@@ -81,6 +81,9 @@ def main(page):
             ft.LargeFloatingActionButton(ft.Icons.ADD, on_click=clicked),
             ft.ExtendedFloatingActionButton("Create", icon=ft.Icons.ADD,
                                            size="medium", on_click=clicked),
+            ft.ExpressiveIconButton(ft.Icons.FAVORITE, size="medium",
+                                    selected=True, bgcolor=ft.Colors.SECONDARY_CONTAINER,
+                                    on_click=clicked),
         ], spacing=20, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         ft.Row([
             ft.Column([

@@ -11,6 +11,7 @@
 - 按钮禁用态：依据 `FilledButtonTokens.kt` 等，容器为 onSurface 的 10%，文字为 onSurfaceVariant 的 38%；描边保留。文字透明度在 blit 时处理，因为 pygame 字体渲染会忽略颜色中的 alpha。
 - `ExpressiveButton`：依据 `Button.kt`，支持 xsmall/small/medium/large/xlarge，分别为 32/40/56/96/136dp；图标为 20/20/24/32/40dp；按下圆角为 8/8/12/16/16dp。使用源码实际覆盖后的 XS padding 12、间距 4，而非生成 token 中的旧值。现有按钮也可传 `expressive=True` 或 `size=`。
 - `ToggleButton` 及 elevated/tonal/outlined 变体：依据 `ToggleButton.kt`，有未选、选中、按下三种形状；选中状态支持事件与程序更新。
+- `ExpressiveIconButton`：同样支持五档尺寸，按下与选中形状变化；图标尺寸为 20/24/24/32/40dp，禁用内容透明度为 38%。
 - `SplitButton`：依据 `SplitButton.kt`，小号 40dp 高、2dp 间距、外角 full、内角 4dp、按下内角 12dp；两段独立命中和事件。
 - `ButtonGroup`：依据 `ButtonGroup.kt`，标准间距 12dp，按下项扩大 15%，相邻项等量缩小；动画中的绘制和命中使用同一布局。
 - `FloatingActionButton` 家族：依据 `FloatingActionButton.kt`，小/标准/中/大尺寸 40/56/80/96dp，圆角 12/16/20/28dp；支持扩展文字形式。大号图标采用源码覆盖值 36dp。
