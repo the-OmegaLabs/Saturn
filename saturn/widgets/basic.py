@@ -125,13 +125,26 @@ class Image(Control):
 
 
 class Card(Container):
-    """flet Card: container with M3 card styling (flat v1 — no blur shadow)."""
+    """Flet Card with Compose Material 3 elevated/filled/outlined surfaces."""
 
     def __init__(self, content=None, *, elevation: float = 1,
                  variant: str = "elevated", **base):
+        from ..types import Border, BoxShadow, Offset
+
         self.elevation = elevation
         self.variant = variant
-        base.setdefault("bgcolor", colors.Colors.SURFACE_CONTAINER_LOW)
+        base.setdefault("border_radius", 12)
+        if variant == "filled":
+            base.setdefault("bgcolor", colors.Colors.SURFACE_CONTAINER_HIGHEST)
+        elif variant == "outlined":
+            base.setdefault("bgcolor", colors.Colors.SURFACE)
+            base.setdefault("border", Border.all(1, colors.Colors.OUTLINE_VARIANT))
+        else:
+            base.setdefault("bgcolor", colors.Colors.SURFACE_CONTAINER_LOW)
+            if elevation > 0:
+                base.setdefault("shadow", BoxShadow(
+                    blur_radius=3 * elevation, offset=Offset(0, elevation),
+                    color="#33000000"))
         super().__init__(content, **base)
 
 
