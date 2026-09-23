@@ -5,6 +5,8 @@ import saturn as ft
 from saturn.renderer.software import SoftwareRenderer
 from saturn.widgets._material import draw_state_layer
 from saturn.painting import _shadow
+from saturn.widgets.expressive_progress import _shapes, _morph_points
+import math
 
 
 def renderer(w=400, h=200):
@@ -34,6 +36,30 @@ def check_regressions():
     assert len(set(alphas)) > 8, alphas
 
 
+def check_progress():
+    data = _shapes()
+    assert len(data['sequence']) == 7
+    for curves in data['sequence']:
+        for progress in (0, .25, .5, .75, 1):
+            pts = _morph_points(curves, progress)
+            assert len(pts) > 20
+            assert all(math.isfinite(v) for point in pts for v in point)
+    r = renderer()
+    for control in (ft.LoadingIndicator(), ft.LoadingIndicator(.5),
+                    ft.WavyProgressIndicator(.5), ft.CircularWavyProgressIndicator(.5)):
+        w, h = control._intrinsic(None, None, r.scale)
+        control._place(0, 0, w, h, r.scale)
+        r.clear((0, 0, 0, 0))
+        control._draw(r, 0, 0)
+        first = pygame.image.tobytes(r._buf, 'RGBA')
+        control._elapsed = .3
+        r.clear((0, 0, 0, 0))
+        control._draw(r, 0, 0)
+        if control.value is None or isinstance(control, ft.WavyProgressIndicator):
+            assert first != pygame.image.tobytes(r._buf, 'RGBA')
+
+
 if __name__ == '__main__':
     check_regressions()
+    check_progress()
     print('EXPRESSIVE REGRESSION CHECKS PASS')
