@@ -33,21 +33,51 @@ If you're looking to build a **web application**, [use Flet instead](https://fle
   <tr>
     <td align="center">
       <strong>Demo</strong><br>
-      <img src="./shots/demo.png" alt="Saturn controls demo">
+      <img src="./shots/demo.png" width="440" alt="Saturn controls demo">
     </td>
     <td align="center">
       <strong>Layout</strong><br>
-      <img src="./shots/layout-demo.png" alt="Saturn layout demo">
+      <img src="./shots/layout-demo.png" width="440" alt="Saturn layout demo">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Text</strong><br>
-      <img src="./shots/text-demo.png" alt="Saturn text demo">
+      <img src="./shots/text-demo.png" width="440" alt="Saturn text demo">
     </td>
     <td align="center">
       <strong>Widgets</strong><br>
-      <img src="./shots/widgets-demo.png" alt="Saturn widgets demo">
+      <img src="./shots/widgets-demo.png" width="440" alt="Saturn widgets demo">
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>Buttons</strong><br>
+      <img src="./shots/buttons-demo.png" width="440" alt="Saturn button variants">
+    </td>
+    <td align="center">
+      <strong>Inputs</strong><br>
+      <img src="./shots/inputs-demo.png" width="440" alt="Saturn input controls">
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>Expressive · Light</strong><br>
+      <img src="./shots/expressive-light.png" width="440" alt="Expressive controls with light theme">
+    </td>
+    <td align="center">
+      <strong>Expressive · Dark</strong><br>
+      <img src="./shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>Motion</strong><br>
+      <img src="./shots/expressive-motion.png" width="440" alt="Expressive loading and motion controls">
+    </td>
+    <td align="center">
+      <strong>FAB Menu</strong><br>
+      <img src="./shots/expressive-menu.png" width="440" alt="Expanded floating action button menu">
     </td>
   </tr>
 </table>
@@ -181,6 +211,8 @@ The public API also includes theme, alignment, padding, border, shadow, animatio
 | [`examples/buttons_demo.py`](./examples/buttons_demo.py) | Button variants and events |
 | [`examples/text_demo.py`](./examples/text_demo.py) | Typography and text behavior |
 | [`examples/widgets_demo.py`](./examples/widgets_demo.py) | Icons, images, cards, and progress indicators |
+| [`examples/expressive_demo.py`](./examples/expressive_demo.py) | Expressive controls in light and dark themes |
+| [`examples/expressive_motion_demo.py`](./examples/expressive_motion_demo.py) | Loading shapes, waves, toolbar, and FAB menu |
 
 Run the full showcase with either renderer:
 
