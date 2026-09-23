@@ -171,6 +171,12 @@ class Theme:
     color_scheme_seed: str | None = None
 
 
+@dataclass
+class MaterialExpressiveTheme(Theme):
+    """Compose MaterialExpressiveTheme's default light color roles."""
+    expressive: bool = True
+
+
 class BoxFit(enum.Enum):
     FILL = "fill"
     CONTAIN = "contain"

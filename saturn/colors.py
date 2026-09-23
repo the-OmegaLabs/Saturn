@@ -103,6 +103,16 @@ INDIGO_DARK = {
     "surfacebright": "39393F",
 }
 
+# Compose Material 3 1.5.0-alpha28 expressiveLightColorScheme(): only these
+# four on-container roles differ from lightColorScheme(). Custom seed schemes
+# supply their own colors, as in Compose's MaterialExpressiveTheme(colorScheme=).
+EXPRESSIVE_LIGHT = {
+    "onprimarycontainer": "4F378B",
+    "onsecondarycontainer": "4A4458",
+    "ontertiarycontainer": "633B48",
+    "onerrorcontainer": "8C1D18",
+}
+
 # set by the active Page's theme_mode; role names resolve against it
 theme_dark: bool = False
 role_overrides: dict[str, str] = {}  # Theme(color_scheme=...) lands in M3
@@ -128,10 +138,12 @@ def system_prefers_dark() -> bool:
     return _system_dark_cache
 
 
-def apply_seed(seed) -> None:
+def apply_seed(seed, *, expressive: bool = False) -> None:
     """Apply a known Flet ColorScheme.fromSeed table to semantic roles."""
     role_overrides.clear()
     if seed is None:
+        if expressive and not theme_dark:
+            role_overrides.update(EXPRESSIVE_LIGHT)
         return
     value = getattr(seed, "value", seed)
     try:
