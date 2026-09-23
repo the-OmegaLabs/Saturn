@@ -1,4 +1,4 @@
-"""Backend factory. GL/Vulkan renderers land in TODO milestones 11/12."""
+"""Renderer backend factory."""
 from __future__ import annotations
 
 from .base import Renderer
@@ -17,5 +17,9 @@ def create_renderer(backend, window, *, logical_size=None,
         from .gl import GLRenderer
         return GLRenderer(
             window, logical_size=logical_size, pixel_ratio=pixel_ratio)
+    if kind == "vulkan":
+        from .vulkan import VulkanRenderer
+        return VulkanRenderer(
+            window, logical_size=logical_size, pixel_ratio=pixel_ratio)
     raise NotImplementedError(
-        f"{backend!r} backend is a placeholder; use Render.SOFTWARE or Render.OPENGL")
+        f"unknown rendering backend: {backend!r}")

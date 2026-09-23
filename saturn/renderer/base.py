@@ -86,6 +86,9 @@ class Renderer(ABC):
     def on_resize(self, width, height, *, pixel_size=None,
                   pixel_ratio: float | None = None) -> None: ...
 
+    def close(self) -> None:
+        """Release backend-owned resources before the native window closes."""
+
     def screenshot(self):
         """RGBA pygame surface of the current frame at logical window size.
 

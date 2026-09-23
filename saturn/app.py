@@ -31,7 +31,7 @@ class Render(enum.Enum):
     """Rendering backend."""
     SOFTWARE = "software"
     OPENGL = "opengl"
-    VULKAN = "vulkan"  # placeholder, see TODO
+    VULKAN = "vulkan"
 
 def _system_refresh_rate() -> int:
     """Return the active display refresh rate, with a conservative fallback."""
@@ -154,6 +154,7 @@ class App:
             size=creation_size,
             resizable=True,
             opengl=self._backend is Render.OPENGL,
+            vulkan=self._backend is Render.VULKAN,
             allow_high_dpi=True,
         )
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
@@ -236,6 +237,8 @@ class App:
             # SDL; the cap also provides safe pacing if a driver ignores it.
             clock.tick(self._refresh_rate)
         self._remove_live_resize_watch()
+        if self.renderer is not None:
+            self.renderer.close()
         self._window.destroy()
         pygame.display.quit()
 
@@ -476,8 +479,6 @@ def run(main, *, backend: Render | None = None, width: int = 800,
     accepted and ignored so flet programs port with a one-line change.
     Returns the App handle (after the window closes).
     """
-    if backend is Render.VULKAN:
-        raise NotImplementedError("Render.VULKAN is a placeholder; use SOFTWARE or OPENGL")
     if backend is None:  # test hook: pick renderer from the environment
         backend = Render(os.environ.get("SATURN_BACKEND", "software").lower())
     app = App(main, backend, width, height, title)
