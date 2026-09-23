@@ -114,7 +114,7 @@ class SoftwareRenderer(Renderer):
             return
         pygame.draw.rect(self._buf, c,
                          (*self._s(x, y)[:2], sw, sh), width=line_w,
-                         border_radius=int(radius * SCALE))
+                         border_radius=int(radius * self.scale))
 
     def line(self, x1, y1, x2, y2, color, width=1):
         x1, y1 = self._translate(x1, y1)
@@ -139,14 +139,25 @@ class SoftwareRenderer(Renderer):
                            0 if fill else max(1, round(self.scale)))
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
+        if radius <= 0 or width <= 0 or end_angle <= start_angle:
+            return
         x, y = self._translate(x, y)
         rect = pygame.Rect(
             0, 0, int(radius * 2 * self.scale),
             int(radius * 2 * self.scale))
         rect.center = self._s(x, y)
-        pygame.draw.arc(self._buf, self._effect_color(color), rect,
-                        start_angle, end_angle,
-                        max(1, int(width * self.scale)))
+        c = self._effect_color(color)
+        line_width = max(1, int(width * self.scale))
+        # Renderer angles run clockwise in screen coordinates, like GL.
+        # pygame's arc API uses a mathematical (counterclockwise) y axis.
+        if c[3] < 255:
+            surface = pygame.Surface(rect.size, pygame.SRCALPHA)
+            pygame.draw.arc(surface, c, surface.get_rect(),
+                            -end_angle, -start_angle, line_width)
+            self._buf.blit(surface, rect.topleft)
+        else:
+            pygame.draw.arc(self._buf, c, rect, -end_angle, -start_angle,
+                            line_width)
 
     def blit(self, surface, x, y, alpha=1.0):
         """surface is already in device px (text/images render at scale)."""
