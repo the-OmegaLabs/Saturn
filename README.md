@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./saturn-logo-a2.svg">
-    <img src="./saturn-logo-a2-black.svg" width="160" alt="Saturn logo">
-  </picture>
+  <img src="./saturn-logo.svg" width="112" alt="Saturn logo">
 </p>
 
 <h1 align="center">Saturn</h1>
