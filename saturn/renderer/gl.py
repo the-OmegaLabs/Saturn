@@ -340,10 +340,9 @@ class GLRenderer(Renderer):
         x, y = self._translate(x, y)
         _sw, sh = self._fb_size()
         device_scale = self.scale
-        rect = (int(x * device_scale),
-                int((sh - y - h) * device_scale),
-                max(0, int(w * device_scale)),
-                max(0, int(h * device_scale)))
+        left, right = round(x * device_scale), round((x + w) * device_scale)
+        bottom, top = round((sh - y - h) * device_scale), round((sh - y) * device_scale)
+        rect = (left, bottom, max(0, right-left), max(0, top-bottom))
         if self._clip_stack:
             px0, py0, pw, ph = self._clip_stack[-1]
             ex0, ey0 = max(px0, rect[0]), max(py0, rect[1])

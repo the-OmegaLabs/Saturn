@@ -688,58 +688,55 @@ class TextField(Control):
             border_draw_color = _mix(
                 inactive, colors.Colors.PRIMARY, focus)
             border_width = 1 + focus
-        if border_width > 0:
-            if filled_style:
-                r.fill_rect(x, y + h - border_width, w, border_width,
-                            border_draw_color)
-            else:
-                label_visible = self.label and (
-                    self._focused or bool(self.value) or self._label_progress > 0)
-                if label_visible:
-                    family, _, _ = self._style()
-                    gap = txt.line_width(self.label, 12, scale=scale, family=family) + 8
-                    draw_notched_outline(r, (x, y, w, h), border_draw_color,
-                                         border_width, radius, _FIELD_PAD - 4, gap)
-                else:
-                    r.stroke_rect(x, y, w, h, border_draw_color,
-                                  width=border_width, radius=radius)
-        label_progress = self._label_progress if self.label else 0.0
-        ty, th = y, h
-        if filled_style and self.label:
-            ty += 16 * label_progress
-            th -= 16 * label_progress
+        label_progress = max(0.0, min(1.0, self._label_progress)) if self.label else 0.0
         family, vsize, vcolor = self._style()
         if self.label:
             inactive_color = _parse(colors.Colors.ON_SURFACE_VARIANT)
             active_color = _parse(colors.Colors.PRIMARY)
             inline_label = self._render_cached(
-                "label-inline", self.label, vsize, scale, family,
-                inactive_color)
+                "label-inline", self.label, vsize, scale, family, inactive_color)
             floating_inactive = self._render_cached(
-                "label-floating-inactive", self.label, 12.0, scale, family,
-                inactive_color)
+                "label-floating-inactive", self.label, 12.0, scale, family, inactive_color)
             floating_active = self._render_cached(
-                "label-floating-active", self.label, 12.0, scale, family,
-                active_color)
+                "label-floating-active", self.label, 12.0, scale, family, active_color)
             inline_width = inline_label.get_width() / scale
+            inline_height = inline_label.get_height() / scale
             floating_width = floating_active.get_width() / scale
             floating_height = floating_active.get_height() / scale
+            draw_width = inline_width + (floating_width - inline_width) * label_progress
+            draw_height = inline_height + (floating_height - inline_height) * label_progress
+            label_line_height = 24.0 + (16.0 - 24.0) * label_progress
+        if border_width > 0:
+            if filled_style:
+                r.fill_rect(x, y + h - border_width, w, border_width,
+                            border_draw_color)
+            else:
+                if self.label and draw_width > 0 and label_progress > 0:
+                    # The cutout grows with the current label's width AND line
+                    # height, using the same progress as its size and position.
+                    gap = draw_width * label_progress + 8.0
+                    draw_notched_outline(r, (x, y, w, h), border_draw_color,
+                                         border_width, radius, _FIELD_PAD - 4, gap,
+                                         depth=label_line_height * label_progress / 2)
+                else:
+                    r.stroke_rect(x, y, w, h, border_draw_color,
+                                  width=border_width, radius=radius)
+        ty, th = y, h
+        if filled_style and self.label:
+            ty += 16 * label_progress
+            th -= 16 * label_progress
+        if self.label:
             if label_progress <= 0.0 or floating_width <= 0.0:
                 inline_y = y + (h - inline_label.get_height() / scale) / 2
                 r.blit(inline_label, x + _FIELD_PAD, inline_y)
             else:
-                # Material Web animates one floating label with a transform,
-                # then swaps to the crisp resting raster at the endpoint. This
-                # avoids rasterising a new font size (and GL texture) per frame.
-                resting_scale = inline_width / floating_width
-                label_scale = resting_scale + (
-                    1.0 - resting_scale) * label_progress
-                draw_width = floating_width * label_scale
-                draw_height = floating_height * label_scale
-                resting_y = y + (h - floating_height * resting_scale) / 2
-                floating_y = y + 8 if filled_style else y - floating_height / 2
-                draw_y = resting_y + (
-                    floating_y - resting_y) * label_progress
+                # Scale cached label rasters, keeping placement and cutout on
+                # the same geometry rather than on the focus target state.
+                if filled_style:
+                    resting_y = y + (h - inline_height) / 2
+                    draw_y = resting_y + (y + 8 - resting_y) * label_progress
+                else:
+                    draw_y = y + h / 2 * (1 - label_progress) - draw_height / 2
                 r.blit_scaled(
                     floating_inactive, x + _FIELD_PAD, draw_y,
                     draw_width, draw_height, alpha=1.0 - focus)

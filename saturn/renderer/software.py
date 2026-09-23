@@ -66,7 +66,8 @@ class SoftwareRenderer(Renderer):
     def _apply_clip(self):
         rect = None
         for x, y, w, h in self._clip:
-            r = pygame.Rect(*self._s(x, y, w, h))
+            left, top, right, bottom = (round(v * self.scale) for v in (x,y,x+w,y+h))
+            r = pygame.Rect(left, top, max(0,right-left), max(0,bottom-top))
             rect = r if rect is None else rect.clip(r)
         self._buf.set_clip(rect)  # None = full surface
 

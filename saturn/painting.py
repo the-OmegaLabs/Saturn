@@ -52,12 +52,12 @@ def draw_shadow(renderer, rect, radius, elevation):
     renderer.blit(surface, x - pad / scale, y - pad / scale)
 
 
-def draw_notched_outline(renderer, rect, color, width, radius, left, gap):
+def draw_notched_outline(renderer, rect, color, width, radius, left, gap, *, depth=None):
     """Omit the top label gap without painting over the parent background."""
     x, y, w, h = rect
     start = max(0.0, min(w, left))
     end = max(start, min(w, start + gap))
-    depth = max(2.0, width + 1.0)
+    depth = max(2.0, width + 1.0) if depth is None else max(0.0, min(h, depth))
     for cx, cy, cw, ch in ((x, y, start, h), (x + end, y, w - end, h),
                            (x + start, y + depth, end - start, h - depth)):
         if cw <= 0 or ch <= 0:

@@ -1,5 +1,6 @@
 """Run with `uv run python -m tests.expressive_checks`."""
 from types import SimpleNamespace
+from unittest.mock import patch
 import pygame
 import saturn as ft
 from saturn.renderer.software import SoftwareRenderer
@@ -26,7 +27,7 @@ def check_regressions():
         r.clear('#123456')
         field = ft.TextField('Value', label='Label')
         field._place(0, 0, 240, 56, r.scale)
-        field._label_progress = progress
+        field._label_progress = 1.0  # Nonempty labels stay floated across focus changes.
         field._focus_progress = progress
         field._focused = True
         field._draw(r, 0, 0)
@@ -35,6 +36,45 @@ def check_regressions():
     assert shadow.get_at((0, 0)).a == 0
     alphas = [shadow.get_at((pad + 300, pad + 80 + n)).a for n in range(20)]
     assert len(set(alphas)) > 8, alphas
+
+
+def check_label_cutout():
+    r = renderer()
+    field = ft.TextField('', label='Transition label')
+    field._place(0, 0, 240, 56, r.scale)
+    def gap_at(progress, focused):
+        field._label_progress = progress
+        field._focused = focused
+        r.clear('#123456')
+        # Inspect the border separately from glyphs that overlap its gap.
+        with patch.object(r, 'blit'), patch.object(r, 'blit_scaled'):
+            field._draw(r, 0, 0)
+        # Fractional cutout clips must never punch a hole in the bottom edge.
+        assert all(r._buf.get_at((x,111))[:3] != (18,52,86) for x in range(16,464))
+        return sum(r._buf.get_at((x, 1))[:3] == (18,52,86)
+                   for x in range(24,360))
+    samples = (0, .01, .1, .25, .5, .75, 1)
+    opening = [gap_at(p, True) for p in samples]
+    closing = [gap_at(p, False) for p in reversed(samples)]
+    assert opening == list(reversed(closing))  # Geometry must not depend on focus intent.
+    assert opening[0] == 0 and opening[-1] > opening[3] > opening[2]
+    assert opening == sorted(opening), opening
+    field._label_progress = 0.0
+    field._restart_cursor_blink = lambda: None
+    field._stop_cursor_blink = lambda: None
+    with patch('saturn.control.time.perf_counter', return_value=10):
+        field._set_focused(True)
+    assert field._label_progress == 0
+    field._tick_animations(10.075)
+    assert 0 < field._label_progress < 1
+    field._tick_animations(10.2)
+    assert field._label_progress == 1
+    with patch('saturn.control.time.perf_counter', return_value=11):
+        field._set_focused(False)
+    field._tick_animations(11.075)
+    assert 0 < field._label_progress < 1
+    field._tick_animations(11.2)
+    assert field._label_progress == 0
 
 
 def check_progress():
@@ -99,6 +139,7 @@ def check_floating():
 
 if __name__ == '__main__':
     check_regressions()
+    check_label_cutout()
     check_progress()
     check_floating()
     print('EXPRESSIVE REGRESSION CHECKS PASS')
