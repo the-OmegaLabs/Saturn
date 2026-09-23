@@ -21,11 +21,6 @@ _LABEL_WEIGHT = 500
 _ICON_SIZE = 18.0
 
 
-def _blend(fg, bg, k: float):
-    """Linear blend two RGBA tuples; k = amount of fg over bg."""
-    return tuple(round(b + (f - b) * k) for f, b in zip(fg, bg))
-
-
 class Button(Control):
     variant_bg = None     # class defaults, resolved at draw (theme-aware)
     variant_fg = None
@@ -97,6 +92,9 @@ class Button(Control):
         return colors.parse_color(v) if v is not None else None
 
     def _bg(self):
+        if self.disabled and (self.bgcolor is not None or self.variant_bg is not None):
+            r, g, b, _ = colors.parse_color(colors.Colors.ON_SURFACE)
+            return r, g, b, round(255 * 0.10)
         if self.bgcolor is not None:
             base = colors.parse_color(self.bgcolor)
         elif self.variant_bg is not None:
@@ -109,10 +107,9 @@ class Button(Control):
         return self.color or self.variant_fg or colors.Colors.ON_SURFACE
 
     def _fg(self):
-        fg = colors.parse_color(self._fg_raw())
         if self.disabled:
-            return _blend(fg, (128, 128, 128, 255), 0.62)
-        return fg
+            return colors.parse_color(colors.Colors.ON_SURFACE_VARIANT)
+        return colors.parse_color(self._fg_raw())
 
     # -- drawing -----------------------------------------------------------
     def _draw(self, r, x, y):
@@ -126,8 +123,10 @@ class Button(Control):
                            (0, 0, 0, shadow_alpha), radius=h / 2 + elevation)
         if bg is not None:
             r.fill_rect(x, y, w, h, bg, radius=h / 2)
-        if self.variant_border is not None and not self.disabled:
-            r.stroke_rect(x, y, w, h, colors.parse_color(self.variant_border),
+        if self.variant_border is not None:
+            border = (colors.Colors.OUTLINE_VARIANT if self.disabled
+                      else self.variant_border)
+            r.stroke_rect(x, y, w, h, colors.parse_color(border),
                           width=1, radius=h / 2)
         if not self.disabled:
             draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), h / 2)
@@ -152,10 +151,12 @@ class Button(Control):
         cx = x + pad_start + (content_w - total) / 2
         cy = y + h / 2
         if icon_surf is not None:
-            r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale))
+            r.blit(icon_surf, cx, cy - icon_surf.get_height() / (2 * scale),
+                   alpha=0.38 if self.disabled else 1.0)
             cx += icon_w + _GAP
         if label_surf is not None:
-            r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale))
+            r.blit(label_surf, cx, cy - label_surf.get_height() / (2 * scale),
+                   alpha=0.38 if self.disabled else 1.0)
 
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
