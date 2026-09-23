@@ -171,9 +171,15 @@ class ProgressBar(Control):
 
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
-        r.fill_rect(x, y, w, h,
-                    colors.parse_color(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
-                    radius=h / 2)
+        track = colors.parse_color(self.bgcolor or colors.Colors.SECONDARY_CONTAINER)
+        active = colors.parse_color(self.color or colors.Colors.PRIMARY)
+
+        def segment(left, right, color):
+            width = right - left
+            if width > 0:
+                r.fill_rect(left, y, width, h, color,
+                            radius=min(h / 2, width / 2))
+
         if self.value is None:
             phase = self._phase
             # Exact Material Web 2s keyframe geometry: two independently
@@ -205,17 +211,29 @@ class ProgressBar(Control):
                        if phase <= 0.4415 else
                        _segment(phase, 0.4415, 1.0, 0.72796, 0.08,
                                 (0.257759, -0.003163, 0.211762, 1.38179)))
-            active = colors.parse_color(self.color or colors.Colors.PRIMARY)
+            bars = ((x + w * (-1.45167 + p_tx), w * p_scale),
+                    (x + w * (-0.548889 + s_tx), w * s_scale))
+            visible = sorted((max(x, bx), min(x + w, bx + bw))
+                             for bx, bw in bars if bx + bw > x and bx < x + w)
+            cursor = x
+            for left, right in visible:
+                segment(cursor, left - 4, track)
+                cursor = max(cursor, right + 4)
+            segment(cursor, x + w, track)
             r.clip_push(x, y, w, h)
-            r.fill_rect(x + w * (-1.45167 + p_tx), y,
-                        w * p_scale, h, active, radius=h / 2)
-            r.fill_rect(x + w * (-0.548889 + s_tx), y,
-                        w * s_scale, h, active, radius=h / 2)
+            for bx, bw in bars:
+                segment(bx, bx + bw, active)
             r.clip_pop()
-        elif self._display_value > 0:
-            r.fill_rect(x, y, w * min(1.0, self._display_value), h,
-                        colors.parse_color(self.color or colors.Colors.PRIMARY),
-                        radius=h / 2)
+        else:
+            progress = max(0.0, min(1.0, self._display_value))
+            active_end = x + w * progress
+            segment(active_end + (4 if progress else 0), x + w, track)
+            segment(x, active_end, active)
+        stop_size = min(4.0, h, w)
+        if self.value is not None and stop_size > 0:
+            stop_offset = min((h - stop_size) / 2, 6.0)
+            r.circle(x + w - stop_size / 2 - stop_offset, y + h / 2,
+                     stop_size / 2, active)
 
     def _prepare_animations(self, now: float):
         super()._prepare_animations(now)
@@ -256,13 +274,32 @@ class ProgressRing(Control):
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
 
+    @staticmethod
+    def _round_arc(r, cx, cy, radius, start, end, color, width):
+        if end <= start:
+            return
+        r.arc(cx, cy, radius, start, end, color, width=width)
+        if end - start < 2 * math.pi - 1e-6 and color[3] == 255:
+            centerline = radius - width / 2
+            for angle in (start, end):
+                r.circle(cx + math.cos(angle) * centerline,
+                         cy + math.sin(angle) * centerline,
+                         width / 2, color)
+
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
         cx, cy = x + w / 2, y + h / 2
-        radius = min(w, h) / 2 - self.stroke_width / 2
-        r.circle(cx, cy, radius,
-                 colors.parse_color(self.bgcolor or colors.Colors.SURFACE_CONTAINER_HIGHEST),
-                 fill=False)
+        diameter = min(w, h)
+        if diameter <= 0:
+            return
+        radius = diameter / 2
+        width = min(self.stroke_width, diameter)
+        if width <= 0:
+            return
+        active = colors.parse_color(self.color or colors.Colors.PRIMARY)
+        track_color = self.bgcolor or (colors.Colors.SECONDARY_CONTAINER
+                                       if self.value is not None else None)
+        track = colors.parse_color(track_color) if track_color else None
         if self.value is None:
             elapsed = self._phase
             arc_phase = (elapsed % 1.333) / 1.333
@@ -276,16 +313,16 @@ class ProgressRing(Control):
             cycle = (elapsed % (4 * 1.333)) / (4 * 1.333)
             arc_rotation = ease(AnimationCurve.FAST_OUT_SLOWIN, cycle) * 1080
             start = math.radians(-90 + linear_rotation + arc_rotation)
-            end = start + math.radians(sweep)
-            r.arc(cx, cy, radius, start, end,
-                  colors.parse_color(self.color or colors.Colors.PRIMARY),
-                  width=self.stroke_width)
-        elif self._display_value > 0:
+            sweep = math.radians(sweep)
+        else:
             start = -math.pi / 2
-            r.arc(cx, cy, radius,
-                  start, start + 2 * math.pi * min(1.0, self._display_value),
-                  colors.parse_color(self.color or colors.Colors.PRIMARY),
-                  width=self.stroke_width)
+            sweep = 2 * math.pi * max(0.0, min(1.0, self._display_value))
+        if track is not None and track[3] > 0:
+            gap = min(sweep, 2 * (4 + width) / diameter)
+            self._round_arc(r, cx, cy, radius,
+                            start + sweep + gap, start + 2 * math.pi - gap,
+                            track, width)
+        self._round_arc(r, cx, cy, radius, start, start + sweep, active, width)
 
     def _prepare_animations(self, now: float):
         super()._prepare_animations(now)
