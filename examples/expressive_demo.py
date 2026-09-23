@@ -1,5 +1,6 @@
 """Expressive gallery. Run with --dark or --check."""
 import sys
+from pathlib import Path
 
 import saturn as ft
 
@@ -53,7 +54,13 @@ def main(page):
         page.update()
 
     page.add(
-        ft.Text("Material 3 Expressive", size=28, weight=ft.FontWeight.W_500),
+        ft.Row([
+            ft.Container(
+                ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
+                         width=48, height=29, fit=ft.BoxFit.CONTAIN),
+                padding=6, bgcolor='#242424', border_radius=8),
+            ft.Text("Material 3 Expressive", size=28, weight=ft.FontWeight.W_500),
+        ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         status,
         ft.Row([
             ft.ExpressiveButton(label, icon=ft.Icons.ADD, size=size, on_click=clicked)

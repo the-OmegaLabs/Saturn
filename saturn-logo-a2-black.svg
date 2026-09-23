@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="980" height="586" viewBox="140 308 980 586"
+     fill="#202020" role="img" aria-labelledby="title desc">
+  <title id="title">Saturn A2 — dark ink</title>
+  <desc id="desc">Hand-drawn dark Saturn silhouette with an open orbital gap and transparent background.</desc>
+
+  <!-- Upper planet: the lower edge follows the near side of the orbit. -->
+  <path d="M 397 754
+           C 366 710 349 657 349 601
+           C 349 450 474 327 628 327
+           C 762 327 874 425 890 554
+           C 750 647 565 722 397 754 Z"/>
+
+  <!-- Orbit and lower planet share one contour; all gaps are unpainted. -->
+  <path d="M 336 610
+           C 253 657 185 713 164 763
+           C 157 780 155 800 164 812
+           C 190 856 311 865 459 822
+           C 505 856 561 874 622 874
+           C 758 874 867 778 894 649
+           C 1038 566 1105 484 1099 439
+           C 1093 372 992 370 838 408
+           L 859 436
+           C 931 423 983 426 989 451
+           C 1003 505 853 614 696 674
+           C 551 737 418 769 333 770
+           C 286 769 260 756 264 731
+           C 267 708 296 677 340 646 Z"/>
+</svg>

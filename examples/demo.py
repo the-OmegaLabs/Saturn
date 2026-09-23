@@ -5,6 +5,7 @@
     .venv/Scripts/python.exe examples/demo.py --backend opengl    # OPENGL
 """
 import sys
+from pathlib import Path
 
 import saturn as ft
 
@@ -13,7 +14,7 @@ class Application:
     def create_window(self, page: ft.Page):
         page.title = "saturn demo"
         page.window.width = 520
-        page.window.height = 560
+        page.window.height = 600
         page.bgcolor = ft.Colors.SURFACE
         page.padding = 16
         page.spacing = 10
@@ -48,11 +49,15 @@ class Application:
 
         page.add(
             ft.Row(controls=[
+                ft.Container(
+                    ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo-a2.svg'),
+                             width=48, height=29, fit=ft.BoxFit.CONTAIN),
+                    padding=6, bgcolor='#242424', border_radius=8),
                 ft.Text("Saturn", size=26, weight=ft.FontWeight.BOLD,
                         color=ft.Colors.PRIMARY),
                 ft.Text(f"v{ft.__version__}", size=12,
                         color=ft.Colors.ON_SURFACE_VARIANT),
-            ], spacing=8),
+            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             out,
             ft.Row(controls=[
                 ft.Button("Elevated", icon=ft.Icons.ADD, on_click=on_click),
@@ -101,4 +106,4 @@ if __name__ == "__main__":
     backend = ft.Render.OPENGL if "--backend" in sys.argv and "opengl" in sys.argv \
         else ft.Render.SOFTWARE
     app = ft.run(main=Application().create_window, backend=backend,
-                 width=520, height=560)
+                 width=520, height=600)
