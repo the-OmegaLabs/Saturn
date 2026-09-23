@@ -1,7 +1,7 @@
 """Expressive motion gallery: --dark, --menu and --pressed snapshot states."""
 import sys
-from pathlib import Path
 import saturn as ft
+from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header
 
 
 def main(page):
@@ -29,11 +29,7 @@ def main(page):
                            ('Share',ft.Icons.SHARE), ('Archive',ft.Icons.ARCHIVE)]
     ], expanded='--menu' in sys.argv)
     page.add(
-        ft.Row([
-            ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo.svg'),
-                     width=36, height=36, fit=ft.BoxFit.CONTAIN),
-            ft.Text('Expressive motion', size=28, weight=ft.FontWeight.W_500),
-        ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER), status,
+        brand_header('Motion Demo'), status,
         ft.Row([ft.LoadingIndicator(width=64,height=64),
                 ft.LoadingIndicator(contained=True,width=64,height=64),
                 *[ft.LoadingIndicator(v,contained=True,width=48,height=48) for v in (0,.3,.7,1)]],
@@ -53,4 +49,4 @@ def main(page):
 
 
 if __name__ == '__main__':
-    ft.run(main,width=920,height=800)
+    ft.run(main,width=DEMO_WIDTH,height=DEMO_HEIGHT)

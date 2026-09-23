@@ -18,6 +18,8 @@
 
 Saturn provides a familiar, declarative API for building native desktop interfaces while keeping rendering and the event loop local to the application.
 
+Browse the [Saturn documentation](./saturn-docs/README.md) for API pages and a screenshot gallery.
+
 Inspired by the simplicity of [Flet](https://flet.dev/), Saturn takes a **lighter and more local approach** to desktop UI development. It uses almost the same concepts and API patterns, while remaining an independent, minimal, and lightweight native UI framework with its own architecture and direction.
 
 Because this compatibility is built into the API design, most Flet desktop applications can be migrated to Saturn with minimal changes, without depending on Flet's underlying implementation.

@@ -1,4 +1,5 @@
 import saturn as ft
+from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header
 
 
 class Application:
@@ -15,6 +16,7 @@ class Application:
         )
 
         page.add(
+            brand_header("Layout Demo"),
             ft.Text("Layout engine demo", size=22, weight=ft.FontWeight.BOLD,
                     color=ft.Colors.PRIMARY),
             ft.Row(
@@ -76,5 +78,6 @@ class Application:
         page.update()
 
 
-s = Application()
-app = ft.run(main=s.create_window, backend=ft.Render.SOFTWARE, width=520, height=560)
+if __name__ == "__main__":
+    ft.run(main=Application().create_window, backend=ft.Render.SOFTWARE,
+           width=DEMO_WIDTH, height=DEMO_HEIGHT)

@@ -31,7 +31,28 @@ def check():
     finally:
         colors.theme_dark = False
 
+    transparent = ft.Image(
+        str(Path(__file__).resolve().parents[1] / 'saturn-logo-transparent.png'),
+        width=52, height=40, color=ft.Colors.PRIMARY,
+    )
+    transparent._place(0, 0, 52, 40, 1)
+    tinted = []
+    try:
+        for dark in (False, True):
+            colors.theme_dark = dark
+            transparent._draw(capture, 0, 0)
+            surface = capture.surface
+            assert surface.get_at((0, 0)).a < 32
+            colored = next(surface.get_at((x, y)) for y in range(40)
+                           for x in range(52) if surface.get_at((x, y)).a > 250)
+            expected = ft.parse_color(ft.Colors.PRIMARY)
+            assert all(abs(colored[i] - expected[i]) <= 3 for i in range(3))
+            tinted.append(colored[:3])
+        assert tinted[0] != tinted[1]
+    finally:
+        colors.theme_dark = False
+
 
 if __name__ == '__main__':
     check()
-    print('CLASSIC LOGO PASS')
+    print('CLASSIC AND TRANSPARENT LOGO PASS')

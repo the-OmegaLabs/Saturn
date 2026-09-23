@@ -1,8 +1,8 @@
 """Expressive gallery. Run with --dark or --check."""
 import sys
-from pathlib import Path
 
 import saturn as ft
+from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header
 
 
 def check():
@@ -54,11 +54,7 @@ def main(page):
         page.update()
 
     page.add(
-        ft.Row([
-            ft.Image(str(Path(__file__).resolve().parents[1] / 'saturn-logo.svg'),
-                     width=36, height=36, fit=ft.BoxFit.CONTAIN),
-            ft.Text("Material 3 Expressive", size=28, weight=ft.FontWeight.W_500),
-        ], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        brand_header("Expressive Demo"),
         status,
         ft.Row([
             ft.ExpressiveButton(label, icon=ft.Icons.ADD, size=size, on_click=clicked)
@@ -115,4 +111,4 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         check()
     else:
-        ft.run(main, width=960, height=800)
+        ft.run(main, width=DEMO_WIDTH, height=DEMO_HEIGHT)

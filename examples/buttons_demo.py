@@ -1,4 +1,5 @@
 import saturn as ft
+from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header, demo_panel
 
 state = {"n": 0}
 
@@ -25,28 +26,36 @@ class Application:
                               color=ft.Colors.ON_SURFACE_VARIANT)
 
         page.add(
+            brand_header("Buttons Demo"),
             counter,
             hover_label,
-            ft.ElevatedButton("Elevated", icon=ft.Icons.ADD, on_click=clicked,
-                              on_hover=hovered),
-            ft.FilledButton("Filled", on_click=clicked),
-            ft.FilledTonalButton("Tonal", on_click=clicked),
-            ft.OutlinedButton("Outlined", on_click=clicked),
-            ft.TextButton("Text", on_click=clicked),
-            ft.Row(
-                ft.IconButton(ft.Icons.FAVORITE, on_click=clicked),
-                ft.IconButton(ft.Icons.DELETE, icon_color=ft.Colors.ERROR,
-                              on_click=clicked),
-                ft.ElevatedButton("Disabled", disabled=True),
-                spacing=8,
-            ),
-            ft.ElevatedButton("Long label button with icon", icon=ft.Icons.SETTINGS,
-                              bgcolor=ft.Colors.PRIMARY_CONTAINER,
-                              color=ft.Colors.ON_PRIMARY_CONTAINER,
-                              on_click=clicked),
+            ft.Row([
+                demo_panel("Emphasis", [
+                    ft.ElevatedButton("Elevated", icon=ft.Icons.ADD,
+                                      on_click=clicked, on_hover=hovered),
+                    ft.FilledButton("Filled", on_click=clicked),
+                    ft.FilledTonalButton("Tonal", on_click=clicked),
+                ]),
+                demo_panel("Other actions", [
+                    ft.OutlinedButton("Outlined", on_click=clicked),
+                    ft.TextButton("Text", on_click=clicked),
+                    ft.Row([
+                        ft.IconButton(ft.Icons.FAVORITE, on_click=clicked),
+                        ft.IconButton(ft.Icons.DELETE, icon_color=ft.Colors.ERROR,
+                                      on_click=clicked),
+                        ft.ElevatedButton("Disabled", disabled=True),
+                    ], spacing=8),
+                    ft.ElevatedButton("Long label button with icon",
+                                      icon=ft.Icons.SETTINGS,
+                                      bgcolor=ft.Colors.PRIMARY_CONTAINER,
+                                      color=ft.Colors.ON_PRIMARY_CONTAINER,
+                                      on_click=clicked),
+                ]),
+            ], spacing=24),
         )
         page.update()
 
 
-s = Application()
-app = ft.run(main=s.create_window, backend=ft.Render.SOFTWARE, width=420, height=520)
+if __name__ == "__main__":
+    ft.run(main=Application().create_window, backend=ft.Render.SOFTWARE,
+           width=DEMO_WIDTH, height=DEMO_HEIGHT)

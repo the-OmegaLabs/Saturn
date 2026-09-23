@@ -1,4 +1,5 @@
 import saturn as ft
+from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header, demo_panel
 
 
 class Application:
@@ -37,9 +38,17 @@ class Application:
                      ft.dropdown.Option("g", text="Gamma")],
             on_select=lambda e: log(f"picked = {e.data}"))
 
-        page.add(label, name, pwd, cb, sw, grp, slider, dd)
+        page.add(
+            brand_header("Inputs Demo"),
+            label,
+            ft.Row([
+                demo_panel("Text and selection", [name, pwd, dd]),
+                demo_panel("Choices and range", [cb, sw, grp, slider]),
+            ], spacing=24),
+        )
         page.update()
 
 
-s = Application()
-app = ft.run(main=s.create_window, backend=ft.Render.SOFTWARE, width=460, height=460)
+if __name__ == "__main__":
+    ft.run(main=Application().create_window, backend=ft.Render.SOFTWARE,
+           width=DEMO_WIDTH, height=DEMO_HEIGHT)
