@@ -17,7 +17,7 @@ class Subpage(Page):
     """
 
     def __init__(self, parent: Page, *, main=None, title="Settings", modal=False,
-                 anchor="center", offset=None, follow_parent=False, backend=None):
+                 anchor="center", offset=None, follow_parent=False, backend=None, gpu=None):
         if not isinstance(parent, Page):
             raise TypeError("parent must be a Page")
         if parent._app._closed.is_set():
@@ -33,7 +33,9 @@ class Subpage(Page):
         self._attachment_key = None
         self._error = None
         app = App(main or (lambda page: None), backend or parent._app._backend,
-                  title=title, _parent_app=parent._app)
+                  title=title, gpu=(parent._app._gpu if gpu is None and
+                      (backend is None or backend is parent._app._backend) else gpu),
+                  _parent_app=parent._app)
         super().__init__(app)
         app.page = self
         self._theme_mode = parent.theme_mode

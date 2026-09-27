@@ -15,6 +15,9 @@ _IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
 class Renderer(ABC):
+    gpu_name = None
+    gpu_index = None
+    gpus = ()
     def activate(self):
         """Select this window's rendering context on the UI thread."""
         pass

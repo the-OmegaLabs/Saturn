@@ -11,6 +11,7 @@ import ctypes
 import math
 import os
 import struct
+import sys
 from array import array
 from collections import OrderedDict
 from pathlib import Path
@@ -210,7 +211,9 @@ class GLRenderer(Renderer):
 
     def __init__(self, window, *, logical_size=None,
                  pixel_ratio: float = 1.0, anti_aliasing: bool = True,
-                 vsync: bool = True):
+                 vsync: bool = True, gpu=None):
+        from .gpu import validate_gpu
+        gpu = validate_gpu(gpu)
         self._init_effect_stacks()
         self.window = window
         self.pixel_ratio = max(1.0, float(pixel_ratio))
@@ -218,7 +221,24 @@ class GLRenderer(Renderer):
         self.vsync = vsync
         self._ssaa = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2
         self.scale = self._ssaa * self.pixel_ratio
-        self.ctx = moderngl.create_context()
+        from _moderngl import DefaultLoader
+        from .gl_gpu import GLGPUBinding
+        # Load each window's actual context rather than reusing ModernGL's
+        # process-global wrapper and its cached renderer/GPU information.
+        self.ctx = moderngl.create_context(context=DefaultLoader())
+        self._gpu_binding = None
+        try:
+            self._gpu_binding = GLGPUBinding(self.ctx,gpu)
+            if self._gpu_binding.render_rc:
+                self.ctx = moderngl.create_context(standalone=True,context=self._gpu_binding)
+            self.gpu_name = self.ctx.info['GL_RENDERER']
+            self.gpus = self._gpu_binding.names
+            self.gpu_index = self._gpu_binding.index
+        except Exception:
+            if self._gpu_binding is not None:
+                self._gpu_binding.close()
+            self.ctx.release()
+            raise
         library = Path(pygame.__file__).with_name("SDL2.dll")
         self._context_sdl = ctypes.CDLL(str(library) if library.exists() else pygame.base.__file__)
         self._context_sdl.SDL_GL_GetCurrentContext.restype = ctypes.c_void_p
@@ -268,18 +288,30 @@ class GLRenderer(Renderer):
         self._frame_color = None
         self._frame_target = None
         self._create_frame_target()
-        self.vsync_active = _set_swap_interval(vsync)
+        self.vsync_active = self._configure_vsync(vsync)
 
     def activate(self):
+        if sys.platform=='win32':
+            self._gpu_binding.activate()
+            return
         if self._context_sdl.SDL_GL_GetCurrentContext() != self._native_gl_context:
             if self._context_sdl.SDL_GL_MakeCurrent(self._native_sdl_window, self._native_gl_context) != 0:
                 raise RuntimeError("Cannot activate the window's OpenGL context")
+
+    def _configure_vsync(self, enabled):
+        if self._gpu_binding.render_rc:
+            self._gpu_binding.activate_default()
+            try:
+                return _set_swap_interval(enabled)
+            finally:
+                self.activate()
+        return _set_swap_interval(enabled)
 
     def configure(self, *, anti_aliasing: bool, vsync: bool):
         changed = anti_aliasing != self.anti_aliasing
         self._flush_rects()
         if vsync != self.vsync:
-            self.vsync_active = _set_swap_interval(vsync)
+            self.vsync_active = self._configure_vsync(vsync)
         super().configure(anti_aliasing=anti_aliasing, vsync=vsync)
         if changed:
             self._ssaa = (1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2)
@@ -767,6 +799,7 @@ class GLRenderer(Renderer):
     # -- present -------------------------------------------------------------
     def screenshot(self):
         """Current framebuffer contents (must run on the UI thread, pre-swap)."""
+        self.activate()
         self._flush_rects()
         w, h = int(self._pixel_size[0]), int(self._pixel_size[1])
         if w <= 0 or h <= 0:
@@ -780,6 +813,9 @@ class GLRenderer(Renderer):
 
     def _resolve_to_window(self):
         self._flush_rects()
+        if self._gpu_binding.render_rc:
+            self._gpu_binding.present(self._frame_target,self._frame_color,self._pixel_size,self.ctx)
+            return
         self.ctx.screen.use()
         self.ctx.viewport = (
             0, 0, int(self._pixel_size[0]), int(self._pixel_size[1]))
@@ -800,7 +836,10 @@ class GLRenderer(Renderer):
         self._resolve_to_window()
         if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
             pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
+        if self._gpu_binding.render_rc:
+            self._gpu_binding.activate_default()
         self.window.flip()
+        self.activate()
         self._use_frame_target()
 
     def on_resize(self, width, height, *, pixel_size=None,
@@ -827,6 +866,7 @@ class GLRenderer(Renderer):
         self._create_frame_target()
 
     def close(self):
+        self.activate()
         for _, texture, target in self._shader_buffers.values():
             target.release()
             texture.release()
@@ -851,3 +891,7 @@ class GLRenderer(Renderer):
         for _, tex in self._immutable_tex_cache.values():
             tex.release()
         self._immutable_tex_cache.clear()
+        self.ctx.release()
+        self._gpu_binding.close()
+        if self._gpu_binding.default_context is not self.ctx:
+            self._gpu_binding.default_context.release()

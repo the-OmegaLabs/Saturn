@@ -104,7 +104,11 @@ def _set_windows_default_icon(hwnd: int) -> bool:
 
 
 class App:
-    def __init__(self, main, backend: Renderer, title: str = "saturn", *, _parent_app=None):
+    def __init__(self, main, backend: Renderer, title: str = "saturn", *, gpu=None, _parent_app=None):
+        from .renderer.gpu import validate_gpu
+        self._gpu = validate_gpu(gpu)
+        if backend is Renderer.SOFTWARE and self._gpu is not None:
+            raise ValueError('The software renderer does not support GPU selection')
         self._parent_app = _parent_app
         self._root = _parent_app._root if _parent_app else self
         self._children = []
@@ -119,6 +123,7 @@ class App:
         self._active_theme = None
         self._main = main
         self._backend = backend
+        self._renderer_failure = None
         # Window.width/height describe the native outer window. Page
         # width/height describe the drawable client area. SDL's Window.size
         # is client-only, so keep the two coordinate spaces separate.
@@ -143,6 +148,7 @@ class App:
         self._vsync = _parent_app._vsync if _parent_app else True
         self._renderer_configuration_pending = False
         self._renderer_options_lock = threading.Lock()
+        self._font_event_lock = asyncio.Lock()
         self.page = None  # set in start()
         self._live_resize_dll = None
         self._live_resize_callback = None
@@ -168,44 +174,33 @@ class App:
         # pygame disables key repeat by default. SDL owns the held-key timer
         # and stops it on key release; text entry still uses TEXTINPUT events.
         pygame.key.set_repeat(400, 35)
-        if self._backend is Renderer.OPENGL:
-            pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
-        self._pixel_ratio = _system_pixel_ratio()
-        creation_size = self.physical_size_for_logical(*self._size)
-        self._window = pygame.Window(
-            title=self._title,
-            size=creation_size,
-            resizable=True,
-            opengl=self._backend is Renderer.OPENGL,
-            vulkan=self._backend is Renderer.VULKAN,
-            allow_high_dpi=True,
-            hidden=self._parent_app is not None,
-        )
-        self._pixel_ratio = _window_pixel_ratio(self._window.handle)
-        self._refresh_rate = _system_refresh_rate()
-        self._apply_default_window_icon()
-        self._frame_size = self._measure_frame_size()
-        client = self.client_size_for_outer(*self._outer_size)
-        pixel_client = self.physical_size_for_logical(*client)
-        if tuple(self._window.size) != pixel_client:
-            self._window.size = pixel_client
-        self._size[:] = client
-        self.renderer = create_renderer(
-            self._backend, self._window,
-            logical_size=client, pixel_ratio=self._pixel_ratio,
-            anti_aliasing=self._anti_aliasing, vsync=self._vsync)
-        # SDL/pygame can retain the set_mode creation size after the native
-        # Window client area is adjusted for the requested outer dimensions.
-        # Seed every renderer from the authoritative final client size so
-        # GL's viewport/scissor and screenshot dimensions match SOFTWARE.
-        self.renderer.on_resize(
-            *client, pixel_size=pixel_client,
-            pixel_ratio=self._pixel_ratio)
+        try:
+            self._create_window_renderer()
+        except Exception as error:
+            if self._backend is Renderer.SOFTWARE:
+                raise
+            self._renderer_failure = dict(backend=self._backend.value,
+                                          gpu=self._gpu, error=str(error))
+            print("Saturn can't use your current GPU, fallback to software renderer.")
+            position = self._window.position if self._window is not None else None
+            if self.renderer is not None:
+                try:
+                    self.renderer.close()
+                except Exception as cleanup_error:
+                    self._renderer_failure['error'] += f"; cleanup failed: {cleanup_error}"
+                self.renderer = None
+            if self._window is not None:
+                self._window.destroy()
+                self._window = None
+            self._backend, self._gpu = Renderer.SOFTWARE, None
+            self._create_window_renderer()
+            if position is not None:
+                self._window.position = position
         from .page import Page  # deferred: page imports app bits
         if self.page is None:
             self.page = Page(self)
         from . import text as _text
-        _text.on_weight_ready = self._root._mark_all_dirty
+        _text._font_event_apps.add(self._root)
         autoclose = os.environ.get("SATURN_AUTOCLOSE")  # test hook
         if autoclose and self._parent_app is None:
             threading.Timer(float(autoclose), self.close).start()
@@ -218,11 +213,81 @@ class App:
         if self._root._running:
             self._install_live_resize_watch()
 
+    def _create_window_renderer(self):
+        if self._backend is Renderer.OPENGL:
+            pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
+        self._pixel_ratio = _system_pixel_ratio()
+        self._window = pygame.Window(
+            title=self._title, size=self.physical_size_for_logical(*self._outer_size),
+            resizable=True, opengl=self._backend is Renderer.OPENGL,
+            vulkan=self._backend is Renderer.VULKAN, allow_high_dpi=True,
+            hidden=self._parent_app is not None)
+        self._pixel_ratio = _window_pixel_ratio(self._window.handle)
+        self._refresh_rate = _system_refresh_rate()
+        self._apply_default_window_icon()
+        self._frame_size = self._measure_frame_size()
+        client = self.client_size_for_outer(*self._outer_size)
+        pixel_client = self.physical_size_for_logical(*client)
+        if tuple(self._window.size) != pixel_client:
+            self._window.size = pixel_client
+        self._size[:] = client
+        self.renderer = create_renderer(
+            self._backend, self._window, logical_size=client,
+            pixel_ratio=self._pixel_ratio, anti_aliasing=self._anti_aliasing,
+            vsync=self._vsync, gpu=self._gpu)
+        self.renderer.on_resize(*client, pixel_size=pixel_client,
+                                pixel_ratio=self._pixel_ratio)
+
+    def _notify_render_ready(self):
+        from .event import RenderFailedEvent, RenderReadyEvent
+        page = self.page
+        events = []
+        if self._renderer_failure is not None:
+            events.append((page.on_render_failed, RenderFailedEvent(
+                "render_failed", page, **self._renderer_failure)))
+        events.append((page.on_render_ready, RenderReadyEvent(
+            "render_ready", page, backend=self.renderer.name,
+            gpu_name=self.renderer.gpu_name, gpu_index=self.renderer.gpu_index,
+            fallback=self._renderer_failure is not None)))
+        self.call(self._dispatch_ordered_events, events)
+
+    async def _dispatch_ordered_events(self, events):
+        from .event import _invoke, normalize_handlers
+        for handlers, event in events:
+            for handler in normalize_handlers(handlers):
+                if self._closed.is_set() or event.page._app._closed.is_set():
+                    return
+                try:
+                    result = await asyncio.get_running_loop().run_in_executor(
+                        self._executor, _invoke, handler, event)
+                    if inspect.isawaitable(result):
+                        await result
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+
+    def _notify_font_optimize(self, **payload):
+        from .event import FontOptimizeEvent
+        events = []
+        for app in tuple(self._apps()):
+            if app._closed.is_set() or app.page is None:
+                continue
+            if payload['status'] != 'started':
+                app.page._font_ready()
+            events.append((app.page.on_font_optimize,
+                           FontOptimizeEvent("font_optimize", app.page, **payload)))
+        async def notify():
+            async with self._font_event_lock:
+                await self._dispatch_ordered_events(events)
+        self.call(notify)
+
     def _invoke_main(self, page):
         result = self._main(page)
         def placed():
             if hasattr(page, "_sync_attachment") and not self._closed.is_set():
                 self.post(lambda: page._sync_attachment(force=True))
+            if not self._closed.is_set():
+                self._notify_render_ready()
         if inspect.isawaitable(result):
             async def finish():
                 try:
@@ -678,7 +743,7 @@ def _report_async_error(future):
         traceback.print_exc()
 
 
-def run(main, *, backend: Renderer | None = None, title: str = "saturn"):
+def run(main, *, backend: Renderer | None = None, title: str = "saturn", gpu: str | int | None = None):
     """Open a window, run `main(page)` and block until the window closes.
 
     Set window dimensions through `page.window.width` and
@@ -686,11 +751,17 @@ def run(main, *, backend: Renderer | None = None, title: str = "saturn"):
     startup options are supported; unknown keyword arguments raise TypeError.
     Returns the App handle (after the window closes).
     The active backend name is available as `page.renderer.name` in main.
+    Pass gpu as an exact/unique GPU name or index; None keeps default selection.
     """
     if backend is None:  # explicit selection and test hook via environment
         backend = Renderer(os.environ.get("SATURN_BACKEND", "opengl").lower())
 
-    app = App(main, backend, title=title)
-    app.start()
+    app = App(main, backend, title=title, gpu=gpu)
+    try:
+        app.start()
+    except Exception:
+        app.close()
+        app.run_until_closed()
+        raise
     app.run_until_closed()
     return app

@@ -21,7 +21,7 @@ def check():
         app = app_class.return_value
         assert saturn.run(main) is app
         app_class.assert_called_once_with(
-            main, saturn.Renderer.OPENGL, title="saturn")
+            main, saturn.Renderer.OPENGL, title="saturn", gpu=None)
         app.start.assert_called_once_with()
         app.run_until_closed.assert_called_once_with()
 

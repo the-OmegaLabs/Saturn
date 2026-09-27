@@ -11,8 +11,8 @@ W_100..W_900 for every font. Non-variable files fall back to synthetic bold.
 First build of a weight runs in a BACKGROUND thread: text shows the Regular
 source immediately (the notice prints once per run), and the real weight
 swaps in on the next frame after the instance lands (placeholder fonts
-evicted + dirty flag via the `on_weight_ready` hook, wired to App.mark_dirty
-in App.start).
+evicted + dirty flags through registered app listeners). Active Pages receive
+on_font_optimize notifications when background optimization starts and ends.
 
 Glyph fallback: a line is segmented into runs — each run renders with the
 first font in the chain that actually covers its characters — and runs are
@@ -28,6 +28,7 @@ import re
 import tempfile
 import threading
 import warnings
+import weakref
 from urllib.parse import urlparse
 from urllib.request import urlopen
 from collections import OrderedDict
@@ -86,12 +87,23 @@ _cover_cache: dict[tuple, bool] = {}
 # Generated icon values are Material Symbols codepoints. Use the filled
 # static font instance for the default Icons family.
 # Regular-first async instancing (see module docstring)
-on_weight_ready = None                          # set by App.start(): mark_dirty
+on_weight_ready = None                          # optional legacy completion hook
+_font_event_apps = weakref.WeakSet()
 _pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
 _inst_failed: set[tuple[str, int]] = set()      # instancing impossible
 _mem_instances: dict[tuple[str, int], io.BytesIO] = {}  # disk write failed
 _optimizing_notice = False                      # the notice prints only once
 _woff2_lock = threading.RLock()
+
+
+def _emit_font_optimize(font, weight=None, *, status, error=None,
+                        operation="instance", cached=False):
+    for app in tuple(_font_event_apps):
+        if not app._closed.is_set():
+            app._notify_font_optimize(
+                font="memory font" if isinstance(font, io.BytesIO) else str(font),
+                weight=weight, status=status, error=error, operation=operation,
+                cached=cached, success=None if status == "started" else status == "completed")
 
 
 def invalidate_fonts():
@@ -122,6 +134,8 @@ def _font_cache_directory():
 
 def _download_font(source, destination):
     """Resolve HTTP fonts off the UI thread, then notify affected pages."""
+    _emit_font_optimize(source, status="started", operation="load")
+    failure = None
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
         with urlopen(source, timeout=20) as response:
@@ -159,6 +173,7 @@ def _download_font(source, destination):
             if aliases:
                 invalidate_fonts()
     except Exception as error:
+        failure = str(error)
         warnings.warn(f"Cannot load font {source}: {error}", RuntimeWarning)
     finally:
         with _font_download_lock:
@@ -166,6 +181,8 @@ def _download_font(source, destination):
         for callback in callbacks:
             if callback is not None:
                 callback()
+        _emit_font_optimize(source, status="failed" if failure else "completed",
+                            error=failure, operation="load", cached=failure is None)
 
 
 def register_fonts(fonts: dict[str, str], on_ready=None):
@@ -453,13 +470,21 @@ def _instance_bg(path: str, wnum: int, dest: Path):
     """Background instancing worker: build the weight, persist it, then
     evict every placeholder font built for this (path, weight) and raise
     the dirty flag so the next frame renders with the real weight."""
-    data = _instance_weight(path, wnum)
+    _emit_font_optimize(path, wnum, status="started")
+    failure = None
+    cached = False
+    try:
+        data = _instance_weight(path, wnum)
+    except Exception as error:
+        data, failure = None, str(error)
     if data is None:
+        failure = failure or "Cannot instance the requested font weight"
         _inst_failed.add((path, wnum))
     else:
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
+            cached = True
         except OSError:
             _mem_instances[(path, wnum)] = io.BytesIO(data)
     # all fallback state is final before discard, so a render racing with
@@ -475,6 +500,8 @@ def _instance_bg(path: str, wnum: int, dest: Path):
     font_revision += 1
     if on_weight_ready is not None:
         on_weight_ready()
+    _emit_font_optimize(path, wnum, status="failed" if failure else "completed",
+                        error=failure, cached=cached)
 
 
 # -- chain (per-glyph fallback) --------------------------------------------------

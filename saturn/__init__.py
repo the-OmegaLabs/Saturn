@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from .event import (
     ControlEvent, KeyboardEvent, PageResizeEvent, PlatformBrightnessChangeEvent,
     TextSelectionChangeEvent, LayoutSizeChangeEvent, RouteChangeEvent,
+    RenderFailedEvent, RenderReadyEvent, FontOptimizeEvent,
 )
 from .app import App, Renderer, run
 
@@ -134,6 +135,7 @@ __all__ = [
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
     "WindowEvent", "WindowEventType", "WindowResizeEdge",
     "TextSelectionChangeEvent", "LayoutSizeChangeEvent", "RouteChangeEvent",
+    "RenderFailedEvent", "RenderReadyEvent", "FontOptimizeEvent",
     "ButtonStyle", "ControlState", "BoxConstraints", "MouseCursor", "Ref",
     "RoundedRectangleBorder", "StadiumBorder", "CircleBorder",
     "ImageRepeat", "FilterQuality", "ClipBehavior", "BoxShape", "StrokeCap", "VisualDensity",

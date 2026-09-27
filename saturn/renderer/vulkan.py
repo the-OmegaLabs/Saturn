@@ -60,7 +60,9 @@ class _VulkanSwapchain(SoftwareRenderer):
     scale = float(SCALE)
 
     def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0,
-                 anti_aliasing: bool = True, vsync: bool = True):
+                 anti_aliasing: bool = True, vsync: bool = True, gpu=None):
+        from .gpu import validate_gpu
+        self._requested_gpu = validate_gpu(gpu)
         # Vulkan SDL windows have no pygame display Surface, so initialize the
         # inherited off-screen rasterizer explicitly.
         Renderer._init_effect_stacks(self)
@@ -230,14 +232,19 @@ class _VulkanSwapchain(SoftwareRenderer):
                 vk.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: 0,
                 vk.VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: 1,
             }.get(properties.deviceType, 2)
-            candidates.append((rank, device, graphics, present, extensions))
+            name = properties.deviceName
+            name = name.decode('utf-8') if isinstance(name, bytes) else str(name)
+            candidates.append((rank, device, graphics, present, extensions, name))
 
         if not candidates:
             raise VulkanUnavailableError(
                 "no Vulkan device supports graphics, presentation and VK_KHR_swapchain")
+        from .gpu import select_gpu
+        self.gpus = tuple(item[5] for item in candidates)
+        default = min(range(len(candidates)), key=lambda index: candidates[index][0])
+        self.gpu_index = select_gpu(self.gpus, self._requested_gpu, default)
         (_, self._physical_device, self._graphics_family, self._present_family,
-         self._device_extensions) = \
-            min(candidates, key=lambda item: item[0])
+         self._device_extensions, self.gpu_name) = candidates[self.gpu_index]
 
     def _create_device(self):
         families = sorted({self._graphics_family, self._present_family})
@@ -662,7 +669,7 @@ class VulkanRenderer(_VulkanSwapchain):
     native_state_layer = True
 
     def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0,
-                 anti_aliasing: bool = True, vsync: bool = True):
+                 anti_aliasing: bool = True, vsync: bool = True, gpu=None):
         self._gpu_views = []
         self._gpu_framebuffers = []
         self._gpu_frame_image = None
@@ -717,7 +724,7 @@ class VulkanRenderer(_VulkanSwapchain):
         self._pixel_size = tuple(window.size)
         super().__init__(window, logical_size=logical_size,
                          pixel_ratio=pixel_ratio,
-                         anti_aliasing=anti_aliasing, vsync=vsync)
+                         anti_aliasing=anti_aliasing, vsync=vsync, gpu=gpu)
         self.scale = self._ssaa * self.pixel_ratio
         self._gpu_white = self._upload_texture(
             pygame.Surface((1, 1), pygame.SRCALPHA, 32),

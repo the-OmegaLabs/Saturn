@@ -59,6 +59,34 @@ class RouteChangeEvent(ControlEvent):
 
 
 @dataclass
+class RenderFailedEvent(ControlEvent):
+    backend: str = ""
+    gpu: str | int | None = None
+    error: str = ""
+    message: str = "Saturn can't use your current GPU, fallback to software renderer."
+    fallback: str = "software"
+
+
+@dataclass
+class RenderReadyEvent(ControlEvent):
+    backend: str = ""
+    gpu_name: str | None = None
+    gpu_index: int | None = None
+    fallback: bool = False
+
+
+@dataclass
+class FontOptimizeEvent(ControlEvent):
+    font: str = ""
+    weight: int | None = None
+    status: str = "started"
+    success: bool | None = None
+    error: str | None = None
+    operation: str = "instance"
+    cached: bool = False
+
+
+@dataclass
 class TapEvent:
     kind: str
     local_position: tuple

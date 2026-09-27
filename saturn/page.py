@@ -60,6 +60,21 @@ class _RendererSettings:
         return context.name if context is not None else None
 
     @property
+    def gpu_name(self) -> str | None:
+        """Actual GPU model; None before startup or with Software rendering."""
+        return self.context.gpu_name if self.context is not None else None
+
+    @property
+    def gpu_index(self) -> int | None:
+        """Index of the active GPU in this context's gpus tuple."""
+        return self.context.gpu_index if self.context is not None else None
+
+    @property
+    def gpus(self) -> tuple[str, ...]:
+        """GPU names available to this backend/context, in selector index order."""
+        return self.context.gpus if self.context is not None else ()
+
+    @property
     def anti_aliasing(self) -> bool:
         return self._app._anti_aliasing
 
@@ -95,6 +110,9 @@ class Page(Control):
         self.window = Window(app)
         self.controls: list[Control] = []
         self.on_route_change = None
+        self.on_render_failed = None
+        self.on_render_ready = None
+        self.on_font_optimize = None
         self.bgcolor = None       # None → theme surface color
         self.padding = 10
         self._theme_mode = ThemeMode.SYSTEM
@@ -153,11 +171,11 @@ class Page(Control):
         self._app._router.go(route)
 
     def open_subpage(self, main=None, *, title="Settings", modal=False,
-                     anchor="center", offset=None, follow_parent=False, backend=None):
+                     anchor="center", offset=None, follow_parent=False, backend=None, gpu=None):
         """Create an owned native child window and return its Subpage handle."""
         from .subpage import Subpage
         return Subpage(self, main=main, title=title, modal=modal, anchor=anchor,
-                       offset=offset, follow_parent=follow_parent, backend=backend)
+                       offset=offset, follow_parent=follow_parent, backend=backend, gpu=gpu)
 
     @property
     def subpages(self):
