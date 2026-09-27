@@ -1,39 +1,40 @@
-# Saturn 性能问题与修复清单
+# Saturn performance issues and fixes
 
-更新日期：2026-09-23。以下区分已修复、仍存在和需要先测量的问题。优化直接放在原有控件中，不新增 `VirtualStudentList`。
+Updated: 2026-09-27. This checklist separates completed fixes from remaining work and items that need measurement. Optimizations stay in the existing controls; no `VirtualStudentList` is introduced. Measurements below are historical results from this machine, recorded on 2026-09-23.
 
-## 已修复
+## Completed
 
-- [x] **默认入口选错渲染后端。** `main.py` 和 `saturn.run()` 默认入口现用 `Renderer.OPENGL`，矩形等图元在 GPU 上绘制并合批；显式 `Renderer.SOFTWARE`、`Renderer.VULKAN` 仍可选。
-- [x] **不可见的列表项仍参与绘制和命中检测。** 原 `ListView` 只裁剪像素，仍遍历所有控件。现按可见范围加 96 逻辑像素预绘边界，用有序行坐标和二分缩小绘制、布局及命中候选集；原控件对象与事件接口保留。
-- [x] **滚动、悬停引发整页布局。** `Page` 区分布局更新与仅重绘；动画只推进活跃控件。固定高度行与 `item_extent` 在原 `ListView` 中按需放置子树，resize 时复用纵向位置并只重新放置附近行。
-- [x] **OpenGL 每个矩形新建缓冲并单独提交。** 连续矩形已按原绘制顺序合批，复用 VBO/VAO；纹理切换仍需保持透明叠加顺序。
-- [x] **OpenGL 窗口 resize 后视口可能回到原生像素大小。** SDL 能在 ModernGL 缓存之外修改底层 GL 视口，2 倍离屏绘制会缩进左下角。每帧清屏前重新绑定离屏目标并设置实际视口；新增模拟外部 `glViewport` 的回归测试。
-- [x] **控件隐藏或输入光标移动后留下闪烁残影。** OpenGL 把完成的离屏帧贴回窗口时仍开启透明混合；半透明像素与窗口上一帧叠加，使旧位置逐帧淡出。最终贴图现关闭混合、覆盖整个窗口，再恢复绘制状态。双帧像素复现中，旧光标位置由残留值 `(78, 78, 78)` 变为与背景完全相同的 `(39, 39, 39)`；`tests/input_checks.py` 包含移动光标、隐藏控件的像素回归。
-- [x] **输入文字与光标垂直错位。** 截图里的 Consolas 14 正文和空值提示都比光标的视觉中心高约 2 像素。`TextField` 现按字体、字号和缩放测量固定参考字形的可见高度，缓存稳定的基线补偿；正文、提示、选区和组合输入下划线一起对齐，光标与 IME 候选锚点保持原位。误加的水平间距已全部撤回。隐藏 OpenGL 像素回归覆盖 Consolas 14 和默认字体的空值提示及有值文字。
-- [x] **静态位图每帧重新取像素并哈希。** 不变的文字、图标、图片按 Surface 身份缓存纹理，缓存有数量上限；图标栅格结果复用，OpenGL 直接缩放图片。
-- [x] **文字重复测量和换行。** 文本测量、最近使用的宽度及字体来源已缓存；修改文本、宽度或字体时仍会重新计算。
-- [x] **普通悬停层分配 CPU 位图。** OpenGL 对统一圆角、无按压波纹的悬停状态直接绘制半透明 GPU 矩形。非统一圆角和软件后端仍使用原精确遮罩路径。
-- [x] **按压波纹分配 CPU 位图。** OpenGL 新增一个按绘制顺序提交的着色器图元，同时计算四角遮罩和动态波纹；不会为波纹创建 Surface、哈希或上传纹理。软件后端仍使用原路径。200×100 截图的波纹区域与软件路径平均像素差约 1.03/255，最大 16/255；三后端波纹压力测试通过。单个波纹场景的总帧时间提升不明显，主要收益是去掉动态位图路径。
-- [x] **可变高度项被逐一放置和重复测量。** 原 `ListView` 现在只放置视口附近的子树；保留最近三种宽度的完整精确行坐标。内置 `Container` 的自然内容宽度若已装得下，就跨新宽度复用其高度；需要换行的行继续按实际宽度测量。内容更新会清空缓存。连续改变宽度的 5,000 行测试 p95 从约 159 ms 降到约 14 ms。
-- [x] **Vulkan 原本在 CPU 画整帧，再上传显示。** 现用 SPIR-V 着色器、Vulkan render pass 和 GPU 顶点批处理绘制矩形、线条、圆形、纹理与裁剪区域；同纹理及裁剪的相邻图元合批，按需从 GPU 读回截图。文字及少数复杂效果仍先生成小纹理再上传，但不再 CPU 栅格化整帧。`tests/vulkan_checks.py` 强制旧软件绘制和整帧上传路径报错，真实窗口绘制及背景/矩形/纹理像素测试通过。
-- [x] **Vulkan 快速跳转首次出现的文字会逐张分配 GPU 图片。** 后端内加有界的 1024² 小纹理图集、1 像素透明边与同帧区域上传；只缓存不可变文字/图标，不改列表结构。5,000 行全表跳转 60 帧压测 p95 从约 **26.51 ms** 降至 **6.68 ms**，常规绘制和波纹回归仍通过。
-- [x] **Vulkan 斜线、弧线和控件边缘缺少抗锯齿。** 后端按设备/格式能力选 4×、2× 或 1× 采样，用多采样颜色附件 resolve 到交换链，并把圆角 SDF 羽化调整到接近 OpenGL。此机实际 4×：同一斜线的混合边缘像素从 1× 的 0 增到 133，弧线从 0 增到 236；圆角与文字边缘的混合像素数也接近 OpenGL。`tests/vulkan_checks.py` 新增斜线、弧线像素回归。
-- [x] **SVG 与大 PNG 缩小时的图片边缘锯齿。** Vulkan 几何 MSAA 不会自动过滤纹理内部。`Image` 现在按目标设备像素尺寸栅格化 SVG，并把大 PNG 一次性平滑缩小后缓存，再由 GPU 合成；避免 410×304 demo 标志直接通过单级双线性采样压到约 52×40。`tests/image_antialias_checks.py` 核验目标尺寸、实际 SVG 像素和缓存复用；`.static/shots/demo-vulkan.png` 是修复后实际 Vulkan 截图。
-- [x] **2 倍离屏帧缓冲成本已测量。** 5,000 行 OpenGL 的 1 倍和 2 倍 GPU 查询 p50 分别约 3.31 / 3.33 ms，没有稳定的速度收益；2 倍仍是默认值，以保留文字和圆角质量。
-- [x] **列表布局被重复属性读取拖慢。** profile 中单次新宽度 `_place` 有 11 万余次 `Control.__getattribute__` 调用。只在 `ListView` 行循环中一次读取必要的原始属性和动画覆盖值，保留动画语义；不改变全局属性访问方式。
-- [x] **重复 attach。** 已移除重复的子树挂接，相关事件和动画回归通过。
+- [x] **Default backend selection.** `saturn.run()` defaults to `Renderer.OPENGL`, with GPU primitives and batching. `Renderer.SOFTWARE` and `Renderer.VULKAN` remain explicit choices. Application entry scripts can override the default.
+- [x] **Invisible list items still drawn and hit-tested.** The original `ListView` clipped pixels but visited every control. It now uses sorted row coordinates and binary search to select draw, layout, and hit-test candidates within the viewport plus a 96 logical pixel preload margin. Control objects and event interfaces are preserved.
+- [x] **Scrolling and hovering trigger full-page layout.** `Page` separates layout updates from repaint requests; animations advance only active controls. Fixed-height rows and `item_extent` place subtrees on demand in the existing `ListView`. Resize reuses vertical positions and places nearby rows.
+- [x] **OpenGL allocates and submits a buffer for each rectangle.** Consecutive rectangles are batched in drawing order with reusable VBO/VAO resources. Texture changes still preserve alpha composition order.
+- [x] **OpenGL viewport returns to native pixel size after resize.** SDL can change the GL viewport outside ModernGL's cache, shifting 2x offscreen rendering into the lower-left corner. Each clear now binds the offscreen target and explicitly restores its viewport. A regression simulates an external `glViewport` change.
+- [x] **Hidden controls and moved carets leave blinking trails.** OpenGL previously kept blending enabled when copying the completed frame into the window. Translucent pixels mixed with the previous frame and old positions faded gradually. Final resolve now disables blending, replaces the whole window, and restores drawing state. In the two-frame reproduction, the old caret pixel changed from residual `(78, 78, 78)` to the exact background `(39, 39, 39)`. `tests/input_checks.py` checks moved carets and hidden controls with pixels.
+- [x] **Text and caret are vertically misaligned.** Consolas 14 value and hint ink sat about 2 pixels above the caret's visual center. `TextField` now measures a stable reference glyph for each family, size, and scale and caches its baseline correction. Value, hint, selection, and IME underline align together; caret and IME candidate anchor retain their positions. The unintended horizontal spacing change was reverted. Hidden OpenGL pixel checks cover Consolas 14 and the default font, with both hints and values.
+- [x] **Static bitmaps are read and hashed every frame.** Immutable text, icon, and image surfaces use bounded identity-based texture caches. Icon raster results are reused; OpenGL scales images directly.
+- [x] **Repeated text measurement and wrapping.** Text metrics, recent widths, and font sources are cached. Changes to text, width, or font still invalidate the result.
+- [x] **Ordinary hover overlays allocate CPU bitmaps.** OpenGL draws uniform-radius hover layers without ripples as translucent GPU rectangles. Irregular corners and the software backend retain their precise mask paths.
+- [x] **Pressed ripples allocate CPU bitmaps.** An OpenGL shader primitive computes four-corner masks and dynamic ripples in drawing order, without creating, hashing, or uploading a Surface. Software retains its original path. Against software, the 200 x 100 ripple region had mean pixel difference about 1.03/255 and maximum 16/255. Ripple stress checks pass on all three backends. A single ripple did not materially improve total frame time; the concrete gain is removing its dynamic bitmap path.
+- [x] **Variable-height rows are repeatedly placed and measured.** The existing `ListView` places only nearby subtrees and caches exact row coordinates for the last three widths. Built-in `Container` reuses measured height across widths when natural content width already fits; wrapping rows still use actual width. Content updates invalidate the cache. A 5,000-row continuous-width test reduced p95 from about 159 ms to about 14 ms.
+- [x] **Vulkan draws the whole frame on the CPU before uploading it.** SPIR-V shaders, a Vulkan render pass, and GPU vertex batches now draw rectangles, lines, circles, textures, and clipped regions. Adjacent primitives sharing texture and clip are batched. Screenshots read back from the GPU on demand. Text and a few complex effects still generate small CPU textures, but the full frame is no longer rasterized on the CPU. `tests/vulkan_checks.py` forces the old software drawing and whole-frame upload paths to fail; real-window background, rectangle, and texture pixel checks pass.
+- [x] **Vulkan allocates separate GPU images for newly encountered text during large jumps.** A bounded 1024-square texture atlas uses 1-pixel transparent padding and grouped region uploads. It caches immutable text and icons without changing list structure. A 5,000-row, 60-frame full-list jump test reduced p95 from **26.51 ms** to **6.68 ms**; ordinary drawing and ripple checks still pass.
+- [x] **Vulkan diagonals, arcs, and control edges lack antialiasing.** Supported device and format capabilities choose 4x, 2x, or 1x sampling; a multisampled color attachment resolves into the swapchain. Rounded-rectangle SDF feathering was adjusted toward OpenGL. This machine used 4x: blended diagonal edge pixels rose from 0 at 1x to 133, and arc pixels from 0 to 236. Rounded corners and text also approached OpenGL's blended edge counts. Vulkan checks include diagonal and arc pixel regressions.
+- [x] **SVG and large PNG edges alias when reduced.** Geometry MSAA does not filter texture interiors. `Image` rasterizes SVG at the target device pixel size and caches a smooth reduction of large PNGs before GPU composition. The 410 x 304 demo logo no longer relies on a single bilinear reduction to about 52 x 40. `tests/image_antialias_checks.py` checks target size, real SVG pixels, and cache reuse. `.static/shots/demo-vulkan.png` is the actual Vulkan screenshot after the fix.
+- [x] **Measured the cost of the 2x offscreen framebuffer.** OpenGL GPU queries for 5,000 rows measured p50 around 3.31 / 3.33 ms at 1x / 2x. No stable speed gain was observed, so 2x remains the default for text and corner quality.
+- [x] **Repeated property reads slow list layout.** A profile recorded over 110,000 `Control.__getattribute__` calls during one `_place` at a new width. The `ListView` row loop now reads required raw properties and animation overrides once while preserving animation semantics. Global property access is unchanged.
+- [x] **Duplicate attach.** Redundant subtree attachment was removed; event and animation regressions pass.
+- [x] **Renderer settings are unavailable through Page.** `page.renderer.anti_aliasing` and `page.renderer.vsync` accept booleans and default to `True`; `page.renderer.context` exposes the actual renderer. Changes are coalesced on the UI thread. Real software, OpenGL, and Vulkan windows passed option toggling, resize, and pixel checks. On this machine Vulkan toggled 1x/4x samples and immediate/FIFO presentation. See [Renderer settings](docs/rendering.md) for fallback behavior and the scope of antialiasing.
 
-## 尚未完成／按需处理
+## Remaining work / handle when needed
 
-- [ ] **可变高度长列表首次布局仍需测量全部行。** 5,000 行首次内在尺寸测量在本机约 320–360 ms；连续新宽度 resize 已降到约 14 ms p95。完全未知的换行高度不能凭空猜测，否则滚动位置会错误。数据规模特别大且行高已知时，请给原 `ListView` 的子项固定 `height` 或提供 `item_extent`。
-- [ ] **极大阴影或越界变换可能超出 96 像素预绘范围。** 做视觉回归；若真实控件需要，局部扩大边界。
-- [ ] **其他动态位图仍走 CPU 与纹理上传。** 复杂图标、阴影和动态图片等路径需按实际热点逐项处理；静态位图和 Material 波纹已经覆盖。
-- [ ] **仅支持 1× 采样的 Vulkan 设备上，纯三角形斜线与弧线仍可能有阶梯边缘。** 设备能力不足时自动回退以保证可运行；圆角 SDF 边缘仍有着色器羽化。
+- [ ] **Initial layout of long variable-height lists still measures every row.** First intrinsic measurement of 5,000 rows takes about 320-360 ms here; continuous new-width resize is about 14 ms p95. Unknown wrapping heights cannot be guessed without corrupting scroll positions. For very large data with known row heights, set child `height` or `ListView.item_extent`.
+- [ ] **Large shadows or out-of-bounds transforms may exceed the 96-pixel preload margin.** Add visual regressions and expand the local margin when real controls require it.
+- [ ] **Other dynamic bitmaps still use CPU rasterization and texture uploads.** Investigate complex icons, shadows, and dynamic images according to actual hotspots. Static bitmaps and Material ripples are covered.
+- [ ] **Vulkan devices limited to 1x sampling may still show stepped triangle edges on diagonals and arcs.** Capability fallback keeps the backend usable; rounded SDF edges retain shader feathering.
 
-## 压测证据与运行方式
+## Stress evidence and commands
 
-`tests/performance_stress.py` 实际创建窗口、真实渲染器及 5,000 行控件；能重放滚动、悬停、全表跳转、波纹与 resize。默认隐藏窗口；`--visible` 可短暂显示真实窗口，`--gpu-time` 收集 OpenGL GPU 查询。结果仍随驱动和机器状态变化。
+`tests/performance_stress.py` creates real windows, renderers, and 5,000 controls. It replays scrolling, hover, full-list jumps, ripples, and resize. Windows are hidden by default; `--visible` briefly shows a real window and `--gpu-time` gathers OpenGL GPU queries. Results vary with drivers and machine load.
 
 ```powershell
 .venv\Scripts\python.exe tests\performance_stress.py --backend all --rows 5000 --frames 60
@@ -46,27 +47,353 @@
 .venv\Scripts\python.exe tests\performance_stress.py --backend vulkan --rows 5000 --frames 60 --full-sweep
 .venv\Scripts\python.exe tests\vulkan_checks.py
 .venv\Scripts\python.exe tests\image_antialias_checks.py
+.venv\Scripts\python.exe tests\renderer_options_checks.py
 ```
 
-本机 800×600、5,000 行、60 帧连续滚动：OpenGL 绘制加呈现 p50 **2.83 ms**、p95 **3.14 ms**；软件 p50 **3.93 ms**，旧 CPU Vulkan p50 **4.87 ms**，约 20/5,000 行进入绘制。resize 每两帧切换 800×600 与 760×570：优化前 OpenGL p50 **9.20 ms**、p95 **18.59 ms**，优化后复测 p50 **1.21 ms**、p95 **2.07 ms**，另有窗口/帧缓冲设置约 2–4 ms。2026-09-23 悬停 GPU 图元优化后同场景再次运行，绘制加呈现 p50 **1.67 ms**、p95 **2.55 ms**；由于机器和缓存波动，这组数值不能单独归因于悬停优化。跨全表跳转并 resize 的 p50 **4.42 ms**、p95 **7.24 ms**。
+Local 800 x 600, 5,000-row, 60-frame continuous scroll: OpenGL drawing plus presentation p50 **2.83 ms**, p95 **3.14 ms**; software p50 **3.93 ms**, old CPU Vulkan p50 **4.87 ms**. About 20 of 5,000 rows entered drawing. Resize alternated 800 x 600 and 760 x 570 every two frames: OpenGL before optimization p50 **9.20 ms**, p95 **18.59 ms**, after optimization **1.21 / 2.07 ms**, plus about 2-4 ms of window/framebuffer setup. After GPU hover primitives on 2026-09-23, the same scenario measured **1.67 / 2.55 ms**. Machine and cache variations prevent attributing that difference solely to hover changes. Full-list jumps with resize measured **4.42 / 7.24 ms**.
 
-新增可见窗口 resize 回放：绘制加呈现 p50 **1.47 ms**、p95 **2.40 ms**，窗口/帧缓冲设置 p95 **6.03 ms**。波纹压力测试支持三后端；OpenGL GPU 波纹的绘制加呈现 p95 **3.15 ms**，同场景强制旧 CPU 波纹 p95 **3.18 ms**，差别在本机单个波纹下不明显。
+Visible-window resize replay measured drawing plus presentation p50 **1.47 ms**, p95 **2.40 ms**, with window/framebuffer setup p95 **6.03 ms**. Ripple stress supports three backends. OpenGL GPU ripple p95 was **3.15 ms**, versus **3.18 ms** with the old CPU ripple path forced; the single-ripple difference was not clear on this machine.
 
-Vulkan GPU 改造前的 5,000 行、60 帧复测：固定行高的 OpenGL 绘制加呈现 p95 **3.41 ms**，软件 **3.97 ms**，旧 CPU Vulkan **7.76 ms**，每帧约 20 行进入绘制。可变行高在两个宽度间切换的 OpenGL p95 **3.48 ms**，窗口设置 p95 **4.18 ms**；81 个宽度的连续拖动模拟 p95 **14.14 ms**，窗口设置 p95 **2.42 ms**。
+Before the Vulkan GPU rewrite, another 5,000-row, 60-frame run measured fixed-height drawing plus presentation p95 **3.41 ms** for OpenGL, **3.97 ms** for software, and **7.76 ms** for old CPU Vulkan, with about 20 drawn rows per frame. Variable heights alternating two widths measured OpenGL p95 **3.48 ms** and window setup **4.18 ms**. An 81-width drag simulation measured **14.14 ms** and setup **2.42 ms**.
 
-Vulkan GPU 改造后的 5,000 行、60 帧本机复测：绘制加呈现 p50 **3.07 ms**、p95 **3.58 ms**，其中呈现 p50 **1.10 ms**；每两帧 resize 时绘制加呈现 p95 **4.81 ms**，交换链重建设置 p95 **11.61 ms**。默认 OpenGL 在相同 resize 压测中绘制加呈现 p95 **1.89 ms**，帧缓冲设置 p95 **4.26 ms**。这些是本机隐藏窗口的时钟时间，不能作为所有显卡和窗口管理器的上限。
+After the Vulkan GPU rewrite, local 5,000-row, 60-frame drawing plus presentation measured p50 **3.07 ms**, p95 **3.58 ms**, with presentation p50 **1.10 ms**. Resize every two frames measured drawing plus presentation p95 **4.81 ms**, swapchain setup **11.61 ms**. Default OpenGL in the same resize workload measured **1.89 ms**, framebuffer setup **4.26 ms**. These hidden-window wall-clock measurements are not bounds for every GPU or window manager.
 
-开启 Vulkan 4× MSAA 后同机复测：常规滚动 p50 **3.04 ms**、p95 **5.80 ms**（少数帧有 GPU 调度尾峰）；每两帧 resize 的绘制加呈现 p95 **3.69 ms**、交换链设置 p95 **12.81 ms**；波纹 p95 **3.15 ms**、全表跳转 p95 **7.55 ms**。抗锯齿带来额外 GPU 采样和窗口 resize 附件成本。
+With Vulkan 4x MSAA, ordinary scrolling measured p50 **3.04 ms**, p95 **5.80 ms**, including occasional GPU scheduling tails. Resize measured drawing plus presentation p95 **3.69 ms**, swapchain setup **12.81 ms**; ripple p95 **3.15 ms**, full-list jumps **7.55 ms**. Antialiasing adds GPU sampling and resize attachment costs.
 
-最终三后端顺序运行的 5,000 行、60 帧常规滚动复测：软件、OpenGL、Vulkan 的绘制加呈现 p95 分别为 **5.48 / 3.29 / 3.19 ms**；每帧约 20 行实际绘制。与上一轮 Vulkan p95 的差异说明尾峰受 GPU 调度和机器状态影响，不能保证每次相同。
+The final sequential 5,000-row, 60-frame ordinary scroll run measured software/OpenGL/Vulkan drawing plus presentation p95 **5.48 / 3.29 / 3.19 ms**, with about 20 rows drawn per frame. Variation from the previous Vulkan result reflects scheduling and machine state; identical results on every run are not guaranteed.
 
-全表快速跳转场景首次遍历大量不同文字，Vulkan 小纹理图集加入前 p95 **26.51 ms**，加入后 p95 **6.68 ms**；OpenGL 同场景 p95 **3.87 ms**。这是比常规连续滚动更严苛的纹理冷启动场景。
+Full-list jumps encounter many different text textures for the first time. Vulkan p95 fell from **26.51 ms** to **6.68 ms** with the small-texture atlas; OpenGL measured **3.87 ms**. This stresses cold texture creation more than ordinary continuous scrolling.
 
-## 其他请求的进度
+## Other requested work
 
-- [x] `saturn-docs` 内容迁入 `docs`；`docs/expressive.md` 有用，保留并更新。
-- [x] `references` 已清理；README、NOTICE 和随包 Apache 2.0 许可证保留来源与授权说明。
-- [x] `saturn.Compose` 与 [迁移及 Flet 核验说明](docs/compose.md) 已添加；Flet 1.0.1 实包核验覆盖 68 个同名类签名、29 种默认控件构造和 4 条行为路径。Flet 全量行为兼容不是 Saturn 当前实现范围，差距已列明。
-- [x] 公开后端枚举按用户命名为 `saturn.Renderer`，保留 `saturn.Render` 兼容别名。
-- [x] 截图、logo 与文档控件图片已移到 `.static`，引用已更新；无用的本地一次性脚本已清理。
-- [x] `gen/MaterialSymbolsOutlined.codepoints` 仍是 `gen_enums.py` 的输入，因此保留。仍被引用的测试、工具及生成器保留。
+- [x] Migrated `saturn-docs` into `docs`; retained and updated the useful `docs/expressive.md`.
+- [x] Removed `references`; README, NOTICE, and the bundled Apache 2.0 license retain origins and attribution.
+- [x] Added `saturn.Compose` and [migration and Flet verification notes](docs/compose.md). Installed Flet 1.0.1 verification covers 68 shared class signatures, 29 standard constructors, and 4 behavior paths. Full Flet behavior compatibility remains outside the implemented scope; gaps are documented.
+- [x] Named the public backend enum `saturn.Renderer`; retained `saturn.Render` as a compatibility alias.
+- [x] Moved screenshots, logos, and documentation control images into `.static` and updated references. Removed unused local one-off scripts.
+- [x] Retained `gen/MaterialSymbolsOutlined.codepoints`, which remains an input to `gen_enums.py`. Referenced tests, tools, and generators remain.
+- [x] Removed startup `width`/`height`; use `page.window` instead. Unsupported startup options raise `TypeError`. [Startup comparison](docs/run-comparison.md) covers Saturn and installed Flet 1.0.1.
+- [x] Removed Flet wording and internal names from the `saturn` package; comparative API documentation retains factual references.
+- [x] Converted repository documentation to English, including the feature planning notes below.
+
+# Saturn and Qt feature-gap planning notes
+
+These notes describe desktop UI capabilities to consider over time. They are a planning reference, not a claim that every listed API is implemented or an instruction to implement all of them in the current optimization work.
+
+## 1. Model / View data models
+
+Qt provides a mature Model/View architecture, including `QAbstractItemModel`, `QModelIndex`, `QSortFilterProxyModel`, `QTableView`, `QTreeView`, and `QListView`. Models own data; views display it.
+
+A file manager can use this flow:
+
+```text
+File system -> File Model -> TreeView
+```
+
+Large datasets do not need to become UI controls all at once. Saturn currently favors direct control manipulation and lacks a mature equivalent abstraction. Model/View provides a foundation for IDEs, file managers, database tools, and log viewers.
+
+## 2. Table
+
+Qt's table system supports rows, columns, headers, sorting, filtering, multiple selection, cell editing, custom cells, and large-data virtualization.
+
+```text
+Name       Size      Modified
+test.py    12 KB     Today
+main.cpp   48 KB     Yesterday
+app.exe    2 MB      Monday
+```
+
+Saturn can compose similar interfaces from existing controls, but needs a dedicated efficient Table for database managers, IDEs, system tools, and administration interfaces.
+
+## 3. Tree
+
+Qt's TreeView supports arbitrary nesting, expansion and collapse, node selection, node dragging, lazy loading, and many nodes.
+
+```text
+Project
+├── src
+│   ├── main.py
+│   └── app.py
+├── assets
+│   └── icon.png
+└── README.md
+```
+
+Saturn lacks a dedicated Tree / TreeView data structure. File managers, IDEs, asset browsers, and project management tools commonly need it.
+
+## 4. Canvas / custom drawing
+
+Qt supports custom lines, rectangles, circles, paths, images, text, and other shapes. A possible Saturn interface would expose:
+
+```text
+Canvas
+├── line()
+├── rect()
+├── circle()
+├── path()
+├── image()
+└── text()
+```
+
+Users could implement specialized controls without waiting for built-in widgets. Canvas would support charts, drawing applications, node editors, audio waveforms, game editors, CAD, and data visualization.
+
+## 5. Native Window API
+
+Qt offers window size and position, minimum and maximum sizes, fullscreen, frameless and transparent windows, always-on-top behavior, and native handles. Saturn could progressively provide:
+
+```text
+page.window.title
+page.window.size
+page.window.position
+page.window.fullscreen
+page.window.resizable
+page.window.transparent
+page.window.native_handle
+```
+
+The Windows native handle is an HWND. These advanced capabilities matter for desktop tools, game launchers, OBS-style applications, desktop overlays, and system utilities, even when ordinary applications do not need them.
+
+## 6. Native Menu
+
+Qt provides menu bars, menus, submenus, menu items, and shortcuts.
+
+```text
+File
+├── New
+├── Open
+├── Save
+└── Exit
+```
+
+A possible Saturn hierarchy is `MenuBar -> Menu -> MenuItem`, with multiple menus and items. IDEs, editors, engineering applications, file managers, and professional tools rely on menus.
+
+## 7. System Tray
+
+Qt's `QSystemTrayIcon` supports tray icons, menus, notifications, clicks, and double-clicks.
+
+```text
+[ Saturn Icon ]
+├── Show
+├── Settings
+└── Exit
+```
+
+Downloaders, synchronization tools, AI agents, server managers, and music players often run without a continuously visible window.
+
+## 8. Native Dialog
+
+Qt provides system dialogs for opening and saving files, selecting folders, colors and fonts, and displaying messages.
+
+```text
+Open File
+┌────────────────────────────┐
+│ Documents                  │
+│ Downloads                  │
+│ test.py                    │
+│ [Cancel]        [Open]     │
+└────────────────────────────┘
+```
+
+Saturn already has file selection capabilities. Native Dialog APIs could be expanded so users receive familiar operating-system dialogs.
+
+## 9. Clipboard
+
+Qt supports clipboard text, images, HTML, files, and MIME data. A basic example is `clipboard.set_text("Hello")`; richer formats should also be supported. Copy and paste are fundamental desktop capabilities.
+
+## 10. Drag & Drop
+
+A complete drag-and-drop system handles incoming files, text, URLs, and MIME data, and allows controls to become drag sources.
+
+```text
+User drags a file -> Saturn -> Drop Event
+```
+
+File managers, IDEs, image editors, and asset browsers rely on this interaction.
+
+## 11. Multiple windows
+
+Qt manages multiple windows, including modality, dialogs, parent/owner relationships, lifecycle, and activation state.
+
+```text
+Main Window
+├── Settings
+├── About
+└── Editor
+```
+
+Complex desktop applications often need several coordinated windows.
+
+## 12. Multiple monitors
+
+Qt abstracts monitor identity, resolution, DPI, scale factor, position, and the primary monitor.
+
+```text
+Monitor 1: 1920 x 1080 @ 100%
+Monitor 2: 2560 x 1440 @ 150%
+```
+
+Two- and three-monitor setups require correct position and density handling to avoid excessively small or large UI and offscreen windows.
+
+## 13. DPI / HiDPI
+
+A mature density system handles per-monitor DPI, density changes, scale factors, and dynamic updates. Moving a window from 100% to 150% requires recalculating dimensions. Modern Windows, macOS, and Linux desktop applications need reliable support.
+
+## 14. Keyboard Shortcut System
+
+Qt supports shortcuts such as `Ctrl+S`, `Ctrl+O`, `Ctrl+Shift+P`, and `F5`, scoped to a window, widget, or application. IDEs, editors, and professional tools need this mechanism.
+
+## 15. Focus System
+
+A focus chain allows Tab navigation:
+
+```text
+TextField -> TextField -> Button -> Checkbox
+```
+
+Focus policies, scopes, and keyboard navigation support forms and accessibility. Saturn should provide consistent focus management.
+
+## 16. Event System
+
+Qt's event system covers mouse, keyboard, touch, gestures, windows, focus, drag-and-drop, clipboard, IME, and native events. Event filters can intercept events. This breadth supports mature desktop applications.
+
+## 17. Custom Widget API
+
+Qt allows application-defined widgets such as `class MyWidget(QWidget)`, with custom layout, event handling, painting, state, and properties. Saturn should progressively expose comparable extension points because built-in controls cannot cover every use case.
+
+## 18. Style / Theme Engine
+
+Qt styles cover buttons, text fields, menus, scrollbars, windows, focus, hover, pressed, and disabled states. Saturn already has themes; a systematic style engine could apply a coherent appearance across an application without individual control configuration.
+
+## 19. Animation System
+
+Property animations can target position, size, opacity, color, transforms, and custom properties.
+
+```text
+opacity: 0 -> 1
+duration: 200 ms
+easing: ease_out
+```
+
+A shared animation system supports complex interfaces without separate timing implementations in each control.
+
+## 20. Resource System
+
+Qt resources manage images, SVGs, fonts, icons, shaders, and other assets and can package them inside an application. Published applications should not depend on paths from the development environment.
+
+## 21. Font System
+
+A complete font system handles families, weights, fallback, Unicode, loading, metrics, and letter spacing. Mixed Chinese, English, Japanese, Korean, and emoji text needs correct fallback. Text rendering is a complex GUI subsystem.
+
+## 22. Internationalization
+
+Qt supports translation, locale, right-to-left text, number formatting, and date formatting. Applications can switch among English, Chinese, Japanese, and Korean based on locale. International desktop use requires these capabilities.
+
+## 23. Accessibility
+
+Desktop accessibility includes screen readers, accessible names and roles, keyboard navigation, and UI automation. A displayed button label should have corresponding system metadata:
+
+```text
+Role: Button
+Name: "Click"
+State: Enabled
+```
+
+These interfaces are needed for professional desktop applications and assistive technology.
+
+## 24. File System Model
+
+Qt can expose a filesystem model through a tree view and watch filesystem changes.
+
+```text
+FileSystemModel -> TreeView
+
+C:\
+├── Users
+├── Windows
+└── Program Files
+```
+
+This is useful for file managers, IDEs, and asset browsers.
+
+## 25. GPU / Graphics API extensions
+
+Qt offers OpenGL, Vulkan, QRhi, scene graphs, and shaders. Saturn already has software, OpenGL, and Vulkan renderers. Additional low-level interfaces could expose textures, shaders, framebuffers, render targets, and GPU resources. Accessible GPU functionality could help distinguish Saturn's Python desktop API.
+
+## 26. Plugin System
+
+Qt can load plugins dynamically. Saturn extension categories could include renderer, widget, backend, and other extension plugins. Third-party developers should be able to extend functionality without modifying core code.
+
+## 27. UI Designer
+
+Qt Designer supports dragging widgets into layouts and editing properties to build interfaces. Saturn currently favors code-driven UI. A lightweight Saturn Designer could help non-programmers and speed up complex layout prototyping.
+
+## 28. Native Platform Backend
+
+Qt provides mature platform abstractions:
+
+```text
+Windows -> Win32
+Linux   -> X11 / Wayland
+macOS   -> Cocoa
+```
+
+Saturn development and testing currently focus on Windows. Cross-platform support requires correct window behavior, IME, DPI, menus, fonts, and accessibility, in addition to successful startup.
+
+## 29. Testing Infrastructure
+
+GUI frameworks need widget, event, rendering, screenshot, DPI, input, and cross-platform tests. Renderer changes should preserve software, OpenGL, and Vulkan behavior. Regressions can otherwise appear in unrelated controls when one area changes.
+
+## 30. Ecosystem
+
+An ecosystem includes third-party widgets and libraries, tutorials, documentation, examples, plugins, IDE integration, and a community. Saturn does not need Qt's scale immediately, but should support installation and import of third-party extensions:
+
+```python
+# Install first: pip install xxx
+import xxx
+```
+
+## Suggested roadmap
+
+The framework need not implement all thirty areas at once. A possible order is:
+
+1. Model / View
+2. Table
+3. Tree
+4. Canvas
+5. Native Window
+6. Menu / Context Menu
+7. Clipboard
+8. Drag & Drop
+9. Multiple Windows
+10. DPI / HiDPI
+11. Focus / Keyboard
+12. IME
+13. Accessibility
+14. File System Model
+15. GPU API
+16. Plugin API
+17. Cross-platform Backend
+
+The proposed layers are:
+
+```text
+┌─────────────────────────────┐
+│          Saturn API         │
+├─────────────────────────────┤
+│ Widgets / Layout / Theme    │
+├─────────────────────────────┤
+│ Model / View / Canvas       │
+├─────────────────────────────┤
+│ Event / Input / IME         │
+├─────────────────────────────┤
+│ Window / Native Integration │
+├─────────────────────────────┤
+│ Renderer                    │
+│ Software / OpenGL / Vulkan  │
+├─────────────────────────────┤
+│ Platform                    │
+│ Windows / Linux / macOS     │
+└─────────────────────────────┘
+```
+
+The proposed direction is a Python desktop UI framework with a simple API, local rendering, GPU support, and progressively accessible lower-level capabilities. The reference frameworks inform planning without requiring Saturn to reproduce their entire scope.
