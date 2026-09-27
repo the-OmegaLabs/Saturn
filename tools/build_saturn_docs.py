@@ -314,6 +314,11 @@ def page_for(name: str, category: str) -> str:
             names = [key for key in vars(obj) if key.isupper()]
             lines += ["## Available names", "", f"There are {len(names)} names. Examples: " + ", ".join(markdown_code(key) for key in names[:16]) + ".", "", "See the source above for the full list; color values resolve according to the theme." if name == "Colors" else "See the source above for the full icon list.", ""]
         else:
+            if name == "Page":
+                lines += ["## Renderer settings", "",
+                          "`page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings",
+                          "that default to `True`. `page.renderer.context` exposes the active backend renderer.",
+                          "See [Renderer settings](../rendering.md) for backend behavior and threading rules.", ""]
             if name in ("App", "Page", "Window"):
                 lines += ["> `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.", ""]
             methods = method_rows(obj)

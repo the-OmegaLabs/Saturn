@@ -7,17 +7,32 @@ logical px with origin top-left and are flipped on the GPU side.
 from __future__ import annotations
 
 import hashlib
+import ctypes
 import math
 import os
 import struct
 from array import array
 from collections import OrderedDict
+from pathlib import Path
 
 import pygame
 import moderngl
 
 from ..colors import parse_color
 from .base import Renderer
+
+
+def _set_swap_interval(enabled: bool) -> bool:
+    """Request SDL synchronization and report the active driver setting."""
+    try:
+        dll = ctypes.CDLL(str(Path(pygame.__file__).with_name("SDL2.dll")))
+        dll.SDL_GL_SetSwapInterval.argtypes = [ctypes.c_int]
+        dll.SDL_GL_SetSwapInterval.restype = ctypes.c_int
+        dll.SDL_GL_GetSwapInterval.restype = ctypes.c_int
+        dll.SDL_GL_SetSwapInterval(1 if enabled else 0)
+        return dll.SDL_GL_GetSwapInterval() != 0
+    except (AttributeError, OSError):
+        return False
 
 RECT_VS = """
 #version 330
@@ -159,11 +174,14 @@ class GLRenderer(Renderer):
     _ssaa = 2
 
     def __init__(self, window, *, logical_size=None,
-                 pixel_ratio: float = 1.0):
+                 pixel_ratio: float = 1.0, anti_aliasing: bool = True,
+                 vsync: bool = True):
         self._init_effect_stacks()
         self.window = window
         self.pixel_ratio = max(1.0, float(pixel_ratio))
-        self._ssaa = 1 if self.pixel_ratio >= 1.5 else 2
+        self.anti_aliasing = anti_aliasing
+        self.vsync = vsync
+        self._ssaa = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2
         self.scale = self._ssaa * self.pixel_ratio
         self.ctx = moderngl.create_context()
         self.ctx.enable(moderngl.BLEND)
@@ -201,6 +219,18 @@ class GLRenderer(Renderer):
         self._frame_color = None
         self._frame_target = None
         self._create_frame_target()
+        self.vsync_active = _set_swap_interval(vsync)
+
+    def configure(self, *, anti_aliasing: bool, vsync: bool):
+        changed = anti_aliasing != self.anti_aliasing
+        self._flush_rects()
+        if vsync != self.vsync:
+            self.vsync_active = _set_swap_interval(vsync)
+        super().configure(anti_aliasing=anti_aliasing, vsync=vsync)
+        if changed:
+            self._ssaa = (1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2)
+            self.scale = self._ssaa * self.pixel_ratio
+            self._create_frame_target()
 
     def _query_size(self):
         try:
@@ -545,7 +575,8 @@ class GLRenderer(Renderer):
         self._flush_rects()
         if pixel_ratio is not None:
             self.pixel_ratio = target_ratio
-            self._ssaa = 1 if self.pixel_ratio >= 1.5 else 2
+            self._ssaa = (1 if not self.anti_aliasing or self.pixel_ratio >= 1.5
+                          else 2)
             self.scale = self._ssaa * self.pixel_ratio
         self._size = target_size
         self._pixel_size = target_pixels

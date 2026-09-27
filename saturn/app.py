@@ -2,7 +2,7 @@
 
 Thread rules:
 - The thread that calls run() owns the window: it pumps SDL events, re-layouts
-  and redraws when dirty, then presents at the active display refresh rate.
+  and redraws when dirty, with optional display refresh pacing.
 - main(page) and every event handler run off the UI thread (sync -> daemon
   thread, async -> the app's asyncio loop), so blocking handlers never freeze
   the window. Control state changes from those threads are only safe between
@@ -101,17 +101,6 @@ def _set_windows_default_icon(hwnd: int) -> bool:
         return False
 
 
-def _set_gl_swap_interval(interval: int = 1) -> bool:
-    """Request v-sync for the current SDL OpenGL context."""
-    try:
-        dll = ctypes.CDLL(str(Path(pygame.__file__).with_name("SDL2.dll")))
-        dll.SDL_GL_SetSwapInterval.argtypes = [ctypes.c_int]
-        dll.SDL_GL_SetSwapInterval.restype = ctypes.c_int
-        return dll.SDL_GL_SetSwapInterval(interval) == 0
-    except (AttributeError, OSError):
-        return False
-
-
 class App:
     def __init__(self, main, backend: Renderer, title: str = "saturn"):
         self._main = main
@@ -131,6 +120,10 @@ class App:
         threading.Thread(target=self._loop.run_forever, daemon=True,
                          name="saturn-async").start()
         self.renderer: _RendererBase | None = None
+        self._anti_aliasing = True
+        self._vsync = True
+        self._renderer_configuration_pending = False
+        self._renderer_options_lock = threading.Lock()
         self.page = None  # set in start()
         self._live_resize_dll = None
         self._live_resize_callback = None
@@ -166,8 +159,6 @@ class App:
             allow_high_dpi=True,
         )
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
-        if self._backend is Renderer.OPENGL:
-            _set_gl_swap_interval(1)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
@@ -178,7 +169,8 @@ class App:
         self._size[:] = client
         self.renderer = create_renderer(
             self._backend, self._window,
-            logical_size=client, pixel_ratio=self._pixel_ratio)
+            logical_size=client, pixel_ratio=self._pixel_ratio,
+            anti_aliasing=self._anti_aliasing, vsync=self._vsync)
         # SDL/pygame can retain the set_mode creation size after the native
         # Window client area is adjusted for the requested outer dimensions.
         # Seed every renderer from the authoritative final client size so
@@ -241,9 +233,12 @@ class App:
                 self._dirty.clear()
                 self.page.draw()
                 self.renderer.flip()
-            # Do not assume a 60 Hz monitor. OpenGL's swap is synchronized by
-            # SDL; the cap also provides safe pacing if a driver ignores it.
-            clock.tick(self._refresh_rate)
+            if self._vsync:
+                clock.tick(self._refresh_rate)
+            elif not self._dirty.is_set():
+                # Poll input while idle without spinning a CPU core. Active
+                # animations remain uncapped when synchronization is off.
+                self._dirty.wait(0.004)
         self._remove_live_resize_watch()
         if self.renderer is not None:
             self.renderer.close()
@@ -251,6 +246,33 @@ class App:
         pygame.display.quit()
 
     # -- cross-thread helpers -------------------------------------------
+    def configure_renderer(self, *, anti_aliasing=None, vsync=None):
+        """Coalesce rendering option changes before the next UI frame."""
+        with self._renderer_options_lock:
+            changed = False
+            if anti_aliasing is not None and anti_aliasing != self._anti_aliasing:
+                self._anti_aliasing = anti_aliasing
+                changed = True
+            if vsync is not None and vsync != self._vsync:
+                self._vsync = vsync
+                changed = True
+            if not changed or self._renderer_configuration_pending:
+                return
+            self._renderer_configuration_pending = True
+
+        def apply():
+            with self._renderer_options_lock:
+                options = (self._anti_aliasing, self._vsync)
+                self._renderer_configuration_pending = False
+            if self.renderer is not None:
+                self.renderer.configure(anti_aliasing=options[0], vsync=options[1])
+            if self.page is not None:
+                self.page._layout_dirty = True
+            self.mark_dirty()
+
+        self.post(apply)
+        self.mark_dirty()
+
     def call(self, fn, *args):
         """Run a user callable off the UI thread (sync: thread, async: loop)."""
         if inspect.iscoroutinefunction(fn):

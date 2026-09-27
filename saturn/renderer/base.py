@@ -15,6 +15,9 @@ class Renderer(ABC):
     native_texture_scaling = False
     native_shape_overlay = False
     native_state_layer = False
+    anti_aliasing = True
+    vsync = True
+    vsync_active = False
 
     def _init_effect_stacks(self):
         self._opacity_stack = [1.0]
@@ -96,6 +99,11 @@ class Renderer(ABC):
 
     def on_resize(self, width, height, *, pixel_size=None,
                   pixel_ratio: float | None = None) -> None: ...
+
+    def configure(self, *, anti_aliasing: bool, vsync: bool) -> None:
+        """Apply rendering options at a frame boundary on the UI thread."""
+        self.anti_aliasing = anti_aliasing
+        self.vsync = vsync
 
     def close(self) -> None:
         """Release backend-owned resources before the native window closes."""

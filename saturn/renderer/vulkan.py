@@ -57,13 +57,16 @@ class _VulkanSwapchain(SoftwareRenderer):
 
     scale = float(SCALE)
 
-    def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0):
+    def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0,
+                 anti_aliasing: bool = True, vsync: bool = True):
         # Vulkan SDL windows have no pygame display Surface, so initialize the
         # inherited off-screen rasterizer explicitly.
         Renderer._init_effect_stacks(self)
         self.window = window
         self.pixel_ratio = max(1.0, float(pixel_ratio))
-        self._aa_scale = 1 if self.pixel_ratio >= 1.5 else SCALE
+        self.anti_aliasing = anti_aliasing
+        self.vsync = vsync
+        self._aa_scale = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else SCALE
         self.scale = self._aa_scale * self.pixel_ratio
         size = tuple(max(1, int(value)) for value in window.size)
         self.screen = pygame.Surface(size, pygame.SRCALPHA, 32)
@@ -266,6 +269,23 @@ class _VulkanSwapchain(SoftwareRenderer):
         self._queue_present = vk.vkGetDeviceProcAddr(
             self._device, "vkQueuePresentKHR")
 
+    def _choose_present_mode(self):
+        modes = self._get_present_modes(self._physical_device, self._surface)
+        mode = vk.VK_PRESENT_MODE_FIFO_KHR
+        if not self.vsync:
+            for candidate in (vk.VK_PRESENT_MODE_IMMEDIATE_KHR,
+                              vk.VK_PRESENT_MODE_MAILBOX_KHR):
+                if candidate in modes:
+                    mode = candidate
+                    break
+        self.present_mode = {
+            vk.VK_PRESENT_MODE_FIFO_KHR: "fifo",
+            vk.VK_PRESENT_MODE_IMMEDIATE_KHR: "immediate",
+            vk.VK_PRESENT_MODE_MAILBOX_KHR: "mailbox",
+        }[mode]
+        self.vsync_active = mode != vk.VK_PRESENT_MODE_IMMEDIATE_KHR
+        return mode
+
     def _create_commands_and_sync(self):
         pool_info = vk.VkCommandPoolCreateInfo(
             flags=vk.VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -361,7 +381,7 @@ class _VulkanSwapchain(SoftwareRenderer):
             pQueueFamilyIndices=families if separate else None,
             preTransform=capabilities.currentTransform,
             compositeAlpha=self._choose_composite_alpha(capabilities),
-            presentMode=vk.VK_PRESENT_MODE_FIFO_KHR,
+            presentMode=self._choose_present_mode(),
             clipped=vk.VK_TRUE,
             oldSwapchain=None,
         )
@@ -567,7 +587,7 @@ class _VulkanSwapchain(SoftwareRenderer):
         width, height = max(1, int(width)), max(1, int(height))
         ratio = (max(1.0, float(pixel_ratio)) if pixel_ratio is not None
                  else self.pixel_ratio)
-        aa_scale = 1 if ratio >= 1.5 else SCALE
+        aa_scale = 1 if not self.anti_aliasing or ratio >= 1.5 else SCALE
         target = tuple(pixel_size) if pixel_size is not None else (width, height)
         target = tuple(max(1, int(value)) for value in target)
         size_changed = self.screen.get_size() != target
@@ -628,7 +648,8 @@ class VulkanRenderer(_VulkanSwapchain):
     native_shape_overlay = True
     native_state_layer = True
 
-    def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0):
+    def __init__(self, window, *, logical_size=None, pixel_ratio: float = 1.0,
+                 anti_aliasing: bool = True, vsync: bool = True):
         self._gpu_views = []
         self._gpu_framebuffers = []
         self._gpu_msaa_image = None
@@ -673,9 +694,10 @@ class VulkanRenderer(_VulkanSwapchain):
         self._logical_size = tuple(logical_size or window.size)
         self._pixel_size = tuple(window.size)
         super().__init__(window, logical_size=logical_size,
-                         pixel_ratio=pixel_ratio)
+                         pixel_ratio=pixel_ratio,
+                         anti_aliasing=anti_aliasing, vsync=vsync)
         # Keep text/image rasterization at 2x, then scale by the GPU sampler.
-        self.scale = SCALE * self.pixel_ratio
+        self.scale = (SCALE if anti_aliasing else 1) * self.pixel_ratio
         self._gpu_white = self._upload_texture(
             pygame.Surface((1, 1), pygame.SRCALPHA, 32),
             pixels=b"\xff\xff\xff\xff")
@@ -738,7 +760,7 @@ class VulkanRenderer(_VulkanSwapchain):
             pQueueFamilyIndices=families if separate else None,
             preTransform=capabilities.currentTransform,
             compositeAlpha=self._choose_composite_alpha(capabilities),
-            presentMode=vk.VK_PRESENT_MODE_FIFO_KHR, clipped=vk.VK_TRUE,
+            presentMode=self._choose_present_mode(), clipped=vk.VK_TRUE,
             oldSwapchain=None)
         self._swapchain = self._create_swapchain_fn(self._device, info, None)
         self._swapchain_images = list(self._get_swapchain_images(
@@ -777,6 +799,8 @@ class VulkanRenderer(_VulkanSwapchain):
             for view in self._gpu_views]
 
     def _choose_sample_count(self):
+        if not self.anti_aliasing:
+            return vk.VK_SAMPLE_COUNT_1_BIT
         limits = vk.vkGetPhysicalDeviceProperties(
             self._physical_device).limits
         supported = limits.framebufferColorSampleCounts
@@ -1649,9 +1673,17 @@ class VulkanRenderer(_VulkanSwapchain):
         self._pixel_size = target
         if pixel_ratio is not None:
             self.pixel_ratio = max(1.0, float(pixel_ratio))
-        self.scale = SCALE * self.pixel_ratio
+        self.scale = (SCALE if self.anti_aliasing else 1) * self.pixel_ratio
         if size_changed and self._swapchain is not None:
             self._recreate_swapchain()
+
+    def configure(self, *, anti_aliasing: bool, vsync: bool):
+        if anti_aliasing == self.anti_aliasing and vsync == self.vsync:
+            return
+        self.anti_aliasing = anti_aliasing
+        self.vsync = vsync
+        self.scale = (SCALE if anti_aliasing else 1) * self.pixel_ratio
+        self._recreate_swapchain()
 
     def close(self):
         if self._closed:

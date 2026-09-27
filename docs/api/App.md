@@ -4,7 +4,7 @@ Application object that manages windows, events, and rendering.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 115).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 104).
 
 > `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
@@ -15,6 +15,7 @@ Source: [`saturn/app.py`](../../saturn/app.py) (line 115).
 | `start(self)` | Starts the application window and event handling. |
 | `close(self)` | Closes a window or expanded menu. |
 | `run_until_closed(self)` | Processes window events until the window closes. |
+| `configure_renderer(self, *, anti_aliasing=None, vsync=None)` | Coalesce rendering option changes before the next UI frame. |
 | `call(self, fn, *args)` | Run a user callable off the UI thread (sync: thread, async: loop). |
 | `mark_dirty(self)` | Marks the interface for redrawing. |
 | `post(self, fn)` | Run a callable on the UI thread (required for SDL display calls). |

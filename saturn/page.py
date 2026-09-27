@@ -162,12 +162,45 @@ class Window:
         self._app.post(_do)
 
 
+class _RendererSettings:
+    """Renderer options applied on the application's UI thread."""
+
+    def __init__(self, app):
+        self._app = app
+
+    @property
+    def anti_aliasing(self) -> bool:
+        return self._app._anti_aliasing
+
+    @anti_aliasing.setter
+    def anti_aliasing(self, value: bool):
+        if not isinstance(value, bool):
+            raise TypeError("anti_aliasing must be a bool")
+        self._app.configure_renderer(anti_aliasing=value)
+
+    @property
+    def vsync(self) -> bool:
+        return self._app._vsync
+
+    @vsync.setter
+    def vsync(self, value: bool):
+        if not isinstance(value, bool):
+            raise TypeError("vsync must be a bool")
+        self._app.configure_renderer(vsync=value)
+
+    @property
+    def context(self):
+        """The active renderer; use its GPU operations on the UI thread."""
+        return self._app.renderer
+
+
 class Page(Control):
     """Root control container. Handlers (on_resize etc.) run off the UI thread."""
 
     def __init__(self, app):
         super().__init__()
         self._app = app
+        self._renderer_settings = _RendererSettings(app)
         self.window = Window(app)
         self.controls: list[Control] = []
         self.bgcolor = None       # None → theme surface color
@@ -200,6 +233,11 @@ class Page(Control):
         self._animation_scan_needed = True
 
     # -- public API ---------------------------------------------------------
+    @property
+    def renderer(self):
+        """Rendering settings and the active backend context."""
+        return self._renderer_settings
+
     @property
     def width(self) -> float:
         return self._app.size[0]

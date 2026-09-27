@@ -30,11 +30,14 @@ def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
 
 class SoftwareRenderer(Renderer):
     def __init__(self, window=None, *, logical_size=None,
-                 pixel_ratio: float = 1.0):
+                 pixel_ratio: float = 1.0, anti_aliasing: bool = True,
+                 vsync: bool = True):
         self._init_effect_stacks()
         self.window = window
         self.pixel_ratio = max(1.0, float(pixel_ratio))
-        self._aa_scale = 1 if self.pixel_ratio >= 1.5 else SCALE
+        self.anti_aliasing = anti_aliasing
+        self.vsync = vsync
+        self._aa_scale = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else SCALE
         self.scale = self._aa_scale * self.pixel_ratio
         self.screen = (window.get_surface() if window is not None
                        else pygame.display.get_surface())
@@ -48,8 +51,9 @@ class SoftwareRenderer(Renderer):
                   pixel_ratio: float | None = None):
         if pixel_ratio is not None:
             self.pixel_ratio = max(1.0, float(pixel_ratio))
-            self._aa_scale = 1 if self.pixel_ratio >= 1.5 else SCALE
-            self.scale = self._aa_scale * self.pixel_ratio
+        self._aa_scale = (1 if not self.anti_aliasing or self.pixel_ratio >= 1.5
+                          else SCALE)
+        self.scale = self._aa_scale * self.pixel_ratio
         self.screen = (self.window.get_surface() if self.window is not None
                        else pygame.display.get_surface())
         pixel_width, pixel_height = (
@@ -59,6 +63,12 @@ class SoftwareRenderer(Renderer):
             (max(1, int(pixel_width)) * self._aa_scale,
              max(1, int(pixel_height)) * self._aa_scale), pygame.SRCALPHA)
         self._apply_clip()
+
+    def configure(self, *, anti_aliasing: bool, vsync: bool):
+        changed = anti_aliasing != self.anti_aliasing
+        super().configure(anti_aliasing=anti_aliasing, vsync=vsync)
+        if changed:
+            self.on_resize(*self.screen.get_size())
 
     def _s(self, *vals):
         return [v * self.scale for v in vals]

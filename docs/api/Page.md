@@ -4,9 +4,15 @@ Application page that manages controls, themes, and dialogs.
 
 [← API index](./README.md)
 
-Source: [`saturn/page.py`](../../saturn/page.py) (line 165).
+Source: [`saturn/page.py`](../../saturn/page.py) (line 197).
 
 **Base class:** [Control](./Control.md)
+
+## Renderer settings
+
+`page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings
+that default to `True`. `page.renderer.context` exposes the active backend renderer.
+See [Renderer settings](../rendering.md) for backend behavior and threading rules.
 
 > `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
