@@ -42,6 +42,23 @@ class PlatformBrightnessChangeEvent(ControlEvent):
 
 
 @dataclass
+class TextSelectionChangeEvent(ControlEvent):
+    selection: object = None
+    text: str = ""
+
+
+@dataclass
+class LayoutSizeChangeEvent(ControlEvent):
+    width: float = 0
+    height: float = 0
+
+
+@dataclass
+class RouteChangeEvent(ControlEvent):
+    route: str = "/"
+
+
+@dataclass
 class TapEvent:
     kind: str
     local_position: tuple
@@ -68,12 +85,21 @@ def handlers_of(control, name: str) -> list:
 
 def fire(control, name: str, data: Any = None) -> None:
     """Dispatch an event to the control's on_<name> handlers."""
-    hs = handlers_of(control, name)
-    if not hs:
-        return
     if control.page is None:
         return
+    if name == "click" and getattr(control, "url", None):
+        import webbrowser
+        value = control.url
+        control.page._app.call(webbrowser.open, str(getattr(value, "url", value)))
     ev = ControlEvent(name=name, control=control, data=data)
+    dispatch_event(control, name, ev)
+
+
+def dispatch_event(control, name: str, ev) -> None:
+    """Dispatch a typed payload with the ordinary handler conventions."""
+    if control.page is None:
+        return
+    hs = handlers_of(control, name)
     for h in hs:
         control.page._app.call(_invoke, h, ev)
 

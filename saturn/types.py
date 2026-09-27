@@ -182,6 +182,110 @@ class BoxFit(enum.Enum):
     COVER = "cover"
     NONE = "none"
     SCALE_DOWN = "scaleDown"
+    FIT_WIDTH = "fitWidth"
+    FIT_HEIGHT = "fitHeight"
+
+
+class ControlState(enum.Enum):
+    HOVERED = "hovered"
+    FOCUSED = "focused"
+    PRESSED = "pressed"
+    DRAGGED = "dragged"
+    SELECTED = "selected"
+    SCROLLED_UNDER = "scrolledUnder"
+    DISABLED = "disabled"
+    ERROR = "error"
+    DEFAULT = "default"
+
+
+class TextCapitalization(enum.Enum):
+    NONE = "none"
+    CHARACTERS = "characters"
+    WORDS = "words"
+    SENTENCES = "sentences"
+
+
+class TextAffinity(enum.Enum):
+    UPSTREAM = "upstream"
+    DOWNSTREAM = "downstream"
+
+
+class MouseCursor(enum.Enum):
+    BASIC = "basic"
+    CLICK = "click"
+    TEXT = "text"
+    VERTICAL_TEXT = "verticalText"
+    FORBIDDEN = "forbidden"
+    NONE = "none"
+    MOVE = "move"
+    GRAB = "grab"
+    GRABBING = "grabbing"
+    PRECISE = "precise"
+    WAIT = "wait"
+    PROGRESS = "progress"
+    RESIZE_LEFT_RIGHT = "resizeLeftRight"
+    RESIZE_UP_DOWN = "resizeUpDown"
+    RESIZE_UP_LEFT_DOWN_RIGHT = "resizeUpLeftDownRight"
+    RESIZE_UP_RIGHT_DOWN_LEFT = "resizeUpRightDownLeft"
+    RESIZE_COLUMN = "resizeColumn"
+    RESIZE_ROW = "resizeRow"
+    RESIZE_LEFT = "resizeLeft"
+    RESIZE_RIGHT = "resizeRight"
+    RESIZE_UP = "resizeUp"
+    RESIZE_DOWN = "resizeDown"
+    RESIZE_UP_LEFT = "resizeUpLeft"
+    RESIZE_UP_RIGHT = "resizeUpRight"
+    RESIZE_DOWN_LEFT = "resizeDownLeft"
+    RESIZE_DOWN_RIGHT = "resizeDownRight"
+    ALIAS = "alias"
+    ALL_SCROLL = "allScroll"
+    CELL = "cell"
+    CONTEXT_MENU = "contextMenu"
+    COPY = "copy"
+    DISAPPEARING = "disappearing"
+    HELP = "help"
+    NO_DROP = "noDrop"
+    ZOOM_IN = "zoomIn"
+    ZOOM_OUT = "zoomOut"
+
+
+class ImageRepeat(enum.Enum):
+    NO_REPEAT = "noRepeat"
+    REPEAT = "repeat"
+    REPEAT_X = "repeatX"
+    REPEAT_Y = "repeatY"
+
+
+class FilterQuality(enum.Enum):
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class ClipBehavior(enum.Enum):
+    NONE = "none"
+    HARD_EDGE = "hardEdge"
+    ANTI_ALIAS = "antiAlias"
+    ANTI_ALIAS_WITH_SAVE_LAYER = "antiAliasWithSaveLayer"
+
+
+class BoxShape(enum.Enum):
+    RECTANGLE = "rectangle"
+    CIRCLE = "circle"
+
+
+class StrokeCap(enum.Enum):
+    ROUND = "round"
+    SQUARE = "square"
+    BUTT = "butt"
+
+
+class VisualDensity(enum.Enum):
+    STANDARD = "standard"
+    COMPACT = "compact"
+    COMFORTABLE = "comfortable"
+    ADAPTIVE_PLATFORM_DENSITY = "adaptivePlatformDensity"
 
 
 @dataclass
@@ -286,6 +390,18 @@ class OutlineInputBorder:
 
 
 @dataclass
+class NoInputBorder:
+    """Remove the input outline and underline."""
+
+
+@dataclass
+class UnderlineInputBorder:
+    """Input underline configuration."""
+    border_radius: object = 4.0
+    side: BorderSide = field(default_factory=BorderSide)
+
+
+@dataclass
 class Border:
     left: BorderSide = field(default_factory=lambda: BorderSide())
     top: BorderSide = field(default_factory=lambda: BorderSide())
@@ -348,6 +464,21 @@ class BoxShadow:
     offset: Offset = field(default_factory=Offset)
 
 
+class SliderInteraction(enum.Enum):
+    TAP_AND_SLIDE = "tapAndSlide"
+    TAP_ONLY = "tapOnly"
+    SLIDE_ONLY = "slideOnly"
+    SLIDE_THUMB = "slideThumb"
+
+
+@dataclass
+class LinearGradient:
+    colors: list
+    begin: Alignment = field(default_factory=lambda: Alignment.CENTER_LEFT)
+    end: Alignment = field(default_factory=lambda: Alignment.CENTER_RIGHT)
+    stops: list | None = None
+
+
 @dataclass
 class TextStyle:
     size: float | None = None
@@ -358,6 +489,96 @@ class TextStyle:
     font_family: str | None = None
     letter_spacing: float | None = None
     overflow: TextOverflow | None = None
+    height: float | None = None
+    word_spacing: float | None = None
+    decoration: object = None
+    decoration_color: object = None
+    decoration_thickness: float | None = None
+
+
+@dataclass
+class TextSelection:
+    base_offset: int = 0
+    extent_offset: int = 0
+    affinity: TextAffinity = TextAffinity.DOWNSTREAM
+    directional: bool = False
+
+    @property
+    def start(self):
+        return min(self.base_offset, self.extent_offset)
+
+    @property
+    def end(self):
+        return max(self.base_offset, self.extent_offset)
+
+    @property
+    def is_collapsed(self):
+        return self.base_offset == self.extent_offset
+
+
+@dataclass
+class InputFilter:
+    allow: bool = True
+    regex_string: str = ""
+    replacement_string: str = ""
+
+
+@dataclass
+class BoxConstraints:
+    min_width: float = 0
+    max_width: float = float("inf")
+    min_height: float = 0
+    max_height: float = float("inf")
+
+    def __post_init__(self):
+        if (self.min_width < 0 or self.min_height < 0 or
+                self.max_width < self.min_width or self.max_height < self.min_height):
+            raise ValueError("invalid box constraints")
+
+
+@dataclass
+class RoundedRectangleBorder:
+    radius: object = 0
+    side: BorderSide | None = None
+
+
+@dataclass
+class StadiumBorder:
+    side: BorderSide | None = None
+
+
+@dataclass
+class CircleBorder:
+    side: BorderSide | None = None
+
+
+@dataclass
+class ButtonStyle:
+    color: object = None
+    bgcolor: object = None
+    overlay_color: object = None
+    shadow_color: object = None
+    elevation: object = None
+    animation_duration: object = None
+    padding: object = None
+    side: object = None
+    shape: object = None
+    alignment: Alignment | None = None
+    enable_feedback: bool | None = None
+    text_style: object = None
+    icon_size: object = None
+    icon_color: object = None
+    visual_density: VisualDensity | None = None
+    mouse_cursor: object = None
+
+
+class Ref:
+    """Reference assigned when a control receives ``ref=``."""
+    def __init__(self):
+        self.current = None
+
+    def __class_getitem__(cls, _control_type):
+        return cls
 
 
 @dataclass

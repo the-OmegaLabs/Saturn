@@ -6,6 +6,7 @@ text edges get antialiasing pygame.draw can't do alone.
 from __future__ import annotations
 
 import os
+import math
 
 import pygame
 
@@ -45,6 +46,10 @@ class SoftwareRenderer(Renderer):
         self._buf = pygame.Surface(
             (w * self._aa_scale, h * self._aa_scale), pygame.SRCALPHA)
         self._clip: list[tuple] = []
+        self._transform_layers = []
+        self._transform_translation = (0.0, 0.0)
+        self._buf_origin = (0.0, 0.0)
+        self._layer_empty = False
         self._apply_clip()
 
     def on_resize(self, width, height, *, pixel_size=None,
@@ -71,12 +76,115 @@ class SoftwareRenderer(Renderer):
             self.on_resize(*self.screen.get_size())
 
     def _s(self, *vals):
-        return [v * self.scale for v in vals]
+        origin = self._buf_origin
+        return [(value-origin[index % 2])*self.scale for index, value in enumerate(vals)]
+
+    def transform_push(self, matrix, *, bounds=None):
+        if matrix == (1.0, 0.0, 0.0, 1.0, 0.0, 0.0):
+            super().transform_push(matrix)
+            self._transform_layers.append(None)
+            return
+        matrix = self._matrix(matrix)
+        a, b, c, d, tx, ty = matrix
+        if (a, b, c, d) == (1.0, 0.0, 0.0, 1.0):
+            previous = self._transform_translation
+            super().transform_push(matrix)
+            self._transform_translation = (previous[0]+tx, previous[1]+ty)
+            self.translate_push(tx, ty)
+            self._transform_layers.append(("translation", previous))
+            return
+        sx, column_y = math.hypot(a, b), math.hypot(c, d)
+        if abs(a*c+b*d) > max(1e-10, sx*column_y*1e-8):
+            raise NotImplementedError("Software transforms support rotation and per-axis scale, not shear")
+        px, py = self._transform_translation
+        # Ancestor translations are already applied to paint coordinates.
+        # Conjugate this layer matrix so rotation remains inside that parent.
+        adjusted = (a, b, c, d, tx+px-a*px-c*py, ty+py-b*px-d*py)
+        determinant = a*d-b*c
+        empty = abs(determinant) < 1e-12 or self._layer_empty
+        left = top = right = bottom = 0.0
+        if not empty:
+            clip = self._buf.get_clip()
+            x0 = self._buf_origin[0]+clip.left/self.scale
+            y0 = self._buf_origin[1]+clip.top/self.scale
+            x1 = self._buf_origin[0]+clip.right/self.scale
+            y1 = self._buf_origin[1]+clip.bottom/self.scale
+            mx, my = adjusted[4:]
+            points = [((d*(x-mx)-c*(y-my))/determinant,
+                       (a*(y-my)-b*(x-mx))/determinant)
+                      for x, y in ((x0,y0),(x1,y0),(x1,y1),(x0,y1))]
+            left, top = min(point[0] for point in points), min(point[1] for point in points)
+            right, bottom = max(point[0] for point in points), max(point[1] for point in points)
+            if bounds is not None:
+                if len(bounds) != 4 or not all(math.isfinite(float(value)) for value in bounds):
+                    raise ValueError("Transform bounds must contain four finite coordinates")
+                bx, by, bw, bh = (float(value) for value in bounds)
+                bx, by = self._translate(bx, by)
+                left, top = max(left,bx), max(top,by)
+                right, bottom = min(right,bx+max(0,bw)), min(bottom,by+max(0,bh))
+            empty = right <= left or bottom <= top
+        origin = (math.floor(left*self.scale-1)/self.scale,
+                  math.floor(top*self.scale-1)/self.scale)
+        size = ((1,1) if empty else
+                (max(1,math.ceil((right-origin[0])*self.scale)+1),
+                 max(1,math.ceil((bottom-origin[1])*self.scale)+1)))
+        if max(size) > 16384 or size[0]*size[1] > 16777216:
+            raise ValueError("Software transform layer exceeds 16 million pixels; provide tighter paint bounds")
+        layer = pygame.Surface(size, pygame.SRCALPHA, 32)
+        super().transform_push(matrix)
+        self._transform_layers.append(("layer", self._buf, self._clip, adjusted,
+                                       self._buf_origin, self._layer_empty))
+        self._buf, self._clip = layer, []
+        self._buf_origin, self._layer_empty = origin, empty
+        self._apply_clip()
+
+    def transform_pop(self):
+        if not self._transform_layers:
+            return
+        layer = self._transform_layers.pop()
+        super().transform_pop()
+        if layer is None:
+            return
+        if layer[0] == "translation":
+            self.translate_pop()
+            self._transform_translation = layer[1]
+            return
+        source = self._buf
+        source_origin = self._buf_origin
+        _, self._buf, self._clip, matrix, self._buf_origin, self._layer_empty = layer
+        self._apply_clip()
+        bounds = source.get_bounding_rect(min_alpha=1)
+        if not bounds.width or not bounds.height:
+            return
+        a, b, c, d, tx, ty = matrix
+        sx = math.hypot(a, b)
+        if sx <= 1e-12:
+            return
+        sy = (a*d-b*c) / sx
+        if abs(sy) <= 1e-12:
+            return
+        scaled = pygame.transform.smoothscale(
+            source.subsurface(bounds),
+            (max(1, round(bounds.width*sx)), max(1, round(bounds.height*abs(sy)))))
+        if sy < 0:
+            scaled = pygame.transform.flip(scaled, False, True)
+        angle = math.degrees(math.atan2(b, a))
+        transformed = pygame.transform.rotate(scaled, -angle) if angle else scaled
+        cx = source_origin[0]+(bounds.x+bounds.width/2)/self.scale
+        cy = source_origin[1]+(bounds.y+bounds.height/2)/self.scale
+        center = ((a*cx+c*cy+tx-self._buf_origin[0])*self.scale,
+                  (b*cx+d*cy+ty-self._buf_origin[1])*self.scale)
+        self._buf.blit(transformed, (round(center[0]-transformed.get_width()/2),
+                                     round(center[1]-transformed.get_height()/2)))
 
     def _apply_clip(self):
+        if self._layer_empty:
+            self._buf.set_clip((0,0,0,0))
+            return
         rect = None
         for x, y, w, h in self._clip:
-            left, top, right, bottom = (round(v * self.scale) for v in (x,y,x+w,y+h))
+            ox, oy = self._buf_origin
+            left, top, right, bottom = (round(v * self.scale) for v in (x-ox,y-oy,x+w-ox,y+h-oy))
             r = pygame.Rect(left, top, max(0,right-left), max(0,bottom-top))
             rect = r if rect is None else rect.clip(r)
         self._buf.set_clip(rect)  # None = full surface
@@ -131,7 +239,7 @@ class SoftwareRenderer(Renderer):
         x1, y1 = self._translate(x1, y1)
         x2, y2 = self._translate(x2, y2)
         pygame.draw.line(self._buf, self._effect_color(color),
-                         *self._s(x1, y1, x2, y2),
+                         self._s(x1, y1), self._s(x2, y2),
                          width=max(1, int(width * self.scale)))
 
     def circle(self, x, y, radius, color, fill=True):
@@ -143,8 +251,9 @@ class SoftwareRenderer(Renderer):
             tmp = pygame.Surface((size, size), pygame.SRCALPHA)
             pygame.draw.circle(tmp, c, (size // 2, size // 2), rr,
                                0 if fill else max(1, round(self.scale)))
-            self._buf.blit(tmp, (round(x * self.scale) - size // 2,
-                                 round(y * self.scale) - size // 2))
+            px, py = self._s(x,y)
+            self._buf.blit(tmp, (round(px) - size // 2,
+                                 round(py) - size // 2))
             return
         pygame.draw.circle(self._buf, c, self._s(x, y), rr,
                            0 if fill else max(1, round(self.scale)))

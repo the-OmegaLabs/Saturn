@@ -102,6 +102,9 @@ def draw_state_layer(control, renderer, rect, color, radius=0.0):
         math.hypot(ripple_x - px, ripple_y - py)
         for px, py in ((x, y), (x + w, y), (x, y + h), (x + w, y + h))
     ) + 10.0
+    configured_radius = getattr(control,"splash_radius",None)
+    if configured_radius is not None:
+        end_radius = max(0,float(configured_radius))
     start_radius = 0.1 * max(w, h)
     ripple_radius = start_radius + (end_radius - start_radius) * progress
 

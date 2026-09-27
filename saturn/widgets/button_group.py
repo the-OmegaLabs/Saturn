@@ -175,7 +175,7 @@ class ButtonGroup(Control):
     def _draw_all(self, r, ox=0.0, oy=0.0):
         if not self.visible:
             return
-        self._effects_begin(r)
+        self._effects_begin(r, ox, oy)
         try:
             for child in self._visible():
                 if child in self._clipped:

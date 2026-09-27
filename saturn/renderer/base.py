@@ -8,9 +8,16 @@ upload it as a texture.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import math
+
+
+_IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
 class Renderer(ABC):
+    def activate(self):
+        """Select this window's rendering context on the UI thread."""
+        pass
     scale: float = 1.0  # supersampling factor (software backend sets 2)
     native_texture_scaling = False
     native_shape_overlay = False
@@ -18,6 +25,7 @@ class Renderer(ABC):
     native_geometry = False
     native_texture_tint = False
     native_shadow = False
+    native_shader = False
     anti_aliasing = True
     vsync = True
     vsync_active = False
@@ -25,6 +33,52 @@ class Renderer(ABC):
     def _init_effect_stacks(self):
         self._opacity_stack = [1.0]
         self._translation_stack = [(0.0, 0.0)]
+        self._transform_stack = [_IDENTITY]
+
+    @staticmethod
+    def _matrix(matrix):
+        if len(matrix) != 6:
+            raise ValueError("A transform requires six affine coefficients")
+        result = tuple(float(value) for value in matrix)
+        if not all(math.isfinite(value) for value in result):
+            raise ValueError("Transform coefficients must be finite")
+        return result
+
+    def transform_push(self, matrix, *, bounds=None) -> None:
+        """Compose an affine matrix: x'=a*x+c*y+tx, y'=b*x+d*y+ty."""
+        if matrix == _IDENTITY:
+            self._transform_stack.append(self._transform_stack[-1])
+            return
+        matrix = self._matrix(matrix)
+        if self._transform_stack[-1] == _IDENTITY:
+            self._transform_stack.append(matrix)
+            return
+        a, b, c, d, tx, ty = matrix
+        pa, pb, pc, pd, px, py = self._transform_stack[-1]
+        self._transform_stack.append((
+            pa*a+pc*b, pb*a+pd*b, pa*c+pc*d, pb*c+pd*d,
+            pa*tx+pc*ty+px, pb*tx+pd*ty+py))
+
+    def transform_pop(self) -> None:
+        if len(self._transform_stack) > 1:
+            self._transform_stack.pop()
+
+    def _transform_point(self, x, y):
+        matrix = self._transform_stack[-1]
+        if matrix == _IDENTITY:
+            return x, y
+        a, b, c, d, tx, ty = matrix
+        return a*x+c*y+tx, b*x+d*y+ty
+
+    def _transform_rect(self, x, y, w, h):
+        """Conservative scissor bounds; GPU clips remain axis aligned."""
+        if self._transform_stack[-1] == _IDENTITY:
+            return x, y, w, h
+        points = (self._transform_point(x, y), self._transform_point(x+w, y),
+                  self._transform_point(x+w, y+h), self._transform_point(x, y+h))
+        left = min(point[0] for point in points)
+        top = min(point[1] for point in points)
+        return left, top, max(point[0] for point in points)-left, max(point[1] for point in points)-top
 
     def opacity_push(self, opacity: float) -> None:
         self._opacity_stack.append(self._opacity_stack[-1] * opacity)
@@ -114,6 +168,16 @@ class Renderer(ABC):
 
     def shadow(self, x, y, w, h, radii, elevation):
         """Draw ambient and key elevation shadows analytically on the GPU."""
+        raise NotImplementedError
+
+    def shader(self, x, y, w, h, effect, color, secondary_color,
+               parameters, information):
+        """Draw a procedural fragment effect without an intermediate bitmap."""
+        raise NotImplementedError
+
+    def custom_shader(self, x, y, w, h, body, layout, values, call,
+                      elapsed, radius, color, secondary_color):
+        """Execute a user fragment directly on the GPU."""
         raise NotImplementedError
 
     @abstractmethod

@@ -18,6 +18,7 @@ from ..types import (CrossAxisAlignment, MainAxisAlignment,
                      as_border_radius, as_padding)
 from ._material import (draw_state_layer, init_state_layer, press,
                         release, set_hover, tick_state_layer)
+from ._compat import axis_distribution, value, reject_options
 
 
 def _margins(c):
@@ -33,7 +34,12 @@ class _Multi(Control):
     def __init__(self, *items, controls=None,
                  alignment=MainAxisAlignment.START,
                  vertical_alignment=None, horizontal_alignment=None,
-                 spacing: float = 10, tight: bool = False, **base):
+                 spacing: float = 10, tight: bool = False, wrap=False,
+                 run_spacing=10, run_alignment=MainAxisAlignment.START,
+                 intrinsic_height=False, intrinsic_width=False,
+                 scroll=None, auto_scroll=False, auto_scroll_animation=None,
+                 scroll_interval=10, on_scroll=None, **base):
+        reject_options(type(self).__name__,auto_scroll_animation=auto_scroll_animation)
         if controls is not None:
             if items:
                 raise TypeError("controls cannot be combined with positional children")
@@ -49,12 +55,28 @@ class _Multi(Control):
         self.horizontal_alignment = horizontal_alignment or CrossAxisAlignment.START
         self.spacing = spacing
         self.tight = tight
+        self.wrap = bool(wrap)
+        self.run_spacing = run_spacing
+        self.run_alignment = run_alignment
+        self.intrinsic_height = bool(intrinsic_height)
+        self.intrinsic_width = bool(intrinsic_width)
+        self.scroll = scroll
+        self.auto_scroll = auto_scroll
+        self.auto_scroll_animation = auto_scroll_animation
+        self.scroll_interval = scroll_interval
+        self.on_scroll = on_scroll
+        self._scroll_view = None
+        if self.wrap and value(scroll) not in (None, "none"):
+            raise ValueError("wrap and scrolling cannot be combined")
 
     def _children(self):
+        if self._scroll_view is not None and value(self.scroll) not in (None,"none"):
+            return [self._scroll_view]
         return self.controls
 
     def _visible(self):
-        return [c for c in self.controls if c.visible]
+        items = [c for c in self.controls if c.visible]
+        return list(reversed(items)) if not self.vertical and self._rtl else items
 
     @staticmethod
     def _expand_of(c) -> float:
@@ -65,6 +87,14 @@ class _Multi(Control):
 
     # -- measuring -----------------------------------------------------------
     def _intrinsic(self, max_w, max_h, scale):
+        if self.wrap:
+            runs = self._wrap_runs(max_h if self.vertical else max_w, max_w, scale)
+            main = max((sum(s[1] for s in run) + self.spacing * (len(run)-1)
+                        for run in runs), default=0)
+            cross = sum(max((s[2] for s in run), default=0) for run in runs)
+            cross += self.run_spacing * max(0, len(runs)-1)
+            w, h = (cross, main) if self.vertical else (main, cross)
+            return self._width if self._width is not None else w, self._height if self._height is not None else h
         kids = self._visible()
         footprints = [self._footprint(k, max_w, scale) for k in kids]
         main = sum(f[0 if not self.vertical else 1] for f in footprints)
@@ -91,38 +121,60 @@ class _Multi(Control):
     # -- placing -----------------------------------------------------------
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
+        if value(self.scroll) not in (None, "none"):
+            # Reuse the existing ListView scrollbar, wheel routing and culling.
+            from .scrolling import ListView
+            if self._scroll_view is None:
+                self._scroll_view = ListView()
+            view = self._scroll_view
+            view.controls = self.controls
+            view.horizontal = not self.vertical
+            view.spacing = self.spacing
+            view.scroll = self.scroll
+            view.auto_scroll = self.auto_scroll
+            view.on_scroll = self._forward_scroll
+            view.scroll_interval = self.scroll_interval
+            view.page, view.parent = self.page, self
+            if self.page is not None:
+                for child in self.controls:
+                    if child.parent is not view:
+                        child._attach(self.page,view)
+            view._place(x, y, w, h, scale)
+            return
+        if self.wrap:
+            self._place_wrapped(x, y, w, h, scale)
+            return
         kids = self._visible()
         if not kids:
             return
         sizes = [self._footprint(k, w, scale) for k in kids]
         main_sizes = [s[0] if not self.vertical else s[1] for s in sizes]
         box_main = w if not self.vertical else h
-        used = sum(main_sizes) + self.spacing * (len(kids) - 1)
-        free = box_main - used
-
         flex = [self._expand_of(k) for k in kids]
-        if sum(flex) and free > 0:
-            share = free / sum(flex)
+        if sum(flex):
+            # Flutter Flex allocates the remaining main axis after non-flex
+            # children. Intrinsic flex sizes must not bias proportional slots.
+            fixed = sum(size for size,weight in zip(main_sizes,flex) if not weight)
+            available = max(0,box_main-fixed-self.spacing*(len(kids)-1))
+            share = available/sum(flex)
             for i, k in enumerate(kids):
                 if flex[i]:
-                    main_sizes[i] += share * flex[i]
-            free = 0.0
+                    slot = share*flex[i]
+                    if k.expand_loose:
+                        ml,mt,mr,mb = _margins(k)
+                        cw,ch = k._intrinsic(max(0,w-ml-mr) if self.vertical else max(0,slot-ml-mr),
+                                             max(0,slot-mt-mb) if self.vertical else max(0,h-mt-mb),scale)
+                        sizes[i] = cw+ml+mr,ch+mt+mb
+                        main_sizes[i] = min(slot,sizes[i][1 if self.vertical else 0])
+                    else:
+                        main_sizes[i] = slot
+        used = sum(main_sizes)+self.spacing*(len(kids)-1)
+        free = box_main-used
 
-        gap = self.spacing
-        pos = 0.0
-        a = self.alignment
-        if a is MainAxisAlignment.END:
-            pos = free
-        elif a is MainAxisAlignment.CENTER:
-            pos = free / 2
-        elif a is MainAxisAlignment.SPACE_BETWEEN and len(kids) > 1:
-            gap += free / (len(kids) - 1)
-        elif a is MainAxisAlignment.SPACE_AROUND and len(kids):
-            gap += free / len(kids)
-            pos = gap / 2
-        elif a is MainAxisAlignment.SPACE_EVENLY and len(kids):
-            gap += free / (len(kids) + 1)
-            pos = gap
+        alignment = self.alignment
+        if not self.vertical and self._rtl and value(alignment) in ("start","end"):
+            alignment = "end" if value(alignment) == "start" else "start"
+        pos, gap = axis_distribution(alignment, free, len(kids), self.spacing)
 
         for i, k in enumerate(kids):
             ml, mt, mr, mb = _margins(k)
@@ -136,9 +188,9 @@ class _Multi(Control):
             cw, ch = fw - ml - mr, fh - mt - mb
             # cross-axis STRETCH fills the inner cross size (unless fixed)
             if not self.vertical:
-                if self.vertical_alignment is CrossAxisAlignment.STRETCH and k._height is None:
+                if value(self.vertical_alignment) == "stretch" and k._height is None:
                     ch = h - mt - mb
-            elif self.horizontal_alignment is CrossAxisAlignment.STRETCH and k._width is None:
+            elif value(self.horizontal_alignment) == "stretch" and k._width is None:
                 cw = w - ml - mr
             if self.vertical:
                 cx = self._cross_pos(k, cw, w, scale)
@@ -150,14 +202,99 @@ class _Multi(Control):
 
     def _cross_pos(self, k, child_cross, inner_cross, scale) -> float:
         a = self.vertical_alignment if not self.vertical else self.horizontal_alignment
-        if a is CrossAxisAlignment.END:
+        if self.vertical and self._rtl and value(a) in ("start","end"):
+            a = "end" if value(a) == "start" else "start"
+        if value(a) == "end":
             return inner_cross - child_cross
-        if a is CrossAxisAlignment.CENTER:
+        if value(a) == "center":
             return (inner_cross - child_cross) / 2
         return 0.0  # START / BASELINE / STRETCH
 
     def _draw(self, r, x, y):
         pass  # children render via _draw_all
+
+    def _wrap_runs(self, available, max_w, scale):
+        runs, run, used = [], [], 0
+        for child in self._visible():
+            w, h = self._footprint(child, max_w, scale)
+            main, cross = (h, w) if self.vertical else (w, h)
+            if run and available is not None and used + self.spacing + main > available:
+                runs.append(run)
+                run, used = [], 0
+            used += main + (self.spacing if run else 0)
+            run.append((child, main, cross))
+        if run:
+            runs.append(run)
+        return runs
+
+    def _place_wrapped(self, x, y, w, h, scale):
+        box_main, box_cross = (h, w) if self.vertical else (w, h)
+        runs = self._wrap_runs(box_main, w, scale)
+        cross_sizes = [max(entry[2] for entry in run) for run in runs]
+        cross_free = box_cross - sum(cross_sizes) - self.run_spacing * max(0, len(runs)-1)
+        cross_pos, cross_gap = axis_distribution(self.run_alignment, cross_free, len(runs), self.run_spacing)
+        for run, cross in zip(runs, cross_sizes):
+            used = sum(entry[1] for entry in run) + self.spacing * (len(run)-1)
+            pos, gap = axis_distribution(self.alignment, box_main-used, len(run), self.spacing)
+            for child, main, child_cross in run:
+                ml, mt, mr, mb = _margins(child)
+                offset = self._cross_pos(child, child_cross, cross, scale)
+                if self.vertical:
+                    child._place(x+cross_pos+offset+ml, y+pos+mt,
+                                 child_cross-ml-mr, main-mt-mb, scale)
+                else:
+                    child._place(x+pos+ml, y+cross_pos+offset+mt,
+                                 main-ml-mr, child_cross-mt-mb, scale)
+                pos += main+gap
+            cross_pos += cross+cross_gap
+
+    def _draw_all(self, r, ox=0, oy=0):
+        if self._scroll_view is not None and value(self.scroll) not in (None, "none"):
+            if self.visible:
+                self._effects_begin(r, ox, oy)
+                try:
+                    self._scroll_view._draw_all(r, ox, oy)
+                finally:
+                    self._effects_end(r)
+            return
+        super()._draw_all(r, ox, oy)
+
+    def _find_scrollable(self, x, y):
+        if self._scroll_view is not None and value(self.scroll) not in (None, "none"):
+            x,y = self._hit_point(x,y)
+            if not self.visible or self.disabled:
+                return None
+            return self._scroll_view._find_scrollable(x, y)
+        return super()._find_scrollable(x, y)
+
+    def _hit_test(self, x, y):
+        if self._scroll_view is not None and value(self.scroll) not in (None, "none"):
+            x,y = self._hit_point(x,y)
+            if not self.visible or self.disabled:
+                return None
+            return self._scroll_view._hit_test(x, y)
+        return super()._hit_test(x, y)
+
+    def _hit_test_hover(self, x, y):
+        if self._scroll_view is not None and value(self.scroll) not in (None, "none"):
+            x,y = self._hit_point(x,y)
+            if not self.visible or self.disabled:
+                return None
+            return self._scroll_view._hit_test_hover(x, y)
+        return super()._hit_test_hover(x, y)
+
+    def scroll_to(self, offset=0, delta=None, **options):
+        if self._scroll_view is None:
+            raise RuntimeError("scrolling must be enabled and laid out first")
+        return self._scroll_view.scroll_to(offset, delta, **options)
+
+    def _forward_scroll(self,event):
+        from ..event import normalize_handlers,_invoke
+        event.control = self
+        for handler in normalize_handlers(self.on_scroll):
+            self.page._app.call(_invoke,handler,event)
+
+    __unsupported_parameters__ = {"auto_scroll_animation"}
 
 
 class Row(_Multi):
@@ -191,7 +328,14 @@ class Container(Control):
                  border=None, border_radius=None, alignment=None,
                  gradient=None, shadow=None, ink=False,
                  animate=None, on_click=None, on_hover=None,
-                 on_long_press=None, **base):
+                 on_long_press=None, on_tap_down=None, ink_color=None,
+                 clip_behavior=None, shape="rectangle", url=None,
+                 ignore_interactions=False, blend_mode=None, image=None,
+                 blur=None, theme=None, dark_theme=None, theme_mode=None,
+                 color_filter=None, foreground_decoration=None, **base):
+        reject_options("Container", blend_mode=blend_mode, image=image, blur=blur,
+                       theme=theme, dark_theme=dark_theme, theme_mode=theme_mode,
+                       color_filter=color_filter, foreground_decoration=foreground_decoration)
         super().__init__(**base)
         self.content = content
         self.padding = as_padding(padding)
@@ -206,6 +350,12 @@ class Container(Control):
         self.on_click = on_click
         self.on_hover = on_hover
         self.on_long_press = on_long_press
+        self.on_tap_down = on_tap_down
+        self.ink_color = ink_color
+        self.clip_behavior = clip_behavior
+        self.shape = shape
+        self.url = url
+        self.ignore_interactions = bool(ignore_interactions)
         self._hovered = False
         self._pressed = False
         init_state_layer(self)
@@ -229,7 +379,8 @@ class Container(Control):
 
     def _hit_test_hover(self, x, y):
         """Ink containers have a visual hover state even without a handler."""
-        if not self.visible or self.disabled:
+        x,y = self._hit_point(x,y)
+        if not self.visible or self.disabled or self.ignore_interactions:
             return None
         for child in reversed(self._children()):
             hit = child._hit_test_hover(x, y)
@@ -241,17 +392,33 @@ class Container(Control):
         return None
 
     def _pressed_hook(self, x, y):
+        import time
+        self._long_press_at = time.perf_counter()+.5 if self.on_long_press else None
+        self._consume_click = False
+        if self.on_tap_down:
+            from ..event import fire, TapEvent
+            fire(self, "tap_down", TapEvent("mouse", (x-self._rect[0], y-self._rect[1]), (x,y)))
         if not self.ink:
             return
         press(self, x, y)
 
     def _released_hook(self, _x, _y):
+        self._long_press_at = None
         if not self.ink:
             return
         release(self)
 
     def _tick_animations(self, now: float) -> bool:
         waiting = tick_state_layer(self, now) if self.ink else False
+        deadline = getattr(self,"_long_press_at",None)
+        if deadline is not None and self._pressed:
+            if now >= deadline:
+                self._long_press_at = None
+                self._consume_click = True
+                from ..event import fire
+                fire(self,"long_press")
+            else:
+                waiting = True
         return super()._tick_animations(now) or waiting
 
     def _children(self):
@@ -311,34 +478,91 @@ class Container(Control):
         if self.bgcolor is not None:
             r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor),
                         radius=self._radius())
+        if self.gradient is not None:
+            self._draw_gradient(r, x, y, w, h)
         if self.border is not None and self.border.left.color is not None:
             r.stroke_rect(x, y, w, h, colors.parse_color(self.border.left.color),
                           width=self.border.left.width, radius=self._radius())
         if self.ink:
             draw_state_layer(self, r, (x, y, w, h),
-                             colors.Colors.ON_SURFACE, self._radius())
-        if self.border_radius:
+                             self.ink_color or colors.Colors.ON_SURFACE, self._radius())
+        if self._clip_children:
             r.clip_push(x, y, w, h)
 
     def _draw_all(self, r, ox: float = 0.0, oy: float = 0.0):
         if not self.visible:
             return
-        self._effects_begin(r)
+        self._effects_begin(r, ox, oy)
         try:
             self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
             if self.content is not None:
                 self.content._draw_all(r, ox, oy)
-            if self.border_radius:
+            if self._clip_children:
                 r.clip_pop()
         finally:
             self._effects_end(r)
 
     def _radius(self):
+        if value(self.shape) == "circle":
+            return min(self._rect[2:]) / 2
         return as_border_radius(self.border_radius).top_left
+
+    @property
+    def _clip_children(self):
+        return (bool(self.border_radius) if self.clip_behavior is None else
+                value(self.clip_behavior) != "none")
+
+    def _hit_test(self, x, y):
+        if self.ignore_interactions:
+            return None
+        return super()._hit_test(x, y)
+
+    def _draw_gradient(self, r, x, y, w, h):
+        # Static decoration cache: gradients are rasterized only when their
+        # size or stops change, then share the ordinary GPU texture path.
+        import pygame
+        from ..painting import corners, shape_mask
+        g = self.gradient
+        begin, end = getattr(g, "begin", None), getattr(g, "end", None)
+        if begin is None or end is None:
+            raise NotImplementedError("only LinearGradient is supported")
+        rgba = tuple(colors.parse_color(c) for c in g.colors)
+        if len(rgba) < 2:
+            raise ValueError("a gradient requires at least two colors")
+        stops = tuple(g.stops) if g.stops else tuple(i/(len(rgba)-1) for i in range(len(rgba)))
+        if len(stops) != len(rgba) or list(stops) != sorted(stops):
+            raise ValueError("gradient stops must match colors and increase")
+        pw, ph = max(1, round(w*r.scale)), max(1, round(h*r.scale))
+        key = (pw, ph, rgba, stops, begin.x, begin.y, end.x, end.y, self._radius())
+        if getattr(self, "_gradient_key", None) != key:
+            sx, sy = (begin.x+1)*pw/2, (begin.y+1)*ph/2
+            dx, dy = (end.x-begin.x)*pw/2, (end.y-begin.y)*ph/2
+            denom = dx*dx+dy*dy or 1
+            surface = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            # A smooth gradient has no high-frequency detail. Rasterize its
+            # small color field once and upscale, without an extra dependency.
+            gw,gh = min(pw,128),min(ph,128)
+            field = pygame.Surface((gw,gh),pygame.SRCALPHA)
+            from bisect import bisect_right
+            for gy in range(gh):
+                for gx in range(gw):
+                    t = max(0,min(1,((gx*pw/gw-sx)*dx+(gy*ph/gh-sy)*dy)/denom))
+                    i = max(0,min(len(stops)-2,bisect_right(stops,t)-1))
+                    fraction = max(0,min(1,(t-stops[i])/(stops[i+1]-stops[i] or 1)))
+                    field.set_at((gx,gy),tuple(round(a+(b-a)*fraction) for a,b in zip(rgba[i],rgba[i+1])))
+            surface = pygame.transform.smoothscale(field,(pw,ph))
+            if self._radius():
+                surface.blit(shape_mask(pw, ph, corners(self._radius(), r.scale, pw, ph)), (0,0), special_flags=pygame.BLEND_RGBA_MULT)
+            self._gradient_surface, self._gradient_key = surface, key
+        r.blit_cached(self._gradient_surface, x, y)
+
+    __unsupported_parameters__ = {"blend_mode", "image", "blur", "theme", "dark_theme",
+                                  "theme_mode", "color_filter", "foreground_decoration"}
 
 
 class Stack(Control):
-    def __init__(self, *items, controls=None, **base):
+    def __init__(self, *items, controls=None, clip_behavior="hardEdge",
+                 alignment=None, fit="loose", **base):
         if controls is not None:
             if items:
                 raise TypeError("controls cannot be combined with positional children")
@@ -347,6 +571,9 @@ class Stack(Control):
             items = tuple(items[0])
         super().__init__(**base)
         self.controls = list(items)
+        self.clip_behavior = clip_behavior
+        self.alignment = alignment
+        self.fit = fit
 
     def _children(self):
         return self.controls
@@ -380,32 +607,53 @@ class Stack(Control):
                 continue
             ml, mt, mr, mb = _margins(k)
             kw, kh = k._intrinsic(w, h, scale)
+            if value(self.fit) == "expand" and k.left is None and k.right is None and k.top is None and k.bottom is None:
+                kw, kh = w, h
             if k._width is not None:
                 kw = k._width
             if k._height is not None:
                 kh = k._height
             kw -= ml + mr
             kh -= mt + mb
+            if k.left is not None and k.right is not None and k._width is None:
+                kw = max(0, w-k.left-k.right-ml-mr)
+            if k.top is not None and k.bottom is not None and k._height is None:
+                kh = max(0, h-k.top-k.bottom-mt-mb)
+            ax, ay = ((self.alignment.x+1)/2, (self.alignment.y+1)/2) if self.alignment else (0,0)
             left = k.left if k.left is not None else (
-                w - kw - (k.right or 0) if k.right is not None else 0)
+                w - kw - (k.right or 0) if k.right is not None else (w-kw)*ax)
             top = k.top if k.top is not None else (
-                h - kh - (k.bottom or 0) if k.bottom is not None else 0)
+                h - kh - (k.bottom or 0) if k.bottom is not None else (h-kh)*ay)
             k._place(x + left + ml, y + top + mt, kw, kh, scale)
 
     def _draw(self, r, x, y):
         pass
 
+    def _draw_all(self, r, ox=0, oy=0):
+        if not self.visible:
+            return
+        clipped = value(self.clip_behavior) != "none"
+        if clipped:
+            x,y,w,h = self._rect
+            r.clip_push(x+ox,y+oy,w,h)
+        try:
+            super()._draw_all(r, ox, oy)
+        finally:
+            if clipped:
+                r.clip_pop()
+
 
 class Divider(Control):
     def __init__(self, *, height: float = 16, thickness: float = 1,
                  color=None, leading_indent: float = 0, trailing_indent: float = 0,
-                 **base):
+                 radius=None, **base):
         super().__init__(**base)
-        self.height = height
-        self.thickness = thickness
+        self.height = 16 if height is None else height
+        self.thickness = 1 if thickness is None else thickness
         self.color = color
-        self.leading_indent = leading_indent
-        self.trailing_indent = trailing_indent
+        self.leading_indent = leading_indent or 0
+        self.trailing_indent = trailing_indent or 0
+        self.radius = radius
 
     def _intrinsic(self, max_w, max_h, scale):
         return (self._width if self._width is not None else (max_w or 0),
@@ -420,4 +668,4 @@ class Divider(Control):
         r.fill_rect(x + self.leading_indent, cy,
                     max(0, w - self.leading_indent - self.trailing_indent),
                     self.thickness,
-                    colors.parse_color(self.color or colors.Colors.OUTLINE_VARIANT))
+                    colors.parse_color(self.color or colors.Colors.OUTLINE_VARIANT), radius=self.radius or 0)

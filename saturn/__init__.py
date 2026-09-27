@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from .event import (
     ControlEvent, KeyboardEvent, PageResizeEvent, PlatformBrightnessChangeEvent,
+    TextSelectionChangeEvent, LayoutSizeChangeEvent, RouteChangeEvent,
 )
 from .app import App, Renderer, run
 
@@ -20,6 +21,8 @@ from ._gen.icons import Icons
 from .colors import BASELINE_DARK, BASELINE_LIGHT, Colors, parse_color, theme_dark
 from .control import Control
 from .page import Page, Window
+from .subpage import Subpage
+from .widgets.shader import Shader, ShaderEffect
 from .window import WindowEvent, WindowEventType, WindowResizeEdge
 from .services import (
     FilePicker,
@@ -30,6 +33,12 @@ from .services import (
     FilePickerUploadFile,
 )
 from .types import (
+    ButtonStyle, ControlState, BoxConstraints, MouseCursor, Ref,
+    RoundedRectangleBorder, StadiumBorder, CircleBorder,
+    ImageRepeat, FilterQuality, ClipBehavior, BoxShape, StrokeCap, VisualDensity,
+    TextSelection, TextAffinity, InputFilter, TextCapitalization,
+    SliderInteraction, LinearGradient,
+    NoInputBorder, UnderlineInputBorder,
     Alignment,
     Animation,
     AnimationCurve,
@@ -119,9 +128,16 @@ from .widgets import (
 from .compose import Compose
 
 __all__ = [
+    "NoInputBorder", "UnderlineInputBorder",
+    "Subpage", "Shader", "ShaderEffect", "SliderInteraction", "LinearGradient",
     "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
     "WindowEvent", "WindowEventType", "WindowResizeEdge",
+    "TextSelectionChangeEvent", "LayoutSizeChangeEvent", "RouteChangeEvent",
+    "ButtonStyle", "ControlState", "BoxConstraints", "MouseCursor", "Ref",
+    "RoundedRectangleBorder", "StadiumBorder", "CircleBorder",
+    "ImageRepeat", "FilterQuality", "ClipBehavior", "BoxShape", "StrokeCap", "VisualDensity",
+    "TextSelection", "TextAffinity", "InputFilter", "TextCapitalization",
     "Colors", "Icons", "parse_color",
     "Control", "Page", "Window", "Text", "Row", "Column", "Container",
     "Stack", "Divider", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",

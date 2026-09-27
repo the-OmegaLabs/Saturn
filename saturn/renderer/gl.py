@@ -44,13 +44,15 @@ in vec2 in_rb;           // radius, border width (radius < 0 -> no SDF)
 in vec4 in_color;
 in vec4 in_border_color;
 uniform vec2 u_size;
+uniform mat3 u_transform;
 out vec2 v_local;
 flat out vec2 v_half;
 flat out vec2 v_rb;
 out vec4 v_color;
 flat out vec4 v_border_color;
 void main() {
-    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    vec2 transformed = (u_transform * vec3(in_pos, 1.0)).xy;
+    vec2 out_pos = vec2(transformed.x, u_size.y - transformed.y);
     gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
     v_local = in_pos - in_center;
     v_half = in_half;
@@ -99,10 +101,12 @@ in vec2 in_pos;
 in vec2 in_uv;
 in vec4 in_color;
 uniform vec2 u_size;
+uniform mat3 u_transform;
 out vec2 v_uv;
 out vec4 v_color;
 void main() {
-    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    vec2 transformed = (u_transform * vec3(in_pos, 1.0)).xy;
+    vec2 out_pos = vec2(transformed.x, u_size.y - transformed.y);
     gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
     v_uv = in_uv;
     v_color = in_color;
@@ -126,9 +130,11 @@ STATE_VS = """
 in vec2 in_pos;
 in vec2 in_uv;
 uniform vec2 u_size;
+uniform mat3 u_transform;
 out vec2 v_uv;
 void main() {
-    vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
+    vec2 transformed = (u_transform * vec3(in_pos, 1.0)).xy;
+    vec2 out_pos = vec2(transformed.x, u_size.y - transformed.y);
     gl_Position = vec4(out_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
     v_uv = in_uv;
 }
@@ -147,10 +153,16 @@ uniform float u_pressed;
 uniform float u_mode;
 uniform vec4 u_wave;
 uniform vec4 u_info;
+uniform vec4 u_secondary_color;
 out vec4 frag;
-""" + Path(__file__).with_name('wave.glsl').read_text() + """
+""" + Path(__file__).with_name('wave.glsl').read_text() + Path(__file__).with_name('effects.glsl').read_text() + """
 void main() {
     vec2 p = v_uv * u_rect_size;
+    if (u_mode > 3.5) {
+        frag = procedural_effect(v_uv, u_rect_size, u_mode - 4.0, u_color,
+                                 u_secondary_color, u_wave, u_info);
+        return;
+    }
     if (u_mode > .5) {
         if (u_mode > 2.5) {
             frag = vec4(u_color.rgb, u_color.a *
@@ -189,6 +201,7 @@ class GLRenderer(Renderer):
     native_geometry = True
     native_texture_tint = True
     native_shadow = True
+    native_shader = True
     native_state_layer = True
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
@@ -205,6 +218,15 @@ class GLRenderer(Renderer):
         self._ssaa = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2
         self.scale = self._ssaa * self.pixel_ratio
         self.ctx = moderngl.create_context()
+        library = Path(pygame.__file__).with_name("SDL2.dll")
+        self._context_sdl = ctypes.CDLL(str(library) if library.exists() else pygame.base.__file__)
+        self._context_sdl.SDL_GL_GetCurrentContext.restype = ctypes.c_void_p
+        self._native_gl_context = self._context_sdl.SDL_GL_GetCurrentContext()
+        self._context_sdl.SDL_GetWindowFromID.argtypes = [ctypes.c_uint32]
+        self._context_sdl.SDL_GetWindowFromID.restype = ctypes.c_void_p
+        self._native_sdl_window = self._context_sdl.SDL_GetWindowFromID(window.id)
+        self._context_sdl.SDL_GL_MakeCurrent.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        self._context_sdl.SDL_GL_MakeCurrent.restype = ctypes.c_int
         self.ctx.enable(moderngl.BLEND)
         # the GL backbuffer follows the OS window automatically, but pygame's
         # get_surface() and moderngl's ctx.screen both cache the CREATION size —
@@ -216,9 +238,12 @@ class GLRenderer(Renderer):
         self._prog = self.ctx.program(vertex_shader=RECT_VS, fragment_shader=RECT_FS)
         self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
         self._prog_state = self.ctx.program(vertex_shader=STATE_VS, fragment_shader=STATE_FS)
+        self._custom_programs = OrderedDict()
+        self._custom_failures = OrderedDict()
         self._prog["u_size"].value = self._fb_size()
         self._prog_tex["u_size"].value = self._fb_size()
         self._prog_state["u_size"].value = self._fb_size()
+        self._set_transform()
         self._prog_tex["u_tex"].value = 0
         self._rect_vertices = array("f")
         self._rect_vbo = self.ctx.buffer(reserve=65536)
@@ -242,6 +267,11 @@ class GLRenderer(Renderer):
         self._create_frame_target()
         self.vsync_active = _set_swap_interval(vsync)
 
+    def activate(self):
+        if self._context_sdl.SDL_GL_GetCurrentContext() != self._native_gl_context:
+            if self._context_sdl.SDL_GL_MakeCurrent(self._native_sdl_window, self._native_gl_context) != 0:
+                raise RuntimeError("Cannot activate the window's OpenGL context")
+
     def configure(self, *, anti_aliasing: bool, vsync: bool):
         changed = anti_aliasing != self.anti_aliasing
         self._flush_rects()
@@ -252,6 +282,26 @@ class GLRenderer(Renderer):
             self._ssaa = (1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2)
             self.scale = self._ssaa * self.pixel_ratio
             self._create_frame_target()
+
+    def _set_transform(self):
+        a, b, c, d, tx, ty = self._transform_stack[-1]
+        value = (a, b, 0.0, c, d, 0.0, tx, ty, 1.0)
+        for program in (self._prog, self._prog_tex, self._prog_state):
+            program['u_transform'].value = value
+
+    def transform_push(self, matrix, *, bounds=None):
+        previous = self._transform_stack[-1]
+        super().transform_push(matrix, bounds=bounds)
+        if self._transform_stack[-1] != previous:
+            self._flush_rects()
+            self._set_transform()
+
+    def transform_pop(self):
+        previous = self._transform_stack[-1]
+        super().transform_pop()
+        if self._transform_stack[-1] != previous:
+            self._flush_rects()
+            self._set_transform()
 
     def _query_size(self):
         try:
@@ -484,18 +534,24 @@ class GLRenderer(Renderer):
         self._tex_vao.render(moderngl.TRIANGLES)
 
     def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         x, y = self._translate(x, y)
         alpha *= self.opacity
         tex, _ = self._texture(surface)
         self._draw_texture(tex, x, y, width, height, alpha)
 
     def blit_cached_scaled(self, surface, x, y, width, height, alpha=1.0):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         x, y = self._translate(x, y)
         alpha *= self.opacity
         self._draw_texture(self._cached_texture(surface), x, y,
                            width, height, alpha)
 
     def blit_tinted_scaled(self, surface, x, y, width, height, color):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         x, y = self._translate(x, y)
         self._draw_texture(self._cached_texture(surface), x, y, width, height,
                            self.opacity, tint=parse_color(color))
@@ -567,10 +623,59 @@ class GLRenderer(Renderer):
         self._wave_quad(x-pad, y-pad, w+2*pad, h+2*pad, (0, 0, 0, 255), 3,
                         radii, (ambient, key, offset, pad))
 
+    def shader(self, x, y, w, h, effect, color, secondary_color,
+               parameters, information):
+        self._prog_state['u_secondary_color'].value = tuple(
+            value / 255 for value in self._effect_color(secondary_color))
+        self._wave_quad(x, y, w, h, color, 4 + effect, parameters, information)
+
+    def custom_shader(self, x, y, w, h, body, layout, values, call,
+                      elapsed, radius, color, secondary_color):
+        from .shader_source import fragment_source, ShaderCompilationError
+        if w <= 0 or h <= 0:
+            return
+        key = (body, layout, call)
+        if key in self._custom_failures:
+            raise ShaderCompilationError(self._custom_failures[key])
+        if key not in self._custom_programs:
+            try:
+                program = self.ctx.program(vertex_shader=STATE_VS,
+                    fragment_shader=fragment_source(body, layout, call))
+            except moderngl.Error as error:
+                self._custom_failures[key] = str(error)
+                if len(self._custom_failures)>32:
+                    self._custom_failures.popitem(last=False)
+                raise ShaderCompilationError(str(error)) from error
+            vao = self.ctx.vertex_array(program,
+                [(self._state_vbo, '2f 2f', 'in_pos', 'in_uv')], skip_errors=True)
+            self._custom_programs[key] = (program, vao)
+            if len(self._custom_programs)>32:
+                _, (old_program, old_vao) = self._custom_programs.popitem(last=False)
+                old_vao.release()
+                old_program.release()
+        program, vao = self._custom_programs[key]
+        self._custom_programs.move_to_end(key)
+        self._flush_rects()
+        x, y = self._translate(x, y)
+        vertices = (x,y,0,0, x+w,y,1,0, x+w,y+h,1,1,
+                    x,y,0,0, x+w,y+h,1,1, x,y+h,0,1)
+        self._state_vbo.write(struct.pack('24f', *vertices))
+        a,b,c,d,tx,ty = self._transform_stack[-1]
+        builtins = dict(u_size=self._fb_size(), u_transform=(a,b,0,c,d,0,tx,ty,1),
+                        u_resolution=(float(w),float(h)), u_time=elapsed,
+                        u_border_radius=radius, u_opacity=self.opacity,
+                        u_color=tuple(v/255 for v in parse_color(color)),
+                        u_secondary_color=tuple(v/255 for v in parse_color(secondary_color)))
+        for name, value in (*builtins.items(), *zip((name for name,_ in layout), values)):
+            if name in program:
+                program[name].value = value
+        vao.render(moderngl.TRIANGLES)
+
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):
         self._flush_rects()
         x, y = self._translate(x, y)
+        x, y, w, h = self._transform_rect(x, y, w, h)
         _sw, sh = self._fb_size()
         device_scale = self.scale
         left, right = round(x * device_scale), round((x + w) * device_scale)
@@ -655,6 +760,10 @@ class GLRenderer(Renderer):
 
     def close(self):
         self._flush_rects()
+        for program, vao in self._custom_programs.values():
+            vao.release()
+            program.release()
+        self._custom_programs.clear()
         for resource in (self._rect_vao, self._tex_vao, self._state_vao,
                          self._rect_vbo, self._tex_vbo, self._state_vbo,
                          self._frame_target, self._frame_color,

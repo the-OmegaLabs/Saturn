@@ -510,7 +510,8 @@ def _chain(family: str | None, wnum: int, italic: bool) -> tuple[tuple, ...]:
 def _chain_cached(family, wnum, italic, _default, _revision):
     """Primary link first, then fallbacks: the other bundled fonts (Inter /
     Inter-Italic / Noto), then the CJK system chain. Deduped by priority."""
-    links = [_primary_link(family, wnum, italic)]
+    links = ([_primary_link(item, wnum, italic) for item in family if item is not None]
+             if isinstance(family, tuple) else [_primary_link(family, wnum, italic)])
     links.append(("file", str(NOTO_REGULAR), wnum, False))
     links.append(_default_link(wnum, False))
     links += [("sys", n.strip(), wnum, False)

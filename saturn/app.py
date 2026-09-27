@@ -104,7 +104,19 @@ def _set_windows_default_icon(hwnd: int) -> bool:
 
 
 class App:
-    def __init__(self, main, backend: Renderer, title: str = "saturn"):
+    def __init__(self, main, backend: Renderer, title: str = "saturn", *, _parent_app=None):
+        self._parent_app = _parent_app
+        self._root = _parent_app._root if _parent_app else self
+        self._children = []
+        self._window = None
+        self._disposed = False
+        self._running = False
+        if _parent_app:
+            self._router = self._root._router
+        else:
+            from .routing import RouteState
+            self._router = RouteState()
+        self._active_theme = None
         self._main = main
         self._backend = backend
         # Window.width/height describe the native outer window. Page
@@ -118,13 +130,17 @@ class App:
         self._closed = threading.Event()
         self._ui_q: queue.SimpleQueue = queue.SimpleQueue()
         # background loop for async handlers / main coroutines
-        self._loop = asyncio.new_event_loop()
-        self._executor = ThreadPoolExecutor(thread_name_prefix="saturn-handler")
-        threading.Thread(target=self._loop.run_forever, daemon=True,
-                         name="saturn-async").start()
+        if _parent_app:
+            self._loop = self._root._loop
+            self._executor = self._root._executor
+        else:
+            self._loop = asyncio.new_event_loop()
+            self._executor = ThreadPoolExecutor(thread_name_prefix="saturn-handler")
+            threading.Thread(target=self._loop.run_forever, daemon=True,
+                             name="saturn-async").start()
         self.renderer: _RendererBase | None = None
-        self._anti_aliasing = True
-        self._vsync = True
+        self._anti_aliasing = _parent_app._anti_aliasing if _parent_app else True
+        self._vsync = _parent_app._vsync if _parent_app else True
         self._renderer_configuration_pending = False
         self._renderer_options_lock = threading.Lock()
         self.page = None  # set in start()
@@ -139,6 +155,7 @@ class App:
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
+        self._ui_thread = threading.get_ident()
         # SDL2 suppresses native IME UI by default. Enable the operating
         # system candidate list before initializing the video subsystem.
         os.environ.setdefault("SDL_IME_SHOW_UI", "1")
@@ -146,7 +163,8 @@ class App:
         # disables Windows' blurry bitmap scaling when a window moves between
         # displays with different densities.
         os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
-        pygame.init()
+        if self._parent_app is None:
+            pygame.init()
         # pygame disables key repeat by default. SDL owns the held-key timer
         # and stops it on key release; text entry still uses TEXTINPUT events.
         pygame.key.set_repeat(400, 35)
@@ -161,6 +179,7 @@ class App:
             opengl=self._backend is Renderer.OPENGL,
             vulkan=self._backend is Renderer.VULKAN,
             allow_high_dpi=True,
+            hidden=self._parent_app is not None,
         )
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
         self._refresh_rate = _system_refresh_rate()
@@ -183,78 +202,193 @@ class App:
             *client, pixel_size=pixel_client,
             pixel_ratio=self._pixel_ratio)
         from .page import Page  # deferred: page imports app bits
-        self.page = Page(self)
+        if self.page is None:
+            self.page = Page(self)
         from . import text as _text
-        _text.on_weight_ready = self.mark_dirty  # Regular -> real weight swap
+        _text.on_weight_ready = self._root._mark_all_dirty
         autoclose = os.environ.get("SATURN_AUTOCLOSE")  # test hook
-        if autoclose:
+        if autoclose and self._parent_app is None:
             threading.Timer(float(autoclose), self.close).start()
         shot = os.environ.get("SATURN_SHOT")  # test hook: save a frame
-        if shot:
+        if shot and self._parent_app is None:
             threading.Timer(2.0, lambda: _swallow(self.screenshot, shot)).start()
-        threading.Thread(target=self.call, args=(self._main, self.page),
+        threading.Thread(target=self.call, args=(self._invoke_main, self.page),
                          daemon=True, name="saturn-main").start()
         self._dirty.set()
+        if self._root._running:
+            self._install_live_resize_watch()
+
+    def _invoke_main(self, page):
+        result = self._main(page)
+        def placed():
+            if hasattr(page, "_sync_attachment") and not self._closed.is_set():
+                self.post(lambda: page._sync_attachment(force=True))
+        if inspect.isawaitable(result):
+            async def finish():
+                try:
+                    return await result
+                finally:
+                    placed()
+            return finish()
+        placed()
+        return result
 
     def close(self):
         self._closed.set()
+        for child in tuple(self._children):
+            child.close()
+
+    def _apps(self):
+        yield self
+        for child in tuple(self._children):
+            yield from child._apps()
+
+    def _mark_all_dirty(self):
+        for app in self._apps():
+            app.mark_dirty()
+
+    def _activate(self):
+        if self.renderer is not None:
+            self.renderer.activate()
+        # Colors and font defaults are currently shared by the widget library.
+        # Restore the owning Page's settings before each window is rendered.
+        if self.page is not None and self.page._theme_key is not None:
+            from . import colors, text
+            text.register_fonts(self.page._fonts, on_ready=self._root._mark_all_dirty)
+            key = self.page._theme_key
+            if self._root._active_theme != key:
+                colors.theme_dark = key[0]
+                colors.apply_seed(key[2], expressive=key[3])
+                text.set_default_family(key[1])
+                self._root._active_theme = key
+
+    def _drain_commands(self):
+        if self._window is None or self._closed.is_set():
+            return
+        self._activate()
+        while True:
+            try:
+                command = self._ui_q.get_nowait()
+            except queue.Empty:
+                break
+            command()
+            self._activate()
+
+    def _handle_event(self, e):
+        self._activate()
+        if e.type == pygame.WINDOWCLOSE:
+            self.page.window._request_close()
+        elif e.type == pygame.WINDOWRESIZED:
+            self._resize_frame(e.x, e.y, present=False, dispatch=True)
+        elif e.type == pygame.WINDOWDISPLAYCHANGED:
+            self._refresh_pixel_ratio()
+            self._resize_frame(*self._window.size, present=False, dispatch=True)
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            self.page.pointer_down(*self.logical_point(*e.pos))
+        elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
+            self.page.pointer_up(*self.logical_point(*e.pos))
+        elif e.type == pygame.MOUSEMOTION:
+            self.page.pointer_move(*self.logical_point(*e.pos))
+        else:
+            self.page.handle_event(e)
+        self.page.window._handle_event(e)
+
+    def _pump_once(self):
+        for app in tuple(self._apps()):
+            app._drain_commands()
+        apps = {app._window.id: app for app in self._apps()
+                if app._window is not None and not app._closed.is_set()}
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.page.window._request_close()
+                continue
+            window = getattr(event, "window", None)
+            window_id = getattr(window, "id", window)
+            target = apps.get(window_id)
+            if target is None and window is None:
+                target = next((app for app in apps.values() if app._window.focused), self)
+            if target is None or target._closed.is_set():
+                continue
+            if any(getattr(child.page, "modal", False) and not child._closed.is_set()
+                   for child in target._children) and event.type in (
+                    pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION,
+                    pygame.KEYDOWN, pygame.KEYUP, pygame.TEXTINPUT, pygame.TEXTEDITING,
+                    pygame.MOUSEWHEEL):
+                continue
+            target._handle_event(event)
+        now = time.perf_counter()
+        for app in tuple(self._apps()):
+            if app._closed.is_set() or app._window is None or app.renderer is None:
+                continue
+            app._activate()
+            if hasattr(app.page, "_sync_attachment"):
+                app.page._sync_attachment()
+            if now - app._last_brightness_check >= 1.0:
+                app._last_brightness_check = now
+                app.page._refresh_platform_brightness()
+            if not app.page.window._values.get("visible", True):
+                # Explicitly hidden windows keep their tree but consume no
+                # animation frames. Showing them requests a fresh frame.
+                app._dirty.clear()
+                continue
+            if app._dirty.is_set():
+                app._dirty.clear()
+                app.page.draw()
+                app.renderer.flip()
+        for app in reversed(tuple(self._apps())):
+            if app._closed.is_set() and app is not self:
+                app._dispose()
+
+    def _dispose(self):
+        if self._disposed:
+            return
+        for child in tuple(self._children):
+            child.close()
+            child._dispose()
+        self._remove_live_resize_watch()
+        self._activate()
+        if self.page is not None:
+            self.page._cancel_input()
+            self.page.window._dispose()
+            self._router.unregister(self.page)
+        if self.renderer is not None:
+            self.renderer.close()
+        if self._window is not None:
+            self._window.destroy()
+            self._window = None
+        self._disposed = True
+        parent = self._parent_app
+        if parent is not None:
+            if self in parent._children:
+                parent._children.remove(self)
+            if (sys.platform == "win32" and parent._window is not None
+                    and getattr(self.page, "modal", False)
+                    and not any(getattr(c.page, "modal", False) and not c._closed.is_set()
+                                for c in parent._children)):
+                ctypes.windll.user32.EnableWindow(ctypes.c_void_p(parent._window.handle), True)
+            if not parent._closed.is_set():
+                parent._activate()
 
     def run_until_closed(self):
         # Bind the SDL watcher to the actual event-loop lifetime. Some unit
         # tests use start() only and create several displays in one process;
         # leaving a watcher attached across those displays is unsafe.
         self._install_live_resize_watch()
+        self._running = True
         clock = pygame.time.Clock()
         while not self._closed.is_set():
-            # drain display-mutation commands from worker threads: SDL video
-            # calls are main-thread-only, calling them from workers deadlocks
-            while True:
-                try:
-                    self._ui_q.get_nowait()()
-                except queue.Empty:
-                    break
-            for e in pygame.event.get():
-                if e.type in (pygame.QUIT, pygame.WINDOWCLOSE):
-                    self.page.window._request_close()
-                elif e.type == pygame.WINDOWRESIZED:
-                    self._resize_frame(e.x, e.y, present=False, dispatch=True)
-                elif e.type == pygame.WINDOWDISPLAYCHANGED:
-                    self._refresh_pixel_ratio()
-                    self._resize_frame(
-                        *self._window.size, present=False, dispatch=True)
-                elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-                    self.page.pointer_down(*self.logical_point(*e.pos))
-                elif e.type == pygame.MOUSEBUTTONUP and e.button == 1:
-                    self.page.pointer_up(*self.logical_point(*e.pos))
-                elif e.type == pygame.MOUSEMOTION:
-                    self.page.pointer_move(*self.logical_point(*e.pos))
-                elif e.type in (pygame.KEYDOWN, pygame.KEYUP, pygame.TEXTINPUT,
-                                pygame.TEXTEDITING, pygame.MOUSEWHEEL):
-                    self.page.handle_event(e)
-                else:
-                    self.page.handle_event(e)
-                self.page.window._handle_event(e)
-            now = time.perf_counter()
-            if now - self._last_brightness_check >= 1.0:
-                self._last_brightness_check = now
-                self.page._refresh_platform_brightness()
-            if self._dirty.is_set():
-                self._dirty.clear()
-                self.page.draw()
-                self.renderer.flip()
+            self._pump_once()
             if self._vsync:
                 clock.tick(self._refresh_rate)
             elif not self._dirty.is_set():
                 # Poll input while idle without spinning a CPU core. Active
                 # animations remain uncapped when synchronization is off.
                 self._dirty.wait(0.004)
-        self._remove_live_resize_watch()
-        self.page.window._dispose()
-        if self.renderer is not None:
-            self.renderer.close()
-        self._window.destroy()
+        self._running = False
+        self._dispose()
         pygame.display.quit()
         self._executor.shutdown(wait=False, cancel_futures=True)
+        self._loop.call_soon_threadsafe(self._loop.stop)
 
     # -- cross-thread helpers -------------------------------------------
     def configure_renderer(self, *, anti_aliasing=None, vsync=None):
@@ -328,6 +462,7 @@ class App:
         ``present=True`` is used by the SDL event watch while Win32 owns the
         modal move/size loop and Saturn's normal event loop cannot advance.
         """
+        self._activate()
         pixel_width = max(1, int(width))
         pixel_height = max(1, int(height))
         self._refresh_pixel_ratio()
@@ -385,6 +520,8 @@ class App:
 
             @callback_type
             def watch(_userdata, event_ptr):
+                if threading.get_ident() != self._ui_thread or self._closed.is_set():
+                    return 1
                 event = event_ptr.contents
                 # SDL2: WINDOWEVENT=0x200; RESIZED=5; SIZE_CHANGED=6.
                 if (event.type == 0x200 and event.window.window_id == window_id
@@ -423,6 +560,8 @@ class App:
     def screenshot(self, path: str | None = None):
         """Grab the current frame from any thread; returns a pygame Surface
         (RGBA, window size) and optionally saves it to `path` as PNG."""
+        if self._closed.is_set():
+            raise RuntimeError("Cannot capture a closed window")
         done = threading.Event()
         box: list = []
 
@@ -472,7 +611,7 @@ class App:
         return (float(x) / ratio, float(y) / ratio)
 
     def _refresh_pixel_ratio(self):
-        if not hasattr(self, "_window"):
+        if self._window is None:
             return False
         ratio = _window_pixel_ratio(self._window.handle)
         if abs(ratio - self._pixel_ratio) < 0.001:

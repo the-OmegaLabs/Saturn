@@ -7,6 +7,8 @@ from ..text import render_icon_cached
 from ..painting import draw_shadow
 from ._material import draw_state_layer, press, release, set_hover
 from .buttons import Button
+from ..control import Control
+from ._compat import shape_radius, value, reject_options
 
 
 # (square side, corner radius, icon size, extended height, leading/trailing
@@ -38,11 +40,16 @@ class FloatingActionButton(Button):
                  size: str = "standard", expanded: bool = True,
                  bgcolor=None, color=None, foreground_color=None,
                  elevation: float = 6.0,
-                 on_click=None, on_hover=None, **base):
+                 on_click=None, on_hover=None, shape=None, autofocus=False,
+                 focus_color=None, disabled_elevation=None, focus_elevation=None,
+                 highlight_elevation=None, hover_elevation=None, hover_color=None,
+                 splash_color=None, enable_feedback=None, url=None, mouse_cursor=None,
+                 clip_behavior="none", **base):
+        reject_options("FloatingActionButton",enable_feedback=True if enable_feedback else None)
         if text is None:
             text = content
-        if text is not None and not isinstance(text, str):
-            raise TypeError("FAB content must be text")
+        if text is not None and not isinstance(text,(str,Control)):
+            raise TypeError("FAB content must be text or a Control")
         if mini and size == "standard":
             size = "small"
         if size not in _SIZES:
@@ -54,10 +61,21 @@ class FloatingActionButton(Button):
         self.size = size
         self.text = text
         self.expanded = expanded
+        self.fab_shape = shape
+        self.focus_color = focus_color
+        self.disabled_elevation = disabled_elevation
+        self.focus_elevation = focus_elevation
+        self.highlight_elevation = highlight_elevation
+        self.hover_elevation = hover_elevation
+        self.hover_color = hover_color
+        self.splash_color = splash_color
+        self.mouse_cursor = mouse_cursor
+        elevation = 6 if elevation is None else elevation
         self._base_elevation = max(0.0, float(elevation))
         super().__init__(content=text, icon=icon, bgcolor=bgcolor,
                          color=color if color is not None else foreground_color,
                          elevation=elevation, on_click=on_click, on_hover=on_hover,
+                         autofocus=autofocus,url=url,clip_behavior=clip_behavior,
                          **base)
         self._elevation_progress = self._base_elevation
 
@@ -73,8 +91,8 @@ class FloatingActionButton(Button):
             width = height = side
         else:
             icon_size = _EXTENDED_ICON_SIZES.get(self.size, icon_size)
-            label_w, _ = txt.measure(self.text, label_size, scale=scale,
-                                     weight=label_weight)
+            label_w,_ = (self.content._intrinsic(max_w,max_h,scale) if isinstance(self.content,Control)
+                         else txt.measure(self.text,label_size,scale=scale,weight=label_weight))
             if self.icon is None:
                 # Text-only extended FAB has 20dp horizontal padding
                 # and an 80dp minimum width.
@@ -88,6 +106,18 @@ class FloatingActionButton(Button):
         return (self._width if self._width is not None else width,
                 self._height if self._height is not None else height)
 
+    def _place(self,x,y,w,h,scale):
+        self._rect=x,y,w,h
+        _,_,icon_size,_,_,gap,_,_ = self._metrics()
+        iw,ih = self.icon._intrinsic(w,h,scale) if isinstance(self.icon,Control) else ((icon_size,icon_size) if self.icon is not None else (0,0))
+        cw,ch = self.content._intrinsic(w,h,scale) if isinstance(self.content,Control) and self._extended() else (0,0)
+        total=iw+cw+(gap if iw and cw else 0)
+        px=x+(w-total)/2
+        if isinstance(self.icon,Control):
+            self.icon._place(px,y+(h-ih)/2,iw,ih,scale)
+        if isinstance(self.content,Control):
+            self.content._place(px+iw+(gap if iw and cw else 0),y+(h-ch)/2,cw,ch,scale)
+
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
         _, radius, icon_size, _, pad, gap, label_size, label_weight = self._metrics()
@@ -97,24 +127,32 @@ class FloatingActionButton(Button):
             if self.size == "small":
                 radius = 16.0
         radius = min(radius, w / 2, h / 2)
+        radius = shape_radius(self.fab_shape,w,h,radius)
         bg = self._bg()
         fg = self._fg()
         elevation = self._elevation_progress
-        if elevation > 0 and not self.disabled:
+        if self.disabled:
+            elevation = self.disabled_elevation or 0
+        elif self._pressed and self.highlight_elevation is not None:
+            elevation = self.highlight_elevation
+        elif self._focused and self.focus_elevation is not None:
+            elevation = self.focus_elevation
+        if elevation > 0:
             draw_shadow(r, (x, y, w, h), radius, elevation)
         if bg is not None:
             r.fill_rect(x, y, w, h, bg, radius=radius)
         if not self.disabled:
-            draw_state_layer(self, r, (x, y, w, h), self._fg_raw(), radius)
+            state_color = (self.splash_color if self._pressed else self.focus_color if self._focused else self.hover_color) or self._fg_raw()
+            draw_state_layer(self,r,(x,y,w,h),state_color,radius)
 
         scale = r.scale
         icon_surf = (render_icon_cached(self.icon, round(icon_size * scale), fg)
-                     if self.icon is not None else None)
+                     if self.icon is not None and not isinstance(self.icon,Control) else None)
         label_surf = (txt.render_line_cached(self.text, label_size, scale=scale,
                                              weight=label_weight, color=fg)
-                      if extended else None)
-        icon_w = icon_surf.get_width() / scale if icon_surf is not None else 0.0
-        label_w = label_surf.get_width() / scale if label_surf is not None else 0.0
+                      if extended and not isinstance(self.content,Control) else None)
+        icon_w = icon_surf.get_width()/scale if icon_surf is not None else self.icon._rect[2] if isinstance(self.icon,Control) else 0
+        label_w = label_surf.get_width()/scale if label_surf is not None else self.content._rect[2] if isinstance(self.content,Control) else 0
         total_w = icon_w + (gap if icon_w and label_w else 0.0) + label_w
         if extended:
             leading = 20.0 if self.icon is None and self.size == "standard" else pad
@@ -134,10 +172,25 @@ class FloatingActionButton(Button):
     def _set_hover(self, on: bool):
         set_hover(self, on)
         self._animate_internal("_elevation_progress",
-                               self._base_elevation + (2.0 if on else 0.0),
+                               (self.hover_elevation if on and self.hover_elevation is not None else self._base_elevation+(2 if on else 0)),
                                motion.SHORT3, motion.EMPHASIZED)
         self.update()
         fire(self, "hover", "true" if on else "false")
+
+    __unsupported_parameters__ = {"enable_feedback"}
+
+    def _draw_all(self,r,ox=0,oy=0):
+        if not self.visible:
+            return
+        self._effects_begin(r,ox,oy)
+        try:
+            self._draw(r,self._rect[0]+ox,self._rect[1]+oy)
+            if isinstance(self.icon,Control):
+                self.icon._draw_all(r,ox,oy)
+            if self._extended() and isinstance(self.content,Control):
+                self.content._draw_all(r,ox,oy)
+        finally:
+            self._effects_end(r)
 
     def _pressed_hook(self, x, y):
         press(self, x, y, ripple_duration=motion.SHORT4, press_duration=75)

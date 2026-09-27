@@ -116,7 +116,8 @@ def check_exact_layout(renderer):
 
 
 def check_updates(renderer):
-    page = SimpleNamespace(_layout_dirty=True, repaint=lambda: None)
+    page = SimpleNamespace(_layout_dirty=True, repaint=lambda: None,
+                           _reconcile_branch=lambda control: None)
     rows = [st.Container(height=20) for _ in range(60)]
     rows[0].bgcolor = '#123456'
     listing = st.ListView(controls=rows)

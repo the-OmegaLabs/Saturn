@@ -7,15 +7,17 @@ from __future__ import annotations
 
 import time
 import math
+from types import SimpleNamespace
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 
 from .. import colors
 from .. import motion
 from ..control import Control
-from ..event import TapEvent, fire
+from ..event import TapEvent, fire, ControlEvent, normalize_handlers, _invoke
 from ..types import as_padding
 from .containers import Container, _margins
+from ._compat import value, reject_options
 
 
 _SCROLLBAR_THICKNESS = 8.0
@@ -48,9 +50,11 @@ def _has_paint_overflow(control, width, height):
     if (state.get("shadow") or state.get("offset") is not None or
             overrides.get("shadow") or overrides.get("offset") is not None):
         return True
+    if any(state.get(name) is not None or overrides.get(name) is not None for name in ("rotate","scale")):
+        return True
     if "_elevation_progress" in state and _elevation_outset(state) > _OVERSCAN:
         return True
-    if isinstance(control, Container) and state.get("border_radius"):
+    if isinstance(control, Container) and control._clip_children:
         return False
     children = state.get("controls")
     if children is None:
@@ -90,7 +94,7 @@ def _paint_outsets(control, width, height):
             right = max(right, grow + sh.offset.x)
             bottom = max(bottom, grow + sh.offset.y)
     # Container clips descendants after drawing its own shadow/background.
-    clipped = isinstance(control, Container) and state.get("border_radius")
+    clipped = isinstance(control, Container) and control._clip_children
     if not clipped:
         children = state.get("controls")
         if children is None:
@@ -113,24 +117,19 @@ def _paint_outsets(control, width, height):
             top = max(top, ct - cy)
             right = max(right, cr + cx + cw - width)
             bottom = max(bottom, cb + cy + ch - height)
-    min_x = min_y = max_x = max_y = 0.0
-    for offset in (state.get("offset"), overrides.get("offset")):
-        if offset is not None:
-            dx, dy = offset if isinstance(offset, tuple) else (offset.x, offset.y)
-            min_x, min_y = min(min_x, dx), min(min_y, dy)
-            max_x, max_y = max(max_x, dx), max(max_y, dy)
-    left += -min_x * width
-    top += -min_y * height
-    right += max_x * width
-    bottom += max_y * height
-    return left, top, right, bottom
+    transformed = control._transform_outsets(width,height,bounds=(-left,-top,width+right,height+bottom))
+    return tuple(max(a,b) for a,b in zip((left,top,right,bottom),transformed))
 
 
 class ListView(Control):
     def __init__(self, *items, controls=None, horizontal: bool = False,
                  spacing: float = 0, item_extent: float | None = None,
                  padding=None, auto_scroll: bool = False, on_scroll=None,
-                 **base):
+                 reverse=False, first_item_prototype=False, prototype_item=None,
+                 divider_thickness=0, clip_behavior="hardEdge", semantic_child_count=None,
+                 cache_extent=None, build_controls_on_demand=True, scroll=None,
+                 auto_scroll_animation=None, scroll_interval=10, **base):
+        reject_options("ListView", auto_scroll_animation=auto_scroll_animation)
         if controls is not None:
             if items:
                 raise TypeError("controls cannot be combined with positional children")
@@ -147,6 +146,20 @@ class ListView(Control):
         self.padding = padding  # resolved lazily via as_padding
         self.auto_scroll = auto_scroll
         self.on_scroll = on_scroll
+        self.reverse = reverse
+        self.first_item_prototype = first_item_prototype
+        self.prototype_item = prototype_item
+        self.divider_thickness = divider_thickness
+        self.clip_behavior = clip_behavior
+        self.semantic_child_count = semantic_child_count
+        self.cache_extent = cache_extent
+        self.build_controls_on_demand = build_controls_on_demand
+        self.scroll = scroll
+        self.scroll_interval = scroll_interval
+        self._last_scroll_event = 0.0
+        self._last_reverse = reverse
+        self._last_divider_thickness = divider_thickness
+        self._reverse_slack = 0
         self._offset = 0.0
         self._content_size = 0.0
         self._placed_controls = []
@@ -188,9 +201,51 @@ class ListView(Control):
                 self._height if self._height is not None else (max_h or 0))
 
     def _place(self, x, y, w, h, scale):
+        distance = self._max_offset()-self._offset
+        pad = self._pad()
+        new_view = w-pad.left-pad.right if self.horizontal else h-pad.top-pad.bottom
+        if self._reverse_slack or self.reverse and self._content_size < new_view:
+            self._layout_controls = ()
+        if self.reverse != self._last_reverse:
+            self._layout_controls = ()
+            self._last_reverse = self.reverse
+        if self.divider_thickness != self._last_divider_thickness:
+            self._layout_controls = ()
+            self._last_divider_thickness = self.divider_thickness
+        original_extent = self.item_extent
+        prototype = self.prototype_item or (next((c for c in self.controls if c.visible),None)
+                                           if self.first_item_prototype else None)
+        if prototype is not None and self.item_extent is None:
+            extent = prototype._intrinsic(w,h,scale)[0 if self.horizontal else 1]
+            if extent <= 0:
+                raise ValueError("prototype item must have positive extent")
+            self.item_extent = extent
+        try:
+            self._place_contents(x,y,w,h,scale)
+        finally:
+            self.item_extent = original_extent
+        if self.reverse:
+            self._offset = 0 if self.auto_scroll else max(0,self._max_offset()-distance)
+            self._reverse_slack = max(0,new_view-self._content_size)
+            if self._reverse_slack:
+                axis = 0 if self.horizontal else 1
+                for child in self._placed_controls:
+                    rect = list(child._rect)
+                    rect[axis] += self._reverse_slack
+                    child._rect = tuple(rect)
+                self._item_starts = [item+self._reverse_slack for item in self._item_starts]
+                self._item_ends = [item+self._reverse_slack for item in self._item_ends]
+                self._lazy_layout_version.clear()
+            self._layout_lazy_candidates(scale)
+        else:
+            self._reverse_slack = 0
+        if value(self.scroll) == "always":
+            self._scrollbar_opacity = _SCROLLBAR_IDLE_OPACITY
+
+    def _place_contents(self, x, y, w, h, scale):
         self._layout_version += 1
         p = self._pad()
-        controls = tuple(self.controls)
+        controls = tuple(reversed(self.controls)) if self.reverse else tuple(self.controls)
         layout_dirty = (self.page is None or
                         getattr(self.page, "_layout_dirty", True))
         rescan_outsets = layout_dirty or self._layout_controls != controls
@@ -266,7 +321,7 @@ class ListView(Control):
         fixed_axis_layout = not self.horizontal
         horizontal = self.horizontal
         item_extent = self.item_extent
-        spacing = self.spacing
+        spacing = self.spacing + max(0,self.divider_thickness)
         intrinsic_cache = self._intrinsic_cache
         cache_limit = max(512, len(controls) * 4)
         for k in controls:
@@ -365,7 +420,7 @@ class ListView(Control):
         self._ordered_items = all(
             starts[i] >= starts[i - 1] and ends[i] >= ends[i - 1]
             for i in range(1, len(starts)))
-        self._content_size = max(0.0, total - self.spacing)
+        self._content_size = max(0.0, total - spacing)
         self._refresh_paint_outsets(rescan=rescan_outsets)
         if not self.horizontal and not fixed_axis_layout:
             self._geometry_cache[geometry_key] = (
@@ -389,13 +444,21 @@ class ListView(Control):
         return max(0.0, self._content_size - view)
 
     def _scroll_by(self, delta):
+        if value(self.scroll) == "none":
+            return
         new = max(0.0, min(self._max_offset(), self._offset + delta))
         if new != self._offset:
             self._offset = new
             self._show_scrollbar()
             if self.page is not None:
                 self.page.repaint()
-            fire(self, "scroll", self._offset)
+            self._emit_scroll()
+
+    def _emit_scroll(self):
+        now = time.perf_counter()
+        if now-self._last_scroll_event >= max(0,self.scroll_interval)/1000:
+            self._last_scroll_event = now
+            fire(self,"scroll",self._max_offset()-self._offset if self.reverse else self._offset)
 
     def _show_scrollbar(self, *, active: bool = False):
         """Reveal the Material scrollbar for scrolling or interaction."""
@@ -470,11 +533,24 @@ class ListView(Control):
             self._offset = new
             if self.page is not None:
                 self.page.repaint()
-            fire(self, "scroll", self._offset)
+            self._emit_scroll()
 
-    def scroll_to(self, offset: float = 0, delta: float | None = None):
-        self._scroll_by(delta if delta is not None
-                        else offset - self._offset)
+    def scroll_to(self, offset: float = 0, delta: float | None = None,
+                  scroll_key=None, duration=None, curve=None):
+        reject_options("ListView.scroll_to",duration=duration,curve=curve)
+        if scroll_key is not None:
+            child = next((c for c in self.controls if c.key == scroll_key),None)
+            if child is None:
+                raise KeyError(scroll_key)
+            axis = 0 if self.horizontal else 1
+            offset = child._rect[axis]-self._rect[axis]
+            if self.reverse:
+                offset = self._max_offset()-offset
+        if offset == -1:
+            offset = self._max_offset()
+        physical = self._max_offset()-offset if self.reverse else offset
+        self._scroll_by((-delta if self.reverse else delta) if delta is not None
+                        else physical-self._offset)
 
     def _candidates(self, low, high):
         if not self._ordered_items:
@@ -509,10 +585,13 @@ class ListView(Control):
     def _layout_lazy_candidates(self, scale):
         x, y, w, h = self._rect
         p = self._pad()
-        guard = _OVERSCAN
+        guard = self._guard
         start = (x if self.horizontal else y) + self._offset
         size = w if self.horizontal else h
-        for child in self._candidates(start - guard, start + size + guard):
+        candidates = (self._candidates(start-guard,start+size+guard) if
+                      self.build_controls_on_demand and value(self.clip_behavior) != "none"
+                      else self._placed_controls)
+        for child in candidates:
             if (child in self._lazy_items and
                     self._lazy_layout_version.get(child) != self._layout_version):
                 ml, _mt, mr, _mb = _margins(child)
@@ -526,21 +605,23 @@ class ListView(Control):
         if not self.visible:
             return
         self._layout_lazy_candidates(r.scale)
-        self._effects_begin(r)
+        self._effects_begin(r, ox, oy)
         try:
             x, y, w, h = self._rect
-            r.clip_push(x + ox, y + oy, w, h)
+            clipped = value(self.clip_behavior) != "none"
+            if clipped:
+                r.clip_push(x + ox, y + oy, w, h)
             off_x = self._offset if self.horizontal else 0.0
             off_y = self._offset if not self.horizontal else 0.0
             # Clipping alone still runs every child renderer. The generous
             # guard keeps ordinary shadows and small paint overflow intact.
-            guard = _OVERSCAN
+            guard = self._guard
             left, top = x + off_x - guard, y + off_y - guard
             right, bottom = x + off_x + w + guard, y + off_y + h + guard
             axis_start = (x if self.horizontal else y) + self._offset
             axis_size = w if self.horizontal else h
-            for c in self._candidates(axis_start - guard,
-                                      axis_start + axis_size + guard):
+            candidates = self._candidates(axis_start-guard,axis_start+axis_size+guard) if self.build_controls_on_demand and clipped else self._placed_controls
+            for c in candidates:
                 if c.visible:
                     cx, cy, cw, ch = c._rect
                     pl, pt, pr, pb = self._paint_outsets.get(c, (0, 0, 0, 0))
@@ -549,12 +630,21 @@ class ListView(Control):
                              cy + ch + pb < top or cy - pt > bottom)):
                         continue
                     c._draw_all(r, ox - off_x, oy - off_y)
-            r.clip_pop()
+                    if self.divider_thickness > 0 and c is not self._placed_controls[-1]:
+                        t = self.divider_thickness
+                        if self.horizontal:
+                            r.fill_rect(cx+cw+ox-off_x,cy+oy-off_y,t,ch,colors.parse_color(colors.Colors.OUTLINE_VARIANT))
+                        else:
+                            r.fill_rect(cx+ox-off_x,cy+ch+oy-off_y,cw,t,colors.parse_color(colors.Colors.OUTLINE_VARIANT))
+            if clipped:
+                r.clip_pop()
             self._draw_scrollbar(r, ox, oy)
         finally:
             self._effects_end(r)
 
     def _draw_scrollbar(self, r, ox, oy):
+        if value(self.scroll) in ("hidden","none"):
+            return
         geometry = self._scrollbar_geometry()
         opacity = self._scrollbar_opacity
         if geometry is None or opacity <= 0.001:
@@ -579,6 +669,7 @@ class ListView(Control):
     # -- interaction ----------------------------------------------------------
     def _hit_test(self, x, y):
         # the viewport itself handles wheel; taps pass through to children
+        x,y = self._hit_point(x,y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
         if self.page is not None and self.page._app.renderer is not None:
@@ -597,6 +688,7 @@ class ListView(Control):
         return None
 
     def _hit_test_hover(self, x, y):
+        x,y = self._hit_point(x,y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
         if self.page is not None and self.page._app.renderer is not None:
@@ -633,6 +725,7 @@ class ListView(Control):
             self.page.repaint()
 
     def _find_scrollable(self, x, y):
+        x,y = self._hit_point(x,y)
         if not self.visible or not self._contains(x, y):
             return None
         if self.page is not None and self.page._app.renderer is not None:
@@ -688,17 +781,36 @@ class ListView(Control):
         if waiting and now >= self._scrollbar_hide_at:
             self._scrollbar_hide_at = None
             waiting = False
-            if not self._scrollbar_hovered and not self._scrollbar_dragging:
+            if not self._scrollbar_hovered and not self._scrollbar_dragging and value(self.scroll) != "always":
                 self._animate_internal(
                     "_scrollbar_opacity", 0.0,
                     motion.MEDIUM1, motion.STANDARD, now=now)
         return super()._tick_animations(now) or waiting
 
+    @property
+    def _guard(self):
+        return _OVERSCAN if self.cache_extent is None else max(0,float(self.cache_extent))
+
+    __unsupported_parameters__ = {"auto_scroll_animation"}
+
 
 class GestureDetector(Control):
     def __init__(self, content=None, *, on_tap=None, on_tap_down=None,
                  on_long_press=None, on_hover=None, on_enter=None, on_exit=None,
-                 mouse_cursor=None, drag_interval=0, hover_interval=0, **base):
+                 mouse_cursor=None, drag_interval=0, hover_interval=0,
+                 on_tap_up=None, on_tap_move=None, on_tap_cancel=None,
+                 on_double_tap=None, on_double_tap_down=None, on_double_tap_cancel=None,
+                 on_horizontal_drag_down=None, on_horizontal_drag_start=None,
+                 on_horizontal_drag_update=None, on_horizontal_drag_end=None, on_horizontal_drag_cancel=None,
+                 on_vertical_drag_down=None, on_vertical_drag_start=None,
+                 on_vertical_drag_update=None, on_vertical_drag_end=None,on_vertical_drag_cancel=None,
+                 on_pan_down=None,on_pan_start=None,on_pan_update=None,on_pan_end=None,on_pan_cancel=None,
+                 on_scroll=None,allowed_devices=None,exclude_from_semantics=False,
+                 multi_tap_touches=0,trackpad_scroll_causes_scale=False, **base):
+        if multi_tap_touches:
+            raise NotImplementedError("GestureDetector.multi_tap_touches requires multitouch input")
+        if trackpad_scroll_causes_scale:
+            raise NotImplementedError("GestureDetector.trackpad_scroll_causes_scale requires pinch input")
         super().__init__(**base)
         self.content = content
         self.on_tap = on_tap
@@ -707,7 +819,25 @@ class GestureDetector(Control):
         self.on_hover = on_hover
         self.on_enter = on_enter
         self.on_exit = on_exit
+        callbacks = locals()
+        for name in ("tap_up","tap_move","tap_cancel","double_tap","double_tap_down","double_tap_cancel",
+                     "horizontal_drag_down","horizontal_drag_start","horizontal_drag_update","horizontal_drag_end","horizontal_drag_cancel",
+                     "vertical_drag_down","vertical_drag_start","vertical_drag_update","vertical_drag_end","vertical_drag_cancel",
+                     "pan_down","pan_start","pan_update","pan_end","pan_cancel","scroll"):
+            setattr(self,"on_"+name,callbacks["on_"+name])
         self.mouse_cursor = mouse_cursor
+        self.drag_interval,self.hover_interval = drag_interval,hover_interval
+        self.allowed_devices = allowed_devices
+        self.exclude_from_semantics = exclude_from_semantics
+        self._drag_origin = self._drag_position = None
+        self._drag_started = False
+        self._drag_last_time = self._hover_last_time = 0
+        self._drag_axis = None
+        self._drag_velocity = (0,0)
+        self._last_pointer = (0,0)
+        self._consume_click = False
+        self._long_press_at = None
+        self._long_press_fired = False
         self.on_click = self._clicked  # internal routing
         self._hovered = False
         self._pressed = False
@@ -717,7 +847,7 @@ class GestureDetector(Control):
 
     def _intrinsic(self, max_w, max_h, scale):
         if self.content is None:
-            return (self._width or 0, self._height or 0)
+            return (self._width or max_w or 0,self._height or max_h or 0)
         w, h = self.content._intrinsic(max_w, max_h, scale)
         return (self._width or w, self._height or h)
 
@@ -730,8 +860,13 @@ class GestureDetector(Control):
         pass
 
     def _hit_test(self, x, y):
+        x,y = self._hit_point(x,y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
+        if self.allowed_devices is not None and not any(value(device) == "mouse" for device in self.allowed_devices):
+            return None
+        if self._has_drag_handlers or any(getattr(self,"on_"+name,None) for name in ("tap","tap_down","tap_up","double_tap","long_press")):
+            return self
         if self.content is not None:
             hit = self.content._hit_test(x, y)
             if hit is not None:
@@ -739,19 +874,138 @@ class GestureDetector(Control):
         return self
 
     def _hit_test_hover(self, x, y):
+        x,y = self._hit_point(x,y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
         return self
 
     # pointer hooks ------------------------------------------------------------
     def _pressed_hook(self, x, y):
-        if self.on_tap_down is not None:
-            gx, gy = x, y
-            fire(self, "tap_down",
-                 TapEvent(kind="down", local_position=(x - self._rect[0], y - self._rect[1]),
-                          global_position=(gx, gy)))
+        self._last_pointer = (x,y)
+        self._long_press_at = time.perf_counter()+.5 if self.on_long_press else None
+        self._long_press_fired = False
+        self._pointer_event("tap_down",x,y)
+        if getattr(self.page,"_click_count",1) == 2:
+            self._pointer_event("double_tap_down",x,y)
 
     def _clicked(self):
-        fire(self, "tap",
-             TapEvent(kind="tap", local_position=(0, 0),
-                      global_position=self._rect[:2]))
+        x,y = self._last_pointer
+        self._pointer_event("double_tap" if getattr(self.page,"_click_count",1) == 2 and self.on_double_tap else "tap",x,y)
+
+    def _released_hook(self,x,y):
+        self._long_press_at = None
+        self._last_pointer = x,y
+        if not self._consume_click:
+            self._pointer_event("tap_up" if self._contains(x,y) else "tap_cancel",x,y)
+            if not self._contains(x,y) and getattr(self.page,"_click_count",1) == 2:
+                self._pointer_event("double_tap_cancel",x,y)
+
+    @property
+    def _has_drag_handlers(self):
+        return any(getattr(self,"on_"+prefix+suffix,None) for prefix in
+                   ("pan_","horizontal_drag_","vertical_drag_") for suffix in ("down","start","update","end"))
+
+    def _pointer_event(self,name,x,y,**fields):
+        if self.page is None:
+            return
+        handlers = normalize_handlers(getattr(self,"on_"+name,None))
+        if not handlers:
+            return
+        ev = ControlEvent(name,self)
+        ev.kind = "mouse"
+        ev.local_position = SimpleNamespace(x=x-self._rect[0],y=y-self._rect[1])
+        gx,gy = getattr(self.page,"_pointer_pos",None) or self._screen_point(x,y)
+        ev.global_position = SimpleNamespace(x=gx,y=gy)
+        for field,item in fields.items():
+            setattr(ev,field,item)
+        for handler in handlers:
+            self.page._app.call(_invoke,handler,ev)
+
+    def _drag_start(self,x,y):
+        self._drag_origin = self._drag_position = (x,y)
+        self._drag_last_time = time.perf_counter()
+        self._drag_started = False
+        self._consume_click = False
+        for prefix in ("pan","horizontal_drag","vertical_drag"):
+            self._pointer_event(prefix+"_down",x,y)
+
+    def _drag(self,x,y):
+        if self._drag_origin is None:
+            return
+        self._last_pointer = x,y
+        now = time.perf_counter()
+        dx,dy = x-self._drag_position[0],y-self._drag_position[1]
+        self._pointer_event("tap_move",x,y,delta_x=dx,delta_y=dy)
+        ox,oy = self._drag_origin
+        if not self._drag_started:
+            if math.hypot(x-ox,y-oy) < 4 or not self._has_drag_handlers:
+                return
+            self._drag_started = True
+            self._long_press_at = None
+            self._consume_click = True
+            self._drag_axis = "horizontal_drag" if abs(x-ox) >= abs(y-oy) else "vertical_drag"
+            self._pointer_event("tap_cancel",x,y)
+            self._pointer_event("pan_start",x,y)
+            self._pointer_event(self._drag_axis+"_start",x,y)
+        if now-self._drag_last_time < max(0,self.drag_interval)/1000:
+            return
+        dt = max(.001,now-self._drag_last_time)
+        self._drag_velocity = dx/dt,dy/dt
+        self._pointer_event("pan_update",x,y,delta_x=dx,delta_y=dy,primary_delta=None)
+        self._pointer_event(self._drag_axis+"_update",x,y,delta_x=dx if self._drag_axis == "horizontal_drag" else 0,
+                            delta_y=dy if self._drag_axis == "vertical_drag" else 0,
+                            primary_delta=dx if self._drag_axis == "horizontal_drag" else dy)
+        self._drag_position,self._drag_last_time = (x,y),now
+
+    def _drag_end(self):
+        if self._drag_started:
+            x,y = self._last_pointer
+            vx,vy = self._drag_velocity
+            velocity = SimpleNamespace(x=vx,y=vy)
+            self._pointer_event("pan_end",x,y,velocity=velocity,primary_velocity=None)
+            self._pointer_event(self._drag_axis+"_end",x,y,velocity=velocity,
+                                primary_velocity=vx if self._drag_axis == "horizontal_drag" else vy)
+        self._drag_origin = None
+
+    def _set_hover(self,on):
+        self._hovered = on
+        self._pointer_event("enter" if on else "exit",*self._last_pointer)
+
+    def _hover_move(self,x,y):
+        self._last_pointer = x,y
+        now = time.perf_counter()
+        if now-self._hover_last_time >= max(0,self.hover_interval)/1000:
+            self._hover_last_time = now
+            self._pointer_event("hover",x,y)
+
+    def _find_scrollable(self,x,y):
+        hx,hy = self._hit_point(x,y)
+        if self.visible and not self.disabled and self.on_scroll and self._contains(hx,hy):
+            return self
+        return super()._find_scrollable(x,y)
+
+    def _wheel(self,delta):
+        self._pointer_event("scroll",*self._last_pointer,scroll_delta=SimpleNamespace(x=0,y=delta))
+
+    def _cancel_pointer(self):
+        x,y = self._last_pointer
+        self._long_press_at = None
+        self._pointer_event("tap_cancel",x,y)
+        if self._drag_started:
+            self._pointer_event("pan_cancel",x,y)
+            self._pointer_event(self._drag_axis+"_cancel",x,y)
+        self._drag_origin = None
+        self._drag_started = False
+        self._consume_click = True
+
+    def _tick_animations(self,now):
+        waiting = self._long_press_at is not None and self._pressed
+        if waiting and now >= self._long_press_at:
+            self._long_press_at = None
+            self._long_press_fired = True
+            self._consume_click = True
+            self._pointer_event("long_press",*self._last_pointer)
+            waiting = False
+        return super()._tick_animations(now) or waiting
+
+    __unsupported_parameters__ = {"multi_tap_touches", "trackpad_scroll_causes_scale"}

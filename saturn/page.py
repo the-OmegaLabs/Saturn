@@ -88,6 +88,7 @@ class Page(Control):
         self._renderer_settings = _RendererSettings(app)
         self.window = Window(app)
         self.controls: list[Control] = []
+        self.on_route_change = None
         self.bgcolor = None       # None → theme surface color
         self.padding = 10
         self._theme_mode = ThemeMode.SYSTEM
@@ -121,6 +122,10 @@ class Page(Control):
         self._attached_roots = {}
         self._attached_services = {}
         self.page = self
+        from .routing import RouteState
+        if not hasattr(app, "_router"):
+            app._router = RouteState()
+        app._router.register(self)
         self._apply_theme()
 
     # -- public API ---------------------------------------------------------
@@ -128,6 +133,31 @@ class Page(Control):
     def renderer(self):
         """Rendering settings and the active backend context."""
         return self._renderer_settings
+
+    @property
+    def route(self):
+        return self._app._router.route
+
+    @route.setter
+    def route(self, value):
+        self.go(value)
+
+    def go(self, route):
+        """Set the application route and notify each window's route handler."""
+        self._app._router.go(route)
+
+    def open_subpage(self, main=None, *, title="Settings", modal=False,
+                     anchor="center", offset=None, follow_parent=False, backend=None):
+        """Create an owned native child window and return its Subpage handle."""
+        from .subpage import Subpage
+        return Subpage(self, main=main, title=title, modal=modal, anchor=anchor,
+                       offset=offset, follow_parent=follow_parent, backend=backend)
+
+    @property
+    def subpages(self):
+        """Direct child-window Pages that have not been destroyed."""
+        return tuple(app.page for app in getattr(self._app, "_children", ())
+                     if app.page is not None and not app._closed.is_set())
 
     @property
     def width(self) -> float:
@@ -181,6 +211,8 @@ class Page(Control):
         if key == self._theme_key:
             return
         self._theme_key = key
+        if hasattr(self._app, "_root"):
+            self._app._root._active_theme = None
         colors.theme_dark = dark
         colors.apply_seed(key[2], expressive=key[3])
         from . import text
@@ -297,40 +329,55 @@ class Page(Control):
         """Attach direct list mutations without reattaching unchanged trees."""
         roots = {id(control): (control, self) for control in self.controls}
         roots.update({id(control): (control, None) for control in self.overlay})
-        removed = [control for ident, (control, _) in self._attached_roots.items()
-                   if ident not in roots]
+        previous = tuple(self._attached_roots.values())
         self._attached_roots = roots
-        detached = set()
-        def collect(control):
-            detached.add(control)
-            for child in control._children():
-                collect(child)
-        for control in removed:
-            collect(control)
-        if detached:
-            # A subtree moved to another top-level root stays attached.
-            def retain(control):
-                detached.discard(control)
-                for child in control._children():
-                    retain(child)
-            for control, _ in roots.values():
-                retain(control)
-            if self._focused in detached:
-                self.focus(None)
-            if self._pressed in detached:
-                self._pressed._pressed = False
-                self._pressed = None
-            if self._hovered in detached:
-                self._hovered._hovered = False
-                self._hovered = None
-            self._active_animations.difference_update(detached)
-            for control in detached:
-                control.page = None
-                control.parent = None
-        # Store before attachment: attachment hooks can request an update.
-        for control, parent in roots.values():
-            if control.page is not self or control.parent is not parent:
+        self._reconcile_trees(tuple(roots.values()), previous)
+
+    def _reconcile_branch(self, control):
+        """Keep an updated subtree attached without scanning unrelated rows."""
+        self._reconcile_trees(((control, control.parent),), ((control, control.parent),))
+
+    def _reconcile_trees(self, roots, previous_roots):
+        previous, current = set(), set()
+        def collect_old(control):
+            if control in previous:
+                return
+            previous.add(control)
+            for child in getattr(control, "_attached_child_controls", ()):
+                collect_old(child)
+        for control, _ in previous_roots:
+            collect_old(control)
+        def reconcile(control, parent):
+            if control in current:
+                raise ValueError("A control cannot occur twice in the same control tree")
+            current.add(control)
+            if control.page is not self:
                 control._attach(self, parent)
+            else:
+                control.parent = parent
+            children = tuple(control._children())
+            control._attached_child_controls = children
+            for child in children:
+                reconcile(child, control)
+        for control, parent in roots:
+            reconcile(control, parent)
+        detached = previous-current
+        # Branch updates preserve controls already reparented into another tree.
+        if len(roots) == 1 and roots[0][0] not in [*self.controls, *self.overlay]:
+            detached = {control for control in detached if control.parent in previous}
+        if self._focused in detached:
+            self.focus(None)
+        if self._pressed in detached:
+            if hasattr(self._pressed, "_cancel_pointer"):
+                self._pressed._cancel_pointer()
+            self._pressed._pressed = False
+            self._pressed = None
+        if self._hovered in detached:
+            self._hovered._hovered = False
+            self._hovered = None
+        self._active_animations.difference_update(detached)
+        for control in detached:
+            control.page, control.parent = None, None
 
     def _reconcile_services(self):
         current = {id(service): service for service in self.services}
@@ -355,7 +402,7 @@ class Page(Control):
         if self.disabled:
             self._cancel_input()
         now = time.perf_counter()
-        for control in [*getattr(self, "controls", []),
+        for control in [*self._children(),
                         *getattr(self, "overlay", [])]:
             control._prepare_animation_tree(now)
         self._layout_dirty = True
@@ -409,11 +456,14 @@ class Page(Control):
         now = time.perf_counter()
         animating = False
         if self._animation_scan_needed:
-            for control in [*self.controls, *self.overlay]:
+            for control in [*self._children(), *self.overlay]:
                 animating = control._tick_animation_tree(now) or animating
             self._animation_scan_needed = False
         else:
             for control in tuple(self._active_animations):
+                if not self._control_enabled(control):
+                    self._active_animations.discard(control)
+                    continue
                 if control._tick_animations(now):
                     animating = True
                 else:
@@ -428,9 +478,9 @@ class Page(Control):
         layout_key = (self.width, self.height, r.scale,
                       p.left, p.top, p.right, p.bottom,
                       self.vertical_alignment, self.horizontal_alignment,
-                      self.spacing, tuple(self.controls))
+                      self.spacing, tuple(self._children()))
         if self._layout_dirty or layout_key != self._layout_key:
-            col = Column(*self.controls, alignment=self.vertical_alignment,
+            col = Column(*self._children(), alignment=self.vertical_alignment,
                          horizontal_alignment=self.horizontal_alignment,
                          spacing=self.spacing)
             col._place(p.left, p.top,
@@ -532,6 +582,9 @@ class Page(Control):
             for control in reversed(self.overlay):
                 if self._control_enabled(control) and control.handle_event(e):
                     return
+            if e.key == pygame.K_TAB:
+                self._focus_next(reverse=bool(mods & pygame.KMOD_SHIFT))
+                return
             if self._control_enabled(self._focused):
                 self._focused._key(e)
 
@@ -548,13 +601,14 @@ class Page(Control):
         if self.disabled or not self.visible:
             return None
         best = None
-        for c in list(reversed(self.overlay)) + list(reversed(self.controls)):
+        for c in list(reversed(self.overlay)) + list(reversed(self._children())):
             best = c._find_scrollable(x, y) or best
         return best
 
     # -- focus ---------------------------------------------------------------
     def focus(self, control):
-        if control is not None and not self._control_enabled(control):
+        if control is not None and (not self._control_enabled(control) or
+                                    not getattr(control, "can_request_focus", True)):
             return
         if self._focused is control:
             return
@@ -573,7 +627,7 @@ class Page(Control):
                 control._set_focused(True)
             else:
                 control._focused = True
-            if not getattr(control, "read_only", False):
+            if hasattr(control, "_update_ime_rect") and not getattr(control, "read_only", False):
                 if hasattr(control, "_update_ime_rect"):
                     control._update_ime_rect()
                 pygame.key.start_text_input()
@@ -584,25 +638,56 @@ class Page(Control):
             pygame.key.stop_text_input()
         self.update()
 
+    def _focus_next(self, reverse=False):
+        controls = []
+        def visit(control):
+            if not self._control_enabled(control):
+                return
+            if getattr(control, "_focusable", False) and getattr(control, "can_request_focus", True):
+                controls.append(control)
+            for child in control._children():
+                visit(child)
+        from .widgets.dialogs import AlertDialog
+        blockers = [root for root in self.overlay if isinstance(root, AlertDialog)
+                    and root.open and root.visible]
+        roots = blockers[-1:] if blockers else [*self._children(), *self.overlay]
+        for root in roots:
+            visit(root)
+        if not controls:
+            return
+        step = -1 if reverse else 1
+        index = controls.index(self._focused) if self._focused in controls else (0 if reverse else -1)
+        self.focus(controls[(index + step) % len(controls)])
+
     def _control_enabled(self, control):
         if control is None or self.disabled or not self.visible:
             return False
         node = control
-        while node is not None:
+        root = control
+        while node is not None and node is not self:
             if node.disabled or not node.visible:
                 return False
+            root = node
             node = node.parent
+        if root is not self and root not in [*self._children(), *self.overlay]:
+            return False
+        owner = getattr(root, "owner", None)
+        if isinstance(owner, Control) and owner is not control and not self._control_enabled(owner):
+            return False
         return control.page is self
 
     def _cancel_input(self):
         if self._focused is not None:
             self.focus(None)
         if self._pressed is not None:
+            if hasattr(self._pressed, "_cancel_pointer"):
+                self._pressed._cancel_pointer()
             self._pressed._pressed = False
             self._pressed = None
         if self._hovered is not None:
             self._hovered._hovered = False
             self._hovered = None
+        self._sync_mouse_cursor(None)
 
     # -- pointer plumbing (called from the UI loop) ------------------------
     def pointer_down(self, x, y, clicks=None):
@@ -611,6 +696,9 @@ class Page(Control):
             return
         self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
+        if self._focused is not None and hit is not self._focused:
+            from .event import fire
+            fire(self._focused, "tap_outside", (x, y))
         now = time.perf_counter()
         if clicks is None:
             close = (self._last_click_pos is not None
@@ -630,19 +718,21 @@ class Page(Control):
         self._last_click_target = hit
         if hit is not None and getattr(hit, "_focusable", False):
             self.focus(hit)
+            local_x, local_y = hit._event_point(x, y)
             if hasattr(hit, "_pointer_down"):
-                hit._pointer_down(x, y, clicks)
+                hit._pointer_down(local_x, local_y, clicks)
             elif hasattr(hit, "_caret_at"):
-                hit._caret_at(x)
+                hit._caret_at(local_x)
         elif hit is None and self._focused is not None:
             self.focus(None)
         self._pressed = hit
         if hit is not None:
+            local_x, local_y = hit._event_point(x, y)
             hit._pressed = True
             if hasattr(hit, "_pressed_hook"):
-                hit._pressed_hook(x, y)
+                hit._pressed_hook(local_x, local_y)
             if hasattr(hit, "_drag_start"):
-                hit._drag_start(x, y)
+                hit._drag_start(local_x, local_y)
             self.update()
 
     def pointer_up(self, x, y):
@@ -656,7 +746,7 @@ class Page(Control):
             if hasattr(self._pressed, "_drag_end"):
                 self._pressed._drag_end()
             if hasattr(self._pressed, "_released_hook"):
-                self._pressed._released_hook(x, y)
+                self._pressed._released_hook(*self._pressed._event_point(x, y))
             consume_click = bool(getattr(self._pressed, "_consume_click", False))
             self._pressed._consume_click = False
             if hit is self._pressed and not consume_click:
@@ -671,8 +761,11 @@ class Page(Control):
             return
         self._pointer_pos = (x, y)
         if self._pressed is not None and hasattr(self._pressed, "_drag"):
-            self._pressed._drag(x, y)
+            self._pressed._drag(*self._pressed._event_point(x, y))
         target = self._hit_test_hover(x, y)
+        self._sync_mouse_cursor(target)
+        if target is not None and hasattr(target, "_hover_move"):
+            target._hover_move(*target._event_point(x, y))
         prev = getattr(self, "_hovered", None)
         if target is prev:
             return
@@ -692,3 +785,35 @@ class Page(Control):
         self._hovered = target
         if prev is not None or target is not None:
             self.repaint()
+
+    def _sync_mouse_cursor(self, target):
+        cursor = getattr(target, "mouse_cursor", None)
+        if cursor is None and getattr(target, "_update_ime_rect", None):
+            cursor = "text"
+        value = getattr(cursor, "value", cursor) or "basic"
+        if value == getattr(self, "_mouse_cursor_value", None):
+            return
+        constants = {
+            "basic": pygame.SYSTEM_CURSOR_ARROW, "click": pygame.SYSTEM_CURSOR_HAND,
+            "text": pygame.SYSTEM_CURSOR_IBEAM, "verticalText": pygame.SYSTEM_CURSOR_IBEAM,
+            "forbidden": pygame.SYSTEM_CURSOR_NO, "noDrop": pygame.SYSTEM_CURSOR_NO,
+            "move": pygame.SYSTEM_CURSOR_SIZEALL, "allScroll": pygame.SYSTEM_CURSOR_SIZEALL,
+            "grab": pygame.SYSTEM_CURSOR_HAND, "grabbing": pygame.SYSTEM_CURSOR_HAND,
+            "precise": pygame.SYSTEM_CURSOR_CROSSHAIR, "cell": pygame.SYSTEM_CURSOR_CROSSHAIR,
+            "wait": pygame.SYSTEM_CURSOR_WAIT, "progress": pygame.SYSTEM_CURSOR_WAITARROW,
+            "resizeLeftRight": pygame.SYSTEM_CURSOR_SIZEWE, "resizeColumn": pygame.SYSTEM_CURSOR_SIZEWE,
+            "resizeLeft": pygame.SYSTEM_CURSOR_SIZEWE, "resizeRight": pygame.SYSTEM_CURSOR_SIZEWE,
+            "resizeUpDown": pygame.SYSTEM_CURSOR_SIZENS, "resizeRow": pygame.SYSTEM_CURSOR_SIZENS,
+            "resizeUp": pygame.SYSTEM_CURSOR_SIZENS, "resizeDown": pygame.SYSTEM_CURSOR_SIZENS,
+            "resizeUpLeftDownRight": pygame.SYSTEM_CURSOR_SIZENWSE,
+            "resizeUpRightDownLeft": pygame.SYSTEM_CURSOR_SIZENESW,
+            "resizeUpLeft": pygame.SYSTEM_CURSOR_SIZENWSE, "resizeDownRight": pygame.SYSTEM_CURSOR_SIZENWSE,
+            "resizeUpRight": pygame.SYSTEM_CURSOR_SIZENESW, "resizeDownLeft": pygame.SYSTEM_CURSOR_SIZENESW,
+        }
+        try:
+            pygame.mouse.set_visible(value != "none")
+            if value != "none":
+                pygame.mouse.set_cursor(constants.get(value, pygame.SYSTEM_CURSOR_ARROW))
+            self._mouse_cursor_value = value
+        except pygame.error:
+            pass

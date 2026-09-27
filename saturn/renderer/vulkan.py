@@ -656,6 +656,7 @@ class VulkanRenderer(_VulkanSwapchain):
     native_geometry = True
     native_texture_tint = True
     native_shadow = True
+    native_shader = True
     native_shape_overlay = True
     native_state_layer = True
 
@@ -701,6 +702,12 @@ class VulkanRenderer(_VulkanSwapchain):
         self._atlas_size = (1024, 1024)
         self._atlas_limit = 16
         self._gpu_initialized_images = set()
+        self._custom_pipelines = OrderedDict()
+        self._custom_failures = OrderedDict()
+        self._custom_draws = {}
+        self._custom_uniform_resources = None
+        self._custom_uniform_data = bytearray()
+        self._custom_batch_break = False
         self._vertices = array("f")
         self._draws = []
         self._clip_gpu = []
@@ -889,12 +896,13 @@ class VulkanRenderer(_VulkanSwapchain):
                 subpassCount=1, pSubpasses=[subpass],
                 dependencyCount=1, pDependencies=[dependency]), None)
 
-    def _create_gpu_pipeline(self):
+    def _create_gpu_pipeline(self, fragment_code=None, pipeline_layout=None):
         directory = Path(__file__).resolve().parent
         shaders = []
         for name, stage in (("vert", vk.VK_SHADER_STAGE_VERTEX_BIT),
                             ("frag", vk.VK_SHADER_STAGE_FRAGMENT_BIT)):
-            code = (directory / f"vulkan_{name}.spv").read_bytes()
+            code = (fragment_code if name == "frag" and fragment_code is not None else
+                    (directory / f"vulkan_{name}.spv").read_bytes())
             module = vk.vkCreateShaderModule(
                 self._device, vk.VkShaderModuleCreateInfo(
                     codeSize=len(code), pCode=code), None)
@@ -961,10 +969,13 @@ class VulkanRenderer(_VulkanSwapchain):
                 pMultisampleState=multisample,
                 pColorBlendState=blend,
                 pDynamicState=dynamic,
-                layout=self._gpu_pipeline_layout,
+                layout=pipeline_layout or self._gpu_pipeline_layout,
                 renderPass=self._gpu_render_pass, subpass=0)
-            self._gpu_pipeline = vk.vkCreateGraphicsPipelines(
+            pipeline = vk.vkCreateGraphicsPipelines(
                 self._device, None, 1, [pipeline_info], None)[0]
+            if fragment_code is None:
+                self._gpu_pipeline = pipeline
+            return pipeline
         finally:
             for module, _ in shaders:
                 vk.vkDestroyShaderModule(self._device, module, None)
@@ -995,6 +1006,9 @@ class VulkanRenderer(_VulkanSwapchain):
         super()._destroy_swapchain_resources()
 
     def _destroy_gpu_pipeline(self):
+        for pipeline in self._custom_pipelines.values():
+            vk.vkDestroyPipeline(self._device, pipeline, None)
+        self._custom_pipelines.clear()
         if self._gpu_pipeline is not None:
             vk.vkDestroyPipeline(self._device, self._gpu_pipeline, None)
             self._gpu_pipeline = None
@@ -1210,8 +1224,13 @@ class VulkanRenderer(_VulkanSwapchain):
                   *(float(v) for v in state_info))
         block = array('f', (0, 0, 0, 0, *common)) * len(points)
         sx, sy = 2 * self.pixel_ratio / self._pixel_size[0], 2 * self.pixel_ratio / self._pixel_size[1]
+        matrix = self._transform_stack[-1]
+        transformed = matrix != (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        a, b, c, d, tx, ty = matrix
         for index, ((x, y), (u, v)) in enumerate(zip(points, uvs)):
             offset = index * self._VERTEX_FLOATS
+            if transformed:
+                x, y = a*x+c*y+tx, b*x+d*y+ty
             block[offset], block[offset + 1] = x * sx - 1, y * sy - 1
             block[offset + 2], block[offset + 3] = u, v
             if coverage is not None:
@@ -1220,7 +1239,8 @@ class VulkanRenderer(_VulkanSwapchain):
         count = len(points)
         clip = self._clip_gpu[-1] if self._clip_gpu else (
             0, 0, self._render_extent[0], self._render_extent[1])
-        if self._draws and self._draws[-1][2] is texture and \
+        if (not self._custom_batch_break and self._draws
+                and self._draws[-1][0] not in self._custom_draws) and self._draws[-1][2] is texture and \
                 self._draws[-1][3] == clip:
             self._draws[-1][1] += count
         else:
@@ -1285,6 +1305,8 @@ class VulkanRenderer(_VulkanSwapchain):
                     self._release_texture(texture)
         self._vertices = array("f")
         self._draws = []
+        self._custom_draws.clear()
+        self._custom_uniform_data.clear()
         self._clear_color = tuple(c / 255.0 for c in parse_color(color))
 
     def fill_rect(self, x, y, w, h, color, radius=0):
@@ -1319,6 +1341,88 @@ class VulkanRenderer(_VulkanSwapchain):
         pad = math.ceil(3 * max(ambient, key) + offset)
         self._append_quad(x-pad, y-pad, w+2*pad, h+2*pad, (0, 0, 0, 255), mode=5,
                           state_radii=radii, state_info=(ambient, key, offset, pad))
+
+    def shader(self, x, y, w, h, effect, color, secondary_color,
+               parameters, information):
+        self._append_quad(x, y, w, h, color, border_color=secondary_color,
+                          mode=6 + effect, state_radii=parameters,
+                          state_info=information)
+
+    def _ensure_custom_uniforms(self):
+        if self._custom_uniform_resources is not None:
+            return self._custom_uniform_resources
+        limits = vk.vkGetPhysicalDeviceProperties(self._physical_device).limits
+        alignment = max(16, int(limits.minUniformBufferOffsetAlignment))
+        capacity, uniform_range = 1024*1024, 4096
+        binding = vk.VkDescriptorSetLayoutBinding(binding=0,
+            descriptorType=vk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            descriptorCount=1, stageFlags=vk.VK_SHADER_STAGE_FRAGMENT_BIT)
+        descriptor_layout = vk.vkCreateDescriptorSetLayout(self._device,
+            vk.VkDescriptorSetLayoutCreateInfo(bindingCount=1, pBindings=[binding]), None)
+        pipeline_layout = vk.vkCreatePipelineLayout(self._device,
+            vk.VkPipelineLayoutCreateInfo(setLayoutCount=2,
+                pSetLayouts=[self._gpu_descriptor_layout, descriptor_layout]), None)
+        pool = vk.vkCreateDescriptorPool(self._device, vk.VkDescriptorPoolCreateInfo(
+            maxSets=1, poolSizeCount=1, pPoolSizes=[vk.VkDescriptorPoolSize(
+                type=vk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, descriptorCount=1)]), None)
+        descriptor = vk.vkAllocateDescriptorSets(self._device, vk.VkDescriptorSetAllocateInfo(
+            descriptorPool=pool, descriptorSetCount=1, pSetLayouts=[descriptor_layout]))[0]
+        buffer, memory = self._create_gpu_buffer(capacity, vk.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            vk.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | vk.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+        mapped = vk.vkMapMemory(self._device, memory, 0, capacity, 0)
+        vk.vkUpdateDescriptorSets(self._device, 1, [vk.VkWriteDescriptorSet(
+            dstSet=descriptor, dstBinding=0, descriptorCount=1,
+            descriptorType=vk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+            pBufferInfo=[vk.VkDescriptorBufferInfo(buffer=buffer, offset=0, range=uniform_range)])], 0, None)
+        self._custom_uniform_resources = (descriptor_layout, pipeline_layout, pool,
+                                         descriptor, buffer, memory, mapped, alignment, capacity)
+        return self._custom_uniform_resources
+
+    def custom_shader(self, x, y, w, h, body, layout, values, call,
+                      elapsed, radius, color, secondary_color):
+        from .shader_source import fragment_source, compile_spirv, pack_uniforms, ShaderCompilationError
+        if w <= 0 or h <= 0:
+            return
+        key = (body, layout, call)
+        if key in self._custom_failures:
+            raise ShaderCompilationError(self._custom_failures[key])
+        resources = self._ensure_custom_uniforms()
+        if key not in self._custom_pipelines:
+            try:
+                code = compile_spirv(fragment_source(body, layout, call, vulkan=True))
+                self._custom_pipelines[key] = self._create_gpu_pipeline(code, resources[1])
+            except ShaderCompilationError as error:
+                self._custom_failures[key] = str(error)
+                if len(self._custom_failures)>32:
+                    self._custom_failures.popitem(last=False)
+                raise
+            # Retire between frames, never while a recorded draw references it.
+            if len(self._custom_pipelines)>32:
+                active = {draw[0] for draw in self._custom_draws.values()}
+                for old_key, pipeline in tuple(self._custom_pipelines.items()):
+                    if old_key != key and pipeline not in active:
+                        vk.vkDeviceWaitIdle(self._device)
+                        vk.vkDestroyPipeline(self._device, pipeline, None)
+                        del self._custom_pipelines[old_key]
+                        break
+        pipeline = self._custom_pipelines[key]
+        self._custom_pipelines.move_to_end(key)
+        data = pack_uniforms(layout, values, (float(w), float(h)), elapsed, radius,
+            tuple(v/255 for v in parse_color(color)),
+            tuple(v/255 for v in parse_color(secondary_color)), self.opacity)
+        alignment, capacity = resources[7:]
+        offset = (len(self._custom_uniform_data)+alignment-1)//alignment*alignment
+        if offset+4096>capacity:
+            raise ValueError("Custom shader uniform capacity exceeded for this frame")
+        self._custom_uniform_data.extend(bytes(offset-len(self._custom_uniform_data)))
+        self._custom_uniform_data.extend(data)
+        self._custom_batch_break = True
+        try:
+            self._append_quad(x, y, w, h, color, mode=0)
+        finally:
+            self._custom_batch_break = False
+        first = self._draws[-1][0]
+        self._custom_draws[first] = (pipeline, offset)
 
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
         self._append_quad(x, y, w, h, (0, 0, 0, 0),
@@ -1479,6 +1583,8 @@ class VulkanRenderer(_VulkanSwapchain):
                                 surface.get_height() / scale, alpha)
 
     def blit_scaled(self, surface, x, y, width, height, alpha=1.0):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         texture, uv = self._texture_for_surface(surface)
         self._append_quad(x, y, width, height,
                           (255, 255, 255,
@@ -1486,6 +1592,8 @@ class VulkanRenderer(_VulkanSwapchain):
                           texture=texture, uv_bounds=uv, textured=True)
 
     def blit_cached_scaled(self, surface, x, y, width, height, alpha=1.0):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         texture, uv = self._texture_for_surface(surface, immutable=True)
         self._append_quad(x, y, width, height,
                           (255, 255, 255,
@@ -1493,12 +1601,15 @@ class VulkanRenderer(_VulkanSwapchain):
                           texture=texture, uv_bounds=uv, textured=True)
 
     def blit_tinted_scaled(self, surface, x, y, width, height, color):
+        if width <= 0 or height <= 0 or surface.get_width() == 0 or surface.get_height() == 0:
+            return
         texture, uv = self._texture_for_surface(surface, immutable=True)
         self._append_quad(x, y, width, height, parse_color(color),
                           texture=texture, uv_bounds=uv, textured=True)
 
     def clip_push(self, x, y, w, h):
         x, y = self._translate(x, y)
+        x, y, w, h = self._transform_rect(x, y, w, h)
         scale = self.scale
         x0, y0 = round(x * scale), round(y * scale)
         x1, y1 = round((x + w) * scale), round((y + h) * scale)
@@ -1587,9 +1698,16 @@ class VulkanRenderer(_VulkanSwapchain):
             vk.vkCmdSetScissor(command, 0, 1, [vk.VkRect2D(
                 offset=vk.VkOffset2D(x=x, y=y),
                 extent=vk.VkExtent2D(width=w, height=h))])
+            custom = self._custom_draws.get(first)
+            pipeline = custom[0] if custom else self._gpu_pipeline
+            layout = self._custom_uniform_resources[1] if custom else self._gpu_pipeline_layout
+            vk.vkCmdBindPipeline(command, vk.VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline)
+            if custom:
+                vk.vkCmdBindDescriptorSets(command, vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    layout, 1, 1, [self._custom_uniform_resources[3]], 1, [custom[1]])
             vk.vkCmdBindDescriptorSets(
                 command, vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                self._gpu_pipeline_layout, 0, 1,
+                layout, 0, 1,
                 [texture[3]], 0, None)
             vk.vkCmdDraw(command, count, 1, first, 0)
         vk.vkCmdEndRenderPass(command)
@@ -1660,6 +1778,8 @@ class VulkanRenderer(_VulkanSwapchain):
             self._recreate_swapchain()
             return
         data = self._vertices.tobytes()
+        if self._custom_uniform_data:
+            self._custom_uniform_resources[6][:len(self._custom_uniform_data)] = self._custom_uniform_data
         if data:
             self._ensure_vertex_buffer(len(data))
             self._gpu_vertex_mapped[:len(data)] = data
@@ -1760,6 +1880,15 @@ class VulkanRenderer(_VulkanSwapchain):
             vk.vkDeviceWaitIdle(self._device)
             self._gpu_keep_pipeline = False
             self._destroy_swapchain_resources()
+            if self._custom_uniform_resources is not None:
+                descriptor_layout, layout, pool, _, buffer, memory, *_ = self._custom_uniform_resources
+                vk.vkUnmapMemory(self._device, memory)
+                vk.vkDestroyBuffer(self._device, buffer, None)
+                vk.vkFreeMemory(self._device, memory, None)
+                vk.vkDestroyDescriptorPool(self._device, pool, None)
+                vk.vkDestroyPipelineLayout(self._device, layout, None)
+                vk.vkDestroyDescriptorSetLayout(self._device, descriptor_layout, None)
+                self._custom_uniform_resources = None
             for texture in self._gpu_tex_cache.values():
                 self._release_texture(texture)
             for _, texture, _, page_id in self._gpu_immutable_cache.values():
