@@ -896,12 +896,14 @@ class VulkanRenderer(_VulkanSwapchain):
                 subpassCount=1, pSubpasses=[subpass],
                 dependencyCount=1, pDependencies=[dependency]), None)
 
-    def _create_gpu_pipeline(self, fragment_code=None, pipeline_layout=None):
+    def _create_gpu_pipeline(self, fragment_code=None, pipeline_layout=None, *,
+                             vertex_code=None, render_pass=None, additive=False):
         directory = Path(__file__).resolve().parent
         shaders = []
         for name, stage in (("vert", vk.VK_SHADER_STAGE_VERTEX_BIT),
                             ("frag", vk.VK_SHADER_STAGE_FRAGMENT_BIT)):
-            code = (fragment_code if name == "frag" and fragment_code is not None else
+            code = (vertex_code if name == "vert" and vertex_code is not None else
+                    fragment_code if name == "frag" and fragment_code is not None else
                     (directory / f"vulkan_{name}.spv").read_bytes())
             module = vk.vkCreateShaderModule(
                 self._device, vk.VkShaderModuleCreateInfo(
@@ -928,10 +930,10 @@ class VulkanRenderer(_VulkanSwapchain):
                     (8, vk.VK_FORMAT_R32G32B32A32_SFLOAT, 68),
                     (9, vk.VK_FORMAT_R32G32B32A32_SFLOAT, 84))]
             vertex_input = vk.VkPipelineVertexInputStateCreateInfo(
-                vertexBindingDescriptionCount=1,
-                pVertexBindingDescriptions=[binding],
-                vertexAttributeDescriptionCount=len(attrs),
-                pVertexAttributeDescriptions=attrs)
+                vertexBindingDescriptionCount=0 if vertex_code else 1,
+                pVertexBindingDescriptions=None if vertex_code else [binding],
+                vertexAttributeDescriptionCount=0 if vertex_code else len(attrs),
+                pVertexAttributeDescriptions=None if vertex_code else attrs)
             assembly = vk.VkPipelineInputAssemblyStateCreateInfo(
                 topology=vk.VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
             viewport_state = vk.VkPipelineViewportStateCreateInfo(
@@ -942,11 +944,11 @@ class VulkanRenderer(_VulkanSwapchain):
                 frontFace=vk.VK_FRONT_FACE_COUNTER_CLOCKWISE,
                 lineWidth=1.0)
             multisample = vk.VkPipelineMultisampleStateCreateInfo(
-                rasterizationSamples=self._gpu_samples)
+                rasterizationSamples=vk.VK_SAMPLE_COUNT_1_BIT if render_pass else self._gpu_samples)
             blend_attachment = vk.VkPipelineColorBlendAttachmentState(
                 blendEnable=vk.VK_TRUE,
-                srcColorBlendFactor=vk.VK_BLEND_FACTOR_SRC_ALPHA,
-                dstColorBlendFactor=vk.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                srcColorBlendFactor=vk.VK_BLEND_FACTOR_ONE if additive else vk.VK_BLEND_FACTOR_SRC_ALPHA,
+                dstColorBlendFactor=vk.VK_BLEND_FACTOR_ONE if additive else vk.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
                 colorBlendOp=vk.VK_BLEND_OP_ADD,
                 srcAlphaBlendFactor=vk.VK_BLEND_FACTOR_ONE,
                 dstAlphaBlendFactor=vk.VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
@@ -970,7 +972,7 @@ class VulkanRenderer(_VulkanSwapchain):
                 pColorBlendState=blend,
                 pDynamicState=dynamic,
                 layout=pipeline_layout or self._gpu_pipeline_layout,
-                renderPass=self._gpu_render_pass, subpass=0)
+                renderPass=render_pass or self._gpu_render_pass, subpass=0)
             pipeline = vk.vkCreateGraphicsPipelines(
                 self._device, None, 1, [pipeline_info], None)[0]
             if fragment_code is None:
@@ -1088,16 +1090,17 @@ class VulkanRenderer(_VulkanSwapchain):
             self._device, self._gpu_upload_memory, 0,
             self._gpu_upload_capacity, 0)
 
-    def _create_texture_resource(self, width, height):
+    def _create_texture_resource(self, width, height, *, render_target=False):
+        format = vk.VK_FORMAT_R8G8B8A8_UNORM
         image = vk.vkCreateImage(self._device, vk.VkImageCreateInfo(
             imageType=vk.VK_IMAGE_TYPE_2D,
-            format=vk.VK_FORMAT_R8G8B8A8_UNORM,
+            format=format,
             extent=vk.VkExtent3D(width=width, height=height, depth=1),
             mipLevels=1, arrayLayers=1,
             samples=vk.VK_SAMPLE_COUNT_1_BIT,
             tiling=vk.VK_IMAGE_TILING_OPTIMAL,
             usage=(vk.VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                   vk.VK_IMAGE_USAGE_SAMPLED_BIT),
+                   vk.VK_IMAGE_USAGE_SAMPLED_BIT | (vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT if render_target else 0)),
             sharingMode=vk.VK_SHARING_MODE_EXCLUSIVE,
             initialLayout=vk.VK_IMAGE_LAYOUT_UNDEFINED), None)
         requirements = vk.vkGetImageMemoryRequirements(self._device, image)
@@ -1113,7 +1116,7 @@ class VulkanRenderer(_VulkanSwapchain):
             baseMipLevel=0, levelCount=1, baseArrayLayer=0, layerCount=1)
         view = vk.vkCreateImageView(self._device, vk.VkImageViewCreateInfo(
             image=image, viewType=vk.VK_IMAGE_VIEW_TYPE_2D,
-            format=vk.VK_FORMAT_R8G8B8A8_UNORM,
+            format=format,
             subresourceRange=subresource), None)
         descriptor = vk.vkAllocateDescriptorSets(
             self._device, vk.VkDescriptorSetAllocateInfo(
@@ -1306,6 +1309,8 @@ class VulkanRenderer(_VulkanSwapchain):
         self._vertices = array("f")
         self._draws = []
         self._custom_draws.clear()
+        if hasattr(self, '_shader_buffer_draws'):
+            self._shader_buffer_draws.clear()
         self._custom_uniform_data.clear()
         self._clear_color = tuple(c / 255.0 for c in parse_color(color))
 
@@ -1356,7 +1361,7 @@ class VulkanRenderer(_VulkanSwapchain):
         capacity, uniform_range = 1024*1024, 4096
         binding = vk.VkDescriptorSetLayoutBinding(binding=0,
             descriptorType=vk.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-            descriptorCount=1, stageFlags=vk.VK_SHADER_STAGE_FRAGMENT_BIT)
+            descriptorCount=1, stageFlags=vk.VK_SHADER_STAGE_FRAGMENT_BIT | vk.VK_SHADER_STAGE_VERTEX_BIT)
         descriptor_layout = vk.vkCreateDescriptorSetLayout(self._device,
             vk.VkDescriptorSetLayoutCreateInfo(bindingCount=1, pBindings=[binding]), None)
         pipeline_layout = vk.vkCreatePipelineLayout(self._device,
@@ -1379,7 +1384,7 @@ class VulkanRenderer(_VulkanSwapchain):
         return self._custom_uniform_resources
 
     def custom_shader(self, x, y, w, h, body, layout, values, call,
-                      elapsed, radius, color, secondary_color):
+                      elapsed, radius, color, secondary_color, *, buffer_pass=None):
         from .shader_source import fragment_source, compile_spirv, pack_uniforms, ShaderCompilationError
         if w <= 0 or h <= 0:
             return
@@ -1416,9 +1421,13 @@ class VulkanRenderer(_VulkanSwapchain):
             raise ValueError("Custom shader uniform capacity exceeded for this frame")
         self._custom_uniform_data.extend(bytes(offset-len(self._custom_uniform_data)))
         self._custom_uniform_data.extend(data)
+        texture = None
+        if buffer_pass is not None:
+            from .shader_buffer import prepare_buffer
+            texture = prepare_buffer(self, buffer_pass, layout, w, h, offset)
         self._custom_batch_break = True
         try:
-            self._append_quad(x, y, w, h, color, mode=0)
+            self._append_quad(x, y, w, h, color, mode=0, texture=texture)
         finally:
             self._custom_batch_break = False
         first = self._draws[-1][0]
@@ -1670,6 +1679,9 @@ class VulkanRenderer(_VulkanSwapchain):
         vk.vkBeginCommandBuffer(command, vk.VkCommandBufferBeginInfo(
             flags=vk.VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT))
         self._record_texture_uploads(command)
+        if getattr(self, '_shader_buffer_draws', None):
+            from .shader_buffer import record_buffers
+            record_buffers(self, command)
         clear = vk.VkClearValue(color=vk.VkClearColorValue(
             float32=self._clear_color))
         area = vk.VkRect2D(
@@ -1878,6 +1890,9 @@ class VulkanRenderer(_VulkanSwapchain):
             return
         if self._device is not None:
             vk.vkDeviceWaitIdle(self._device)
+            if hasattr(self, '_shader_buffers'):
+                from .shader_buffer import close_buffers
+                close_buffers(self)
             self._gpu_keep_pipeline = False
             self._destroy_swapchain_resources()
             if self._custom_uniform_resources is not None:

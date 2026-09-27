@@ -71,6 +71,62 @@ def main(backend):
         assert pygame.image.tobytes(first,"RGB") != pygame.image.tobytes(draw(),"RGB")
         shader.shader = 'void mainImage(out vec4 color, in vec2 pixel) { color=vec4(pixel/iResolution.xy,0,1); }'
         assert 120<=draw().get_at((120,80)).g<=135
+        # GPU geometry accumulates into one reusable image before compositing.
+        vertex = '''void main() {
+            const vec2 corners[6]=vec2[6](vec2(-1,-1),vec2(1,-1),vec2(-1,1),
+                vec2(-1,1),vec2(1,-1),vec2(1,1));
+            gl_Position=vec4(corners[SATURN_VERTEX_ID],0,1);
+        }'''
+        fragment = '''uniform vec3 tint; SATURN_LOCATION(0) out vec4 frag;
+            void main() { frag=vec4(tint*.1*u_opacity,.25); }'''
+        shader.shader = '''uniform vec3 tint; vec4 mainImage(vec2 uv) {
+            vec4 c=saturnSampleBuffer(uv); return vec4(c.rgb/max(c.a,.00001),c.a);
+        }'''
+        shader.uniforms={'tint':(1,0,0)}
+        shader.buffer=st.ShaderBuffer(vertex,fragment,instances=2)
+        shader.border_radius=0
+        renderer.clear('black')
+        shader._draw_all(renderer)
+        first=renderer.screenshot()
+        assert 49<=first.get_at((120,80)).r<=54,first.get_at((120,80))
+        target=next(iter(renderer._shader_buffers.values()))
+        renderer.clear('black')
+        shader._draw_all(renderer)
+        assert next(iter(renderer._shader_buffers.values())) is target
+        shader.opacity=.5
+        renderer.clear('black')
+        shader._draw_all(renderer)
+        assert 24<=renderer.screenshot().get_at((120,80)).r<=28
+        shader.opacity=1.
+        renderer.clear('black')
+        renderer.clip_push(20,20,60,120)
+        shader._draw_all(renderer)
+        renderer.clip_pop()
+        assert renderer.screenshot().get_at((120,80)).r==0
+        # Repeated draws of the same buffer need independent per-draw images.
+        renderer.clear('black')
+        shader._draw_all(renderer)
+        shader._place(20,140,200,40,renderer.scale)
+        shader.uniforms['tint']=(0,1,0)
+        shader._draw_all(renderer)
+        shot=renderer.screenshot()
+        assert shot.get_at((120,80)).r>=49 and shot.get_at((120,80)).g==0
+        assert shot.get_at((120,160)).g>=49 and shot.get_at((120,160)).r==0
+        shader._place(20,20,200,120,renderer.scale)
+        valid=shader.buffer
+        shader.buffer=st.ShaderBuffer(vertex,fragment+'\n#error invalid_buffer')
+        renderer.clear('black')
+        shader._draw_all(renderer)
+        assert shader.error
+        failures=len(renderer._custom_failures)
+        shader._draw_all(renderer)
+        assert shader.error and len(renderer._custom_failures)==failures
+        shader.buffer=valid
+        shader.uniforms={'tint':(1,0,0)}
+        draw()
+        shader.buffer=None
+        shader.shader='vec4 mainImage(vec2 uv) {return vec4(uv,0,1);}'
+        shader.uniforms={}
         window.size=(360,240)
         renderer.on_resize(360,240,pixel_size=(360,240),pixel_ratio=1)
         assert draw().get_size()==(360,240)
@@ -80,7 +136,7 @@ def main(backend):
             pass
         else:
             raise AssertionError("Include cycles accepted")
-        print(f"{backend.value}: GLSL, includes, uniforms, ordering, cache, recovery, time and resize OK")
+        print(f"{backend.value}: GLSL, includes, uniforms, ordering, cache, recovery, time, resize and instanced GPU buffers OK")
     finally:
         renderer.close()
         window.destroy()

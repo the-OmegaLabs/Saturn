@@ -22,7 +22,7 @@ from .colors import BASELINE_DARK, BASELINE_LIGHT, Colors, parse_color, theme_da
 from .control import Control
 from .page import Page, Window
 from .subpage import Subpage
-from .widgets.shader import Shader, ShaderEffect
+from .widgets.shader import Shader, ShaderEffect, ShaderBuffer
 from .window import WindowEvent, WindowEventType, WindowResizeEdge
 from .services import (
     FilePicker,
@@ -129,7 +129,7 @@ from .compose import Compose
 
 __all__ = [
     "NoInputBorder", "UnderlineInputBorder",
-    "Subpage", "Shader", "ShaderEffect", "SliderInteraction", "LinearGradient",
+    "Subpage", "Shader", "ShaderEffect", "ShaderBuffer", "SliderInteraction", "LinearGradient",
     "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
     "WindowEvent", "WindowEventType", "WindowResizeEdge",

@@ -4,6 +4,8 @@ from __future__ import annotations
 import math
 import time as _time
 from enum import Enum
+from dataclasses import dataclass
+from pathlib import Path
 
 from .. import colors
 from ..control import Control
@@ -18,6 +20,26 @@ class ShaderEffect(str, Enum):
 
 _EFFECTS = {effect.value: index for index, effect in enumerate(ShaderEffect)}
 _UNIFORMS = {"intensity", "frequency", "center", "angle"}
+
+
+@dataclass(frozen=True)
+class ShaderBuffer:
+    """Additive instanced geometry rendered to u_buffer before mainImage.
+
+    Stages define void main(), share the Shader uniforms, and use
+    SATURN_LOCATION, SATURN_VERTEX_ID and SATURN_INSTANCE_ID for portability.
+    The fragment returns premultiplied color. The final mainImage can call
+    saturnSampleBuffer(uv) with top-left UV coordinates.
+    """
+    vertex_shader: str | Path
+    fragment_shader: str | Path
+    instances: int = 1
+
+    def __post_init__(self):
+        if not isinstance(self.vertex_shader, (str, Path)) or not isinstance(self.fragment_shader, (str, Path)):
+            raise TypeError("ShaderBuffer stages must be GLSL strings or pathlib.Path files")
+        if isinstance(self.instances, bool) or not isinstance(self.instances, int) or not 1 <= self.instances <= 1_000_000:
+            raise ValueError("ShaderBuffer.instances must be an integer from 1 to 1,000,000")
 
 
 def _number(value, name):
@@ -45,7 +67,7 @@ class Shader(Control):
                  color="#6750A4", secondary_color="#EADDFF", uniforms=None,
                  animate: bool = True, speed: float = 1.0, time: float = 0.0,
                  border_radius: float = 0.0, fallback_color=None,
-                 includes=None, include_dirs=(), on_error=None, **base):
+                 includes=None, include_dirs=(), on_error=None, buffer=None, **base):
         super().__init__(**base)
         if shader is not None and effect is not None:
             raise ValueError("Pass shader or the legacy effect argument, not both")
@@ -61,6 +83,10 @@ class Shader(Control):
         self.includes = dict(includes or {})
         self.include_dirs = tuple(include_dirs)
         self.on_error = on_error
+        self.buffer = buffer
+        self._buffer_token = object()
+        self._buffer_key = None
+        self._buffer_sources = None
         self._error = None
         self._source_key = None
         self._source = None
@@ -87,7 +113,21 @@ class Shader(Control):
     def reload(self):
         """Read the source file and includes again on the next frame."""
         self._source_key = None
+        self._buffer_key = None
         self.update()
+
+    def _buffer_parameters(self):
+        if self.buffer is None:
+            return None
+        if not isinstance(self.buffer, ShaderBuffer):
+            raise TypeError("buffer must be a ShaderBuffer or None")
+        from ..renderer.shader_source import resolve_source
+        key = (self.buffer, tuple(sorted(self.includes.items())), self.include_dirs)
+        if key != self._buffer_key:
+            self._buffer_sources = tuple(resolve_source(source, self.includes, self.include_dirs)
+                for source in (self.buffer.vertex_shader, self.buffer.fragment_shader))
+            self._buffer_key = key
+        return (self._buffer_token, *self._buffer_sources, self.buffer.instances)
 
     @property
     def _builtin(self):
@@ -99,6 +139,8 @@ class Shader(Control):
         if key != self._source_key:
             self._source = resolve_source(self.shader, self.includes, self.include_dirs)
             self._source_key = key
+        if 'saturnSampleBuffer' in self._source and self.buffer is None:
+            raise ValueError("saturnSampleBuffer requires a ShaderBuffer")
         radius = _number(self.border_radius, "border_radius")
         if radius < 0:
             raise ValueError("border_radius must be nonnegative")
@@ -156,7 +198,8 @@ class Shader(Control):
             from ..renderer.shader_source import ShaderCompilationError
             try:
                 renderer.custom_shader(x, y, w, h, *self._custom_parameters(),
-                                       colors.parse_color(self.color), colors.parse_color(self.secondary_color))
+                                       colors.parse_color(self.color), colors.parse_color(self.secondary_color),
+                                       buffer_pass=self._buffer_parameters())
                 self._error = None
             except (ShaderCompilationError, ValueError, TypeError, FileNotFoundError) as error:
                 message = str(error)

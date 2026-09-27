@@ -239,6 +239,8 @@ class GLRenderer(Renderer):
         self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
         self._prog_state = self.ctx.program(vertex_shader=STATE_VS, fragment_shader=STATE_FS)
         self._custom_programs = OrderedDict()
+        self._shader_buffers = OrderedDict()
+        self._buffer_programs = OrderedDict()
         self._custom_failures = OrderedDict()
         self._prog["u_size"].value = self._fb_size()
         self._prog_tex["u_size"].value = self._fb_size()
@@ -630,7 +632,7 @@ class GLRenderer(Renderer):
         self._wave_quad(x, y, w, h, color, 4 + effect, parameters, information)
 
     def custom_shader(self, x, y, w, h, body, layout, values, call,
-                      elapsed, radius, color, secondary_color):
+                      elapsed, radius, color, secondary_color, *, buffer_pass=None):
         from .shader_source import fragment_source, ShaderCompilationError
         if w <= 0 or h <= 0:
             return
@@ -656,6 +658,8 @@ class GLRenderer(Renderer):
         program, vao = self._custom_programs[key]
         self._custom_programs.move_to_end(key)
         self._flush_rects()
+        if buffer_pass is not None:
+            self._render_shader_buffer(buffer_pass, layout, values, w, h, elapsed, color, secondary_color)
         x, y = self._translate(x, y)
         vertices = (x,y,0,0, x+w,y,1,0, x+w,y+h,1,1,
                     x,y,0,0, x+w,y+h,1,1, x,y+h,0,1)
@@ -670,6 +674,69 @@ class GLRenderer(Renderer):
             if name in program:
                 program[name].value = value
         vao.render(moderngl.TRIANGLES)
+
+    def _render_shader_buffer(self, buffer_pass, layout, values, w, h, elapsed, color, secondary):
+        from .shader_source import buffer_source, ShaderCompilationError
+        token, vertex, fragment, instances = buffer_pass
+        key = (vertex, fragment, layout)
+        failure_key = ('buffer', *key)
+        if failure_key in self._custom_failures:
+            raise ShaderCompilationError(self._custom_failures[failure_key])
+        if key not in self._buffer_programs:
+            try:
+                program = self.ctx.program(vertex_shader=buffer_source(vertex, layout, vertex=True),
+                                          fragment_shader=buffer_source(fragment, layout))
+                vao = self.ctx.vertex_array(program, [])
+            except moderngl.Error as error:
+                self._custom_failures[failure_key] = str(error)
+                if len(self._custom_failures) > 32:
+                    self._custom_failures.popitem(last=False)
+                raise ShaderCompilationError(str(error)) from error
+            self._buffer_programs[key] = (program, vao)
+            if len(self._buffer_programs) > 16:
+                _, (old, old_vao) = self._buffer_programs.popitem(last=False)
+                old_vao.release()
+                old.release()
+        program, vao = self._buffer_programs[key]
+        self._buffer_programs.move_to_end(key)
+        size = (max(1, round(w*self.scale)), max(1, round(h*self.scale)))
+        cached = self._shader_buffers.get(token)
+        if cached is not None and cached[0] != size:
+            cached[2].release()
+            cached[1].release()
+            del self._shader_buffers[token]
+            cached = None
+        if cached is None:
+            texture = self.ctx.texture(size, 4)
+            texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            texture.repeat_x = texture.repeat_y = False
+            target = self.ctx.framebuffer(color_attachments=[texture])
+            cached = self._shader_buffers[token] = (size, texture, target)
+        self._shader_buffers.move_to_end(token)
+        if len(self._shader_buffers) > 16:
+            _, (_, old_texture, old_target) = self._shader_buffers.popitem(last=False)
+            old_target.release()
+            old_texture.release()
+        viewport, scissor = self.ctx.viewport, self.ctx.scissor
+        try:
+            cached[2].use()
+            self.ctx.viewport = (0, 0, *size)
+            self.ctx.scissor = None
+            cached[2].clear(0, 0, 0, 0)
+            self.ctx.blend_func = (moderngl.ONE, moderngl.ONE, moderngl.ONE, moderngl.ONE_MINUS_SRC_ALPHA)
+            builtins = dict(u_resolution=(float(w),float(h)), u_time=elapsed,
+                            u_border_radius=0., u_opacity=1.,
+                            u_color=tuple(v/255 for v in parse_color(color)),
+                            u_secondary_color=tuple(v/255 for v in parse_color(secondary)))
+            for name, value in (*builtins.items(), *zip((n for n,_ in layout), values)):
+                if name in program:
+                    program[name].value = value
+            vao.render(moderngl.TRIANGLES, vertices=6, instances=instances)
+        finally:
+            self._use_frame_target()
+            self.ctx.viewport, self.ctx.scissor = viewport, scissor
+            self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA, moderngl.ONE, moderngl.ONE_MINUS_SRC_ALPHA)
+        cached[1].use(location=0)
 
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):
@@ -759,6 +826,14 @@ class GLRenderer(Renderer):
         self._create_frame_target()
 
     def close(self):
+        for _, texture, target in self._shader_buffers.values():
+            target.release()
+            texture.release()
+        self._shader_buffers.clear()
+        for program, vao in self._buffer_programs.values():
+            vao.release()
+            program.release()
+        self._buffer_programs.clear()
         self._flush_rects()
         for program, vao in self._custom_programs.values():
             vao.release()

@@ -19,7 +19,7 @@ _DECLARATION = re.compile(r"\buniform\s+(float|int|bool|vec[234])\s+([A-Za-z_]\w
 _COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
 _INCLUDE = re.compile(r'^\s*#include\s+["<]([^">]+)[">]\s*$', re.M)
 _RESERVED = {"u_resolution", "u_time", "u_color", "u_secondary_color", "u_border_radius",
-             "u_opacity", "iTime", "iResolution", "u_size", "u_transform"}
+             "u_opacity", "iTime", "iResolution", "u_size", "u_transform", "u_buffer"}
 
 
 def resolve_source(shader, includes=None, include_dirs=()):
@@ -136,7 +136,27 @@ def fragment_source(body, layout, call, *, vulkan=False):
         header += 'uniform vec2 u_resolution; uniform float u_time, u_border_radius, u_opacity;\nuniform vec4 u_color, u_secondary_color;\n'
         header += '\n'.join(f'uniform {kind} {name};' for name,kind in layout)+'\n'
     header += '#define iTime u_time\n#define iResolution vec3(u_resolution, 1.0)\n'
+    if 'saturnSampleBuffer' in body:
+        header += ('layout(set=0,binding=0) uniform sampler2D u_buffer;\n' if vulkan else
+                   'uniform sampler2D u_buffer;\n')
+        uv = 'uv' if vulkan else 'vec2(uv.x,1.0-uv.y)'
+        header += f'vec4 saturnSampleBuffer(vec2 uv) {{ return textureLod(u_buffer,{uv},0.0); }}\n'
     return header+body+_TAIL.replace('SATURN_CALL', call)
+
+
+def buffer_source(source, layout, *, vertex=False, vulkan=False):
+    """One optional additive GPU buffer, sharing the fragment's uniform layout."""
+    header = fragment_source('', layout, '', vulkan=vulkan).split('void main()')[0]
+    header = re.sub(r'(?:layout\(location=0\) )?(?:in vec2 v_uv|out vec4 frag);\n', '', header)
+    if vulkan:
+        header = re.sub(r'#define u_opacity[^\n]*', '#define u_opacity 1.0', header)
+        header = re.sub(r'#define u_border_radius[^\n]*', '#define u_border_radius 0.0', header)
+    else:
+        header += '#define u_opacity 1.0\n#define u_border_radius 0.0\n'
+    header += ('#define SATURN_VULKAN 1\n#define SATURN_LOCATION(n) layout(location=n)\n'
+               '#define SATURN_VERTEX_ID gl_VertexIndex\n#define SATURN_INSTANCE_ID gl_InstanceIndex\n'
+               if vulkan else '#define SATURN_LOCATION(n)\n#define SATURN_VERTEX_ID gl_VertexID\n#define SATURN_INSTANCE_ID gl_InstanceID\n')
+    return header + _DECLARATION.sub('', re.sub(r'^\s*#version[^\n]*', '', source, flags=re.M))
 
 
 def pack_uniforms(layout, values, size, elapsed, radius, color, secondary, opacity):
@@ -153,16 +173,16 @@ def pack_uniforms(layout, values, size, elapsed, radius, color, secondary, opaci
 
 
 @lru_cache(maxsize=64)
-def compile_spirv(source):
+def compile_spirv(source, stage='frag'):
     compiler = os.environ.get('SATURN_GLSLANG') or shutil.which('glslangValidator') or shutil.which('glslang')
     if not compiler and os.environ.get('VULKAN_SDK'):
         compiler = str(Path(os.environ['VULKAN_SDK'])/'Bin'/'glslangValidator.exe')
     if not compiler:
         raise ShaderCompilationError("Custom Vulkan GLSL requires glslangValidator on PATH or SATURN_GLSLANG set to its executable. Built-in effects do not require it.")
     with tempfile.TemporaryDirectory(prefix='saturn-glsl-') as directory:
-        src, dst = Path(directory)/'effect.frag', Path(directory)/'effect.spv'
+        src, dst = Path(directory)/('effect.'+stage), Path(directory)/'effect.spv'
         src.write_text(source, encoding='utf-8')
-        result = subprocess.run([compiler, '-V', '-S', 'frag', '-o', str(dst), str(src)],
+        result = subprocess.run([compiler, '-V', '-S', stage, '-o', str(dst), str(src)],
                                 capture_output=True, text=True, timeout=30,
                                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
