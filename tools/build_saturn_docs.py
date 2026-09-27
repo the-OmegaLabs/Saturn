@@ -24,7 +24,7 @@ OUT = ROOT / "docs"
 API = OUT / "api"
 
 CATEGORIES = {
-    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
+    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent RenderFailedEvent RenderReadyEvent FontOptimizeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
     "Navigation and effects": "Subpage Shader ShaderEffect ShaderBuffer",
     "Input border styles": "NoInputBorder UnderlineInputBorder",
     "Expressive namespace": "Compose",
@@ -45,6 +45,9 @@ DESCRIPTIONS = {
     "Renderer": "Selects the software, OpenGL, or Vulkan backend.",
     "Render": "Compatibility alias for Renderer.",
     "run": "Starts a Saturn app and passes its Page to the entry point.",
+    "RenderFailedEvent": "Reports a failed GPU startup request and recovery to software rendering.",
+    "RenderReadyEvent": "Reports the actual backend and GPU after initialization or software recovery.",
+    "FontOptimizeEvent": "Reports background font load/weight optimization start, completion or failure.",
     "ControlEvent": "Event data received by a control callback.",
     "KeyboardEvent": "Pressed key and modifier flags supplied to a Page keyboard handler.",
     "PageResizeEvent": "Logical client dimensions supplied to a Page resize handler.",
@@ -339,6 +342,8 @@ def page_for(name: str, category: str) -> str:
                           "`page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings",
                           "that default to `True`. `page.renderer.context` exposes the active backend renderer.",
                           "`page.renderer.name` reports `software`, `opengl` or `vulkan`, or `None` before startup.",
+                          "Read-only `.gpu_name`, `.gpu_index` and `.gpus` expose the actual device and available choices; select with `saturn.run(..., gpu=...)`.",
+                          "`page.on_render_failed`, `.on_render_ready` and `.on_font_optimize` report startup recovery and background font work.",
                           "See [Renderer settings](../rendering.md) for backend behavior and threading rules.", ""]
                 lines += ["See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.", ""]
             if name == "Window":

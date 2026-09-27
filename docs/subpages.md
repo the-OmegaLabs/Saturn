@@ -98,6 +98,22 @@ windows can invalidate the shared text caches when switching windows.
 share the application UI thread, so expensive shaders or synchronized
 presentation in several animated windows can affect responsiveness.
 
+With the same backend, an omitted/`None` `gpu` inherits the owner's startup
+GPU request. Pass `gpu="Intel"` or `gpu=1` to select another compatible device
+for the child. Changing `backend` without a `gpu` uses that backend's default
+device. Read the child's actual selection through `child.renderer.gpu_name`,
+`.gpu_index` and `.gpus`. See [GPU selection](./rendering.md#gpu-selection)
+for matching rules and OpenGL driver limits.
+
+GPU initialization failure recovers to a software child window. Its own
+`on_render_failed` and `on_render_ready` handlers receive the failure and actual
+backend after its entry function finishes. Children of a recovered window
+inherit software rendering unless another backend is explicitly selected.
+
+```python
+child = page.open_subpage(settings, backend=st.Renderer.VULKAN, gpu="Intel")
+```
+
 ## Shared application routing
 
 All Pages belonging to the same root application observe one route string.

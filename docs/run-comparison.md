@@ -27,7 +27,7 @@ The window configuration syntax also works with `import flet as ft`. `page.windo
 Saturn's signature:
 
 ```python
-saturn.run(main, *, backend=None, title="saturn")
+saturn.run(main, *, backend=None, title="saturn", gpu=None)
 ```
 
 | Feature | Saturn | Flet 1.0.1 |
@@ -35,6 +35,7 @@ saturn.run(main, *, backend=None, title="saturn")
 | `main(page)` | Functions, bound methods, and coroutines | Functions, bound methods, and coroutines |
 | `width`, `height` | Rejected; use `page.window` | Rejected; use `page.window` |
 | `backend` | OpenGL, Vulkan, or software; defaults to OpenGL, overridable with `SATURN_BACKEND` | No such parameter |
+| `gpu` | Startup device name or index; `None` keeps default selection. OpenGL selection depends on driver extensions; see [Renderer settings](./rendering.md) | No such parameter |
 | `title` | Initial title; can also be changed through `page.title` | No startup parameter; use `page.title` |
 | `before_main` | Unsupported; raises `TypeError` | Called after creating Page and before running main |
 | `name`, `host`, `port`, `view` | Unsupported; raises `TypeError` | Configure application name, service address, and presentation mode |

@@ -4,7 +4,7 @@ Application page that manages controls, themes, and dialogs.
 
 [← API index](./README.md)
 
-Source: [`saturn/page.py`](../../saturn/page.py) (line 88).
+Source: [`saturn/page.py`](../../saturn/page.py) (line 103).
 
 **Base class:** [Control](./Control.md)
 
@@ -13,6 +13,8 @@ Source: [`saturn/page.py`](../../saturn/page.py) (line 88).
 `page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings
 that default to `True`. `page.renderer.context` exposes the active backend renderer.
 `page.renderer.name` reports `software`, `opengl` or `vulkan`, or `None` before startup.
+Read-only `.gpu_name`, `.gpu_index` and `.gpus` expose the actual device and available choices; select with `saturn.run(..., gpu=...)`.
+`page.on_render_failed`, `.on_render_ready` and `.on_font_optimize` report startup recovery and background font work.
 See [Renderer settings](../rendering.md) for backend behavior and threading rules.
 
 See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.
@@ -24,7 +26,7 @@ See [Page fonts and events](../page.md) for font registration, typed callbacks, 
 | Method | Description |
 | --- | --- |
 | `go(self, route)` | Set the application route and notify each window's route handler. |
-| `open_subpage(self, main=None, *, title='Settings', modal=False, anchor='center', offset=None, follow_parent=False, backend=None)` | Create an owned native child window and return its Subpage handle. |
+| `open_subpage(self, main=None, *, title='Settings', modal=False, anchor='center', offset=None, follow_parent=False, backend=None, gpu=None)` | Create an owned native child window and return its Subpage handle. |
 | `add(self, *ctrls: 'Control')` | Adds a child control to the end of a page or control list. |
 | `insert(self, index, ctrl)` | Inserts a child control at a specified position. |
 | `remove(self, ctrl)` | Removes a specified control from its container. |

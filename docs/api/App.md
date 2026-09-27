@@ -28,7 +28,7 @@ Source: [`saturn/app.py`](../../saturn/app.py) (line 106).
 ## Constructor parameters
 
 ```python
-saturn.App(main, backend: 'Renderer', title: 'str' = 'saturn')
+saturn.App(main, backend: 'Renderer', title: 'str' = 'saturn', *, gpu=None)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -36,3 +36,4 @@ saturn.App(main, backend: 'Renderer', title: 'str' = 'saturn')
 | `main` | `—` | `required` | Application entry point that receives a Page. |
 | `backend` | `Renderer` | `required` | Rendering backend to use. For saturn.run(), omission selects OpenGL unless SATURN_BACKEND overrides it. |
 | `title` | `str` | `'saturn'` | Title of a dialog, notification, or window. |
+| `gpu` | `—` | `None` | Startup GPU name or nonnegative index; None keeps default selection. OpenGL selection requires driver support; see the renderer guide. |

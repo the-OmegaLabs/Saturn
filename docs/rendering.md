@@ -51,6 +51,101 @@ reports its own window's backend.
 print(self.page.renderer.name)  # "vulkan", for example
 ```
 
+## GPU selection
+
+Select the GPU at startup with a device name or a zero-based index:
+
+```python
+saturn.run(main, backend=saturn.Renderer.VULKAN, gpu="Intel")
+saturn.run(main, backend=saturn.Renderer.VULKAN, gpu=1)
+saturn.run(main, backend=saturn.Renderer.OPENGL, gpu="NVIDIA")
+```
+
+Omitting `gpu`, or passing `None`, preserves default selection. Vulkan prefers
+a compatible discrete GPU, then an integrated GPU; OpenGL uses SDL's driver
+default. Names are case-insensitive: an exact match wins, otherwise a unique
+substring is accepted. Ambiguous or unavailable choices fail GPU initialization;
+the application prints the fallback notice below and starts software rendering.
+It never silently substitutes a different GPU. Invalid selector types, empty
+names and negative indices raise immediately. Software rejects explicit GPUs.
+
+| Backend | Explicit device selection |
+| --- | --- |
+| Vulkan | Selects from physical devices that support graphics, presentation and the window's swapchain. |
+| Windows OpenGL | Uses `WGL_NV_gpu_affinity` or `WGL_AMD_gpu_association` when the driver exposes it. Offscreen frames are copied/blitted between GPU contexts for window presentation, without CPU readback. |
+| OpenGL without these extensions, including other platforms | Can identify and accept the current device; requests for another device trigger software fallback. Configure the OS/driver graphics preference before startup or use Vulkan to choose another adapter. |
+
+The actual device and available choices are read-only:
+
+```python
+print(page.renderer.gpu_name)   # Actual renderer device, not the request string
+print(page.renderer.gpu_index)  # Index into gpus, if identifiable
+print(page.renderer.gpus)       # Tuple of backend-compatible device names
+```
+
+Before startup, these return `None`, `None`, and `()` respectively. Software
+uses the same empty values. OpenGL drivers without selection extensions expose
+only their current device. Indices depend on driver enumeration and can change
+after hardware/driver updates; names are preferable for saved configuration.
+Device selection is fixed for the lifetime of a window.
+
+On the development laptop, Vulkan selection, screenshots and resize were
+verified on both NVIDIA GeForce RTX 5070 Laptop GPU and Intel(R) Graphics.
+OpenGL default/name/index selection and multiple native windows were verified
+on NVIDIA. Its driver does not expose either selection extension, so the
+alternate-device NVIDIA/AMD OpenGL presentation paths remain unverified on
+hardware with those extensions.
+
+Try `python examples/gpu_selection.py --backend vulkan --gpu Intel`.
+Run `python tests/gpu_selection_checks.py` for matching, startup forwarding,
+failure recovery, real rendering on each selectable device and child-window
+GPU isolation/inheritance.
+
+## Renderer and font events
+
+If GPU window/context/device initialization fails, Saturn releases that window
+and creates a software window with the same title, dimensions and position.
+The console prints this exact notice:
+
+```text
+Saturn can't use your current GPU, fallback to software renderer.
+```
+
+Register handlers inside `main(page)`. Notifications are sent after the entry
+function finishes (after awaiting an async entry function), so handlers can be
+installed even when the fallback happened before `main` started:
+
+```python
+def main(page):
+    page.on_render_failed = lambda e: print(e.message, e.backend, e.gpu, e.error)
+    page.on_render_ready = lambda e: print(e.backend, e.gpu_name, e.fallback)
+    page.on_font_optimize = lambda e: print(e.font, e.weight, e.status, e.error)
+```
+
+| Handler / event | When and payload |
+| --- | --- |
+| `on_render_failed` / `RenderFailedEvent` | Once after failed GPU initialization and successful software recovery. `backend` and `gpu` identify the failed request; `error` contains the reason, `message` is the notice above, `fallback` is `"software"`. |
+| `on_render_ready` / `RenderReadyEvent` | Once after initialization, including recovery. `backend`, `gpu_name`, `gpu_index` describe the actual renderer; `fallback` is a boolean. Delivered after the failure handler finishes. |
+| `on_font_optimize` / `FontOptimizeEvent` | Background font work starts and ends. `status` is `"started"`, `"completed"` or `"failed"`; `success` is `None`, `True` or `False`; `font`, `weight`, `error`, `cached` describe the work. `operation="instance"` builds a font weight, `operation="load"` downloads/validates/caches an HTTP font (`weight=None`). |
+
+All three support one callback, callback lists, zero arguments, one event
+argument, and async callbacks. Sync callbacks run in workers; async callbacks
+are awaited on the application loop. Font notifications are serialized so
+completion cannot overtake a slow async start handler. Cached/shipped fonts
+produce no optimization events because no background work runs. Shared font
+cache jobs notify all active Pages in the application; completion also requests
+layout and redraw. Closed Pages do not receive these notifications.
+
+Fallback covers initialization, including Subpages. It does not switch renderers
+after runtime draw failures, and shader compilation failures keep the existing
+`Shader.error` behavior. Software cannot render custom GLSL; use a shader's
+`fallback_color` when software fallback needs a visible placeholder.
+
+Run `python tests/renderer_event_checks.py` to check recovery pixels, native
+child inheritance, sync/async notification order and font success/failure paths.
+
+## Renderer context
+
 `page.renderer.context` is the active backend renderer object. It is read-only;
 the backend itself is selected through `saturn.run(..., backend=...)`.
 

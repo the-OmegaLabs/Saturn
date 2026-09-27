@@ -2,11 +2,11 @@
 
 [← Documentation home](../README.md) · [Screenshot gallery](../gallery.md)
 
-This index covers the 136 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
+This index covers the 139 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
 
 ## App and page
 
-[App](./App.md) · [Renderer](./Renderer.md) · [Render](./Render.md) · [run](./run.md) · [ControlEvent](./ControlEvent.md) · [KeyboardEvent](./KeyboardEvent.md) · [PageResizeEvent](./PageResizeEvent.md) · [PlatformBrightnessChangeEvent](./PlatformBrightnessChangeEvent.md) · [TextSelectionChangeEvent](./TextSelectionChangeEvent.md) · [LayoutSizeChangeEvent](./LayoutSizeChangeEvent.md) · [RouteChangeEvent](./RouteChangeEvent.md) · [WindowEvent](./WindowEvent.md) · [WindowEventType](./WindowEventType.md) · [WindowResizeEdge](./WindowResizeEdge.md) · [Control](./Control.md) · [Page](./Page.md) · [Window](./Window.md)
+[App](./App.md) · [Renderer](./Renderer.md) · [Render](./Render.md) · [run](./run.md) · [ControlEvent](./ControlEvent.md) · [KeyboardEvent](./KeyboardEvent.md) · [PageResizeEvent](./PageResizeEvent.md) · [PlatformBrightnessChangeEvent](./PlatformBrightnessChangeEvent.md) · [TextSelectionChangeEvent](./TextSelectionChangeEvent.md) · [LayoutSizeChangeEvent](./LayoutSizeChangeEvent.md) · [RouteChangeEvent](./RouteChangeEvent.md) · [RenderFailedEvent](./RenderFailedEvent.md) · [RenderReadyEvent](./RenderReadyEvent.md) · [FontOptimizeEvent](./FontOptimizeEvent.md) · [WindowEvent](./WindowEvent.md) · [WindowEventType](./WindowEventType.md) · [WindowResizeEdge](./WindowResizeEdge.md) · [Control](./Control.md) · [Page](./Page.md) · [Window](./Window.md)
 
 ## Navigation and effects
 

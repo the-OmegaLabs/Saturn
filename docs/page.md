@@ -67,6 +67,16 @@ page.on_resize.append(lambda: print("Size changed"))
 | `on_resize` | `width`, `height` in logical pixels; `page` |
 | `on_keyboard_event` | `key`, `shift`, `ctrl`, `alt`, `meta`; `page` |
 | `on_platform_brightness_change` | `brightness` as `"light"` / `"dark"`; `page` |
+| `on_render_failed` | Failed startup `backend`, requested `gpu`, `error`, fallback `message` and `fallback="software"`; `page` |
+| `on_render_ready` | Actual `backend`, `gpu_name`, `gpu_index`, boolean `fallback`; `page` |
+| `on_font_optimize` | `font`, `weight`, `status` (`started` / `completed` / `failed`), `success`, `error`, `operation`, `cached`; `page` |
+
+Install renderer handlers inside the entry function; they run after it finishes.
+On software recovery, failure notification precedes readiness. Font events
+notify the start and end of background downloading or weight instancing;
+already cached fonts do not start a new job. See
+[renderer and font events](./rendering.md#renderer-and-font-events) for timing
+and recovery details.
 
 **Migration:** earlier Saturn Page handlers received Page itself. They now receive the event, so change `current_page.width` to `event.width` or `event.page.width`. Handler lists remain supported.
 

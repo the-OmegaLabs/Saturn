@@ -22,7 +22,7 @@ Source: [`saturn/subpage.py`](../../saturn/subpage.py) (line 11).
 ## Constructor parameters
 
 ```python
-saturn.Subpage(parent: 'Page', *, main=None, title='Settings', modal=False, anchor='center', offset=None, follow_parent=False, backend=None)
+saturn.Subpage(parent: 'Page', *, main=None, title='Settings', modal=False, anchor='center', offset=None, follow_parent=False, backend=None, gpu=None)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -35,3 +35,4 @@ saturn.Subpage(parent: 'Page', *, main=None, title='Settings', modal=False, anch
 | `offset` | `—` | `None` | Displacement applied beyond the layout position. |
 | `follow_parent` | `—` | `False` | Keep the child at its relative attachment position when windows move or resize. |
 | `backend` | `—` | `None` | Rendering backend to use. For saturn.run(), omission selects OpenGL unless SATURN_BACKEND overrides it. |
+| `gpu` | `—` | `None` | Startup GPU name or nonnegative index; None keeps default selection. OpenGL selection requires driver support; see the renderer guide. |
