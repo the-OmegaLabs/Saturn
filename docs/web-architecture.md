@@ -1,6 +1,13 @@
 # Saturn Web architecture
 
-**Status: design proposal. The Web runtime and these APIs are not implemented yet.**
+**Status: the first single-process runtime is implemented.**
+
+See [Web sessions](./web.md) for installation, examples, API behavior and current
+coverage. Session selection, ordered events, FastAPI hosting, Canvas scenes,
+native input, local scrolling/opacity, bounded queues and retained reconnect
+are available. WebGL, full control adapters, independent font measurement
+caches and distributed ownership remain planned. The architecture below also
+describes these longer-term targets.
 
 ## Goal
 
@@ -90,11 +97,12 @@ one client's membership cannot accidentally move all participants.
 
 ### Web context
 
-| Proposed API | Meaning |
+| Implemented API | Meaning |
 | --- | --- |
 | `page.web.session` | Session ID, writable during initial selection |
 | `page.web.is_new_session` | Whether this entry invocation owns initialization |
 | `page.web.client_id` | Originating browser-view ID inside entry functions/events; `None` for server-originated jobs |
+| `page.web.query` | Originating WebSocket URL query parameters |
 | `page.web.connection_count` | Number of attached views in this session |
 | `page.web.events` | Named message subscriptions and sending |
 | `page.web.on_connect` | A view has joined an initialized Page |
@@ -137,7 +145,7 @@ page.web.events.unsubscribe("notice")
 ```
 
 Handlers follow ordinary Saturn conventions: sync/async, zero arguments or
-one event. The proposed message event contains `name`, `data`, `page`,
+one event. The message event contains `name`, `data`, `page`,
 `session`, `client_id`, `message_id` and `sequence`. Server-originated messages
 use `client_id=None`.
 
@@ -191,8 +199,8 @@ Duplicate transport submissions are rejected within a bounded acknowledgement
 window. Callbacks cannot concurrently mutate the same shared control tree.
 
 An async callback preserves event order while it is awaited. External work
-that would block the session queue must use a background-work API, then submit
-a result with its expected revision when conflict detection is needed. A
+that would block the queue is owned by the ASGI host. A future background-work
+API can submit results with expected revisions for conflict detection. A
 handler cannot wait for a message it just enqueued while holding that queue.
 
 Accepted input values are shared; drafts and composition are local. Input
@@ -236,19 +244,19 @@ saturn/web/
     app.py            # ASGI integration and callback runtime
     session.py        # registry, Page ownership and view lifecycle
     events.py         # scoped subscriptions and ordered messages
-    protocol.py       # versions, scene transactions and semantic input
     scene.py          # stable scene nodes and differences
-    view.py           # per-view layout and interaction state
+    context.py        # originating view/session ContextVars
     resources.py      # immutable fonts/images and cache references
     static/
         index.html
         client.js     # WebSocket, state synchronization, input and animation
         renderer.js   # Canvas drawing
+        style.css     # native input and accessibility overlays
 ```
 
 FastAPI and the ASGI runner are optional dependencies. `saturn.__init__` does
-not import the Web package. Current main imports load desktop modules; headless
-deployment also needs platform imports extracted or deferred.
+not import the Web package. Current imports still load desktop modules;
+deployment retains the pygame dependency, without initializing SDL windows.
 
 `create_app(main)` returns a real FastAPI instance with UI, resource and
 WebSocket routes. Users can add ordinary APIs, routers, middleware and lifespan
@@ -297,11 +305,11 @@ Desktop currently switches global theme/font settings between windows. Web
 requires explicit session render configuration. Font/image source caches can
 be shared; measurement keys include actual font and measurement parameters.
 
-Current controls contain layout/interaction fields such as `_rect`, focus
-and scroll positions. Separate those from shared logical state. Each view has
-its own geometry, hit regions, measurement inputs and culling state. Resizing
-one browser cannot change another's layout. Broadcasting identical coordinates
-to different viewports is insufficient.
+Current controls contain layout scratch fields such as `_rect`. The first
+runtime serializes each layout pass and stores published geometry and scroll
+offsets per view. A future extraction should remove the remaining scratch
+coupling and font-global cache switching. Resizing one browser does not change
+another's published scene; callbacks must not use `_rect` as public view state.
 
 ## Retained scene and protocol
 
@@ -310,8 +318,10 @@ sub-identities rather than transient draw-call positions. One control can emit
 several nodes; events target the owner control. Nodes contain parent/order,
 drawing kind, geometry, style, clipping, transforms, interactions and resources.
 
-Initial connection sends a full view snapshot. Later transactions use `create`,
-`patch`, `remove`, `reorder` and `animate`. Shared state revisions and view scene
+Initial connection sends a full view snapshot. The current protocol uses
+`create`, `patch`, `remove` and complete order metadata; opacity animation
+parameters travel with nodes. Dedicated `reorder`/`animate` operations remain
+future extensions. Shared state revisions and view scene
 revisions are distinct: a resize may change one scene without changing the Page.
 
 ```json
@@ -321,15 +331,15 @@ revisions are distinct: a resize may change one scene without changing the Page.
   "revision": 12,
   "base_revision": 11,
   "ops": [
-    {"op": "patch", "id": "label-1", "props": {"text": "1"}},
-    {"op": "animate", "id": "card-1", "property": "opacity",
-     "to": 1, "duration_ms": 200, "curve": "ease_out", "version": 3}
-  ]
+    {"op": "patch", "node": {"id": "label-1", "kind": "text", "text": "1"}}
+  ],
+  "metadata": {"order": ["label-1"]}
 }
 ```
 
-Transactions apply atomically. Animation replacement is versioned and starts
-from the displayed value. Initially receipt time is the playback origin;
+The abbreviated node above omits its geometry and styling. Transactions apply
+atomically. Opacity replacement starts from the displayed value; advanced
+animation versions and easing remain planned. Receipt time is the playback origin;
 nodes in one batch use the same origin. Playback remains view-local.
 
 The protocol includes version negotiation, acknowledgements and resynchronizing
@@ -339,10 +349,11 @@ or accumulate unlimited stale updates. Idle state produces no scene messages.
 
 ## Input, scrolling and fonts
 
-The browser hit-tests its displayed scene, including clipping/transforms.
+The browser's DOM layer hit-tests the displayed scene, including clipping.
 The server validates membership, control ownership, allowed events and input
-versions. Input identifies the displayed scene revision; the server cannot
-hit-test against another view's geometry.
+versions. Current input names a stable control ID validated against the
+originating view's scene. Versioned coordinate-event support remains planned;
+the server does not hit-test against another view's geometry.
 
 TextField text, selection, caret and IME use the same browser input element.
 Accepted values synchronize; composition stays local. Server pygame measurement
@@ -395,7 +406,7 @@ Desktop imports do not load Web dependencies.
 ## References
 
 Flet informs server-driven UI, update protocols and event transport. Its Flutter
-client renders controls; Saturn proposes its own retained Canvas scene and
+client renders controls; Saturn uses its own retained Canvas scene and
 initial server layout through a per-view context.
 
 - [Flet client source](https://github.com/flet-dev/flet/blob/main/packages/flet/lib/src/flet_backend.dart)

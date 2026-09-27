@@ -17,6 +17,8 @@ Saturn is a lightweight UI framework for Python desktop applications. These docs
 | [Flet mapping and scope](./flet-mapping.md) | Name mappings and implemented coverage |
 | [Saturn.run and Flet.run](./run-comparison.md) | Startup parameters, window sizing, and runtime differences |
 | [Page](./page.md) | Fonts, events, themes, list attachment, and services |
+| [Web sessions](./web.md) | Optional browser runtime, shared Pages, scoped events, demos and current coverage |
+| [Web architecture](./web-architecture.md) | Session/view boundaries, implemented foundation and future extensions |
 | [Native desktop windows](./window.md) | Window properties, native events, close interception, and HWND access |
 | [Page compatibility and remaining differences](./page-properties-comparison.md) | Completed desktop repairs, event migration, and meaningful remaining limits |
 | [Control parameter comparison](./control-parameters-comparison.md) | Per-control implemented, missing and explicitly unsupported Flet constructor names |

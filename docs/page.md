@@ -2,6 +2,10 @@
 
 Page owns the control tree, overlays, application services, theme, and input events. Window changes belong to `page.window`; backend options belong to `page.renderer`.
 
+Browser Pages hosted by `saturn.web` expose session and message services through
+`page.web`. Native window operations remain desktop-only. See [Web sessions](./web.md)
+for shared initialization, events and browser-control coverage.
+
 ```python
 import saturn
 

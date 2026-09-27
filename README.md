@@ -26,7 +26,9 @@ Inspired by the simplicity of [Flet](https://flet.dev/), Saturn takes a **lighte
 
 Saturn implements a subset of Flet-style desktop APIs. When migrating a Flet application, check constructor parameters and behavior against the [Flet mapping](./docs/flet-mapping.md) and [verified API gaps](./docs/compose.md).
 
-If you're looking to build a **web application**, [use Flet instead](https://flet.dev/).
+Browser apps can use the optional `saturn.web` runtime with shared sessions,
+scoped events and Canvas rendering. See [Web sessions](./docs/web.md) for the
+runnable demo and current coverage.
 
 ## Third-party expressive geometry
 
