@@ -28,6 +28,8 @@ import re
 import tempfile
 import threading
 import warnings
+from urllib.parse import urlparse
+from urllib.request import urlopen
 from collections import OrderedDict
 from functools import lru_cache
 from pathlib import Path
@@ -65,10 +67,13 @@ _SNAP_TO_STATIC_LIMIT = 5 * 1024 * 1024
 
 _fvar_cache: dict[str, float | None] = {}  # path -> default wght (None: static)
 
-# set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
+# Selected by the active Page theme; None = bundled Inter.
 default_family: str | None = None
-# aliases registered via page.fonts = {"name": path}
+# Resolved aliases registered through page.fonts.
 registered_fonts: dict[str, str] = {}
+_font_sources: dict[str, str] = {}
+_font_downloads: dict[str, list] = {}
+_font_download_lock = threading.RLock()
 font_revision = 0
 
 _font_cache: dict = {}
@@ -89,14 +94,116 @@ _optimizing_notice = False                      # the notice prints only once
 _woff2_lock = threading.RLock()
 
 
-def register_fonts(fonts: dict[str, str]):
+def invalidate_fonts():
+    """Invalidate measurements, glyph coverage and rendered text together."""
     global font_revision
-    registered_fonts.clear()
-    registered_fonts.update(fonts)
     font_revision += 1
+    _font_cache.clear()
+    _probe_cache.clear()
     _cover_cache.clear()
+    _compressed_font_source.cache_clear()
+    _chain_cached.cache_clear()
+    _glyph_links.cache_clear()
+    _line_width_cached.cache_clear()
     with _line_surface_lock:
         _line_surface_cache.clear()
+
+
+def set_default_family(family):
+    global default_family
+    if family != default_family:
+        default_family = family
+        invalidate_fonts()
+
+
+def _font_cache_directory():
+    return Path(tempfile.gettempdir()) / "saturn-font-cache" / "downloads"
+
+
+def _download_font(source, destination):
+    """Resolve HTTP fonts off the UI thread, then notify affected pages."""
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with urlopen(source, timeout=20) as response:
+            data = response.read(32 * 1024 * 1024 + 1)
+        if len(data) > 32 * 1024 * 1024:
+            raise ValueError("font exceeds 32 MiB")
+        # Reject a failed download (e.g. an HTML error page) before it can
+        # become a persistent cache entry. Collections are valid too.
+        from fontTools.ttLib import TTCollection, TTFont
+        loaded = (TTCollection(io.BytesIO(data)) if data[:4] == b"ttcf"
+                  else TTFont(io.BytesIO(data)))
+        try:
+            if data[:4] in (b"wOF2", b"wOFF"):
+                # HTTP endpoints need not have a filename extension.
+                # Normalize compressed fonts before storing the cache.
+                loaded.flavor = None
+                decoded = io.BytesIO()
+                loaded.save(decoded)
+                data = decoded.getvalue()
+        finally:
+            loaded.close()
+        with tempfile.NamedTemporaryFile(dir=destination.parent,
+                                         delete=False) as temporary:
+            temporary.write(data)
+            staged = Path(temporary.name)
+        try:
+            os.replace(staged, destination)
+        finally:
+            staged.unlink(missing_ok=True)
+        with _font_download_lock:
+            aliases = [alias for alias, value in _font_sources.items()
+                       if value == source]
+            for alias in aliases:
+                registered_fonts[alias] = str(destination)
+            if aliases:
+                invalidate_fonts()
+    except Exception as error:
+        warnings.warn(f"Cannot load font {source}: {error}", RuntimeWarning)
+    finally:
+        with _font_download_lock:
+            callbacks = _font_downloads.pop(source, [])
+        for callback in callbacks:
+            if callback is not None:
+                callback()
+
+
+def register_fonts(fonts: dict[str, str], on_ready=None):
+    """Register local paths/assets or asynchronously cached HTTP(S) fonts."""
+    sources = {str(alias): os.fspath(source) for alias, source in fonts.items()}
+    with _font_download_lock:
+        if sources == _font_sources:
+            return
+        _font_sources.clear()
+        _font_sources.update(sources)
+        registered_fonts.clear()
+        pending = []
+        for alias, source in sources.items():
+            parsed = urlparse(source)
+            if parsed.scheme.lower() in ("http", "https"):
+                cached = _font_cache_directory() / (
+                    hashlib.sha256(source.encode()).hexdigest() + ".ttf")
+                if cached.is_file():
+                    registered_fonts[alias] = str(cached)
+                else:
+                    registered_fonts[alias] = ""
+                    callbacks = _font_downloads.get(source)
+                    if callbacks is None:
+                        _font_downloads[source] = [on_ready]
+                        pending.append((source, cached))
+                    elif on_ready not in callbacks:
+                        callbacks.append(on_ready)
+            else:
+                path = Path(source).expanduser()
+                if not path.is_absolute() and not path.is_file():
+                    asset = Path("assets") / path
+                    if asset.is_file():
+                        path = asset
+                registered_fonts[alias] = str(path)
+        invalidate_fonts()
+        for source, cached in pending:
+            threading.Thread(target=_download_font, args=(source, cached),
+                             daemon=True, name="saturn-font-download").start()
 
 
 @lru_cache(maxsize=64)
@@ -153,16 +260,25 @@ def _bundled_font_source(path: str):
 def _font_source(path: str):
     if path in (str(INTER), str(INTER_ITALIC), str(INTER_BOLD)):
         return _bundled_font_source(path)
+    # Ordinary SFNT paths do not require Path/stat work for each run.
+    if not path.lower().endswith((".woff2", ".woff")):
+        return path
+    stat = os.stat(path)
+    return _compressed_font_source(path, stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=256)
+def _compressed_font_source(path: str, modified_ns: int, size: int):
     return _resolve_font_source(path)
 
 
 def _resolve_font_source(path: str):
-    if Path(path).suffix.lower() != ".woff2":
+    if not path.lower().endswith((".woff2", ".woff")):
         return path
     resolved = Path(path).resolve()
     with resolved.open("rb") as stream:
-        if stream.read(4) != b"wOF2":
-            raise ValueError(f"not a WOFF2 font: {path}")
+        if stream.read(4) not in (b"wOF2", b"wOFF"):
+            raise ValueError(f"not a web font: {path}")
     stat = resolved.stat()
     with _woff2_lock:
         source = _decode_woff2(str(resolved), stat.st_mtime_ns, stat.st_size)
@@ -371,7 +487,7 @@ def _primary_link(family: str | None, wnum: int, italic: bool) -> tuple:
                 return ("file", _font_source(reg), wnum, italic)
             return _default_link(wnum, italic)
         if os.path.isfile(resolved) and Path(resolved).suffix.lower() in \
-                (".ttf", ".otf", ".woff2"):
+                (".ttf", ".otf", ".ttc", ".woff", ".woff2"):
             return ("file", _font_source(resolved), wnum, italic)
         return ("sys", resolved, wnum, italic)
     return _default_link(wnum, italic)
@@ -502,17 +618,29 @@ def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
 
 
 # -- segmentation + rendering -----------------------------------------------------
+@lru_cache(maxsize=256)
+def _glyph_links(family, wnum, italic, _default, _revision):
+    """Share exact fallback choices across different strings in one style."""
+    return _chain(family, wnum, italic), {}
+
+
 def _segment(text: str, px: int, wnum: int, italic: bool,
              family: str | None) -> list[tuple[pygame.font.Font, str]]:
     """Split text into (font, substring) runs by glyph coverage."""
     if not text:
         return []
-    links = _chain(family, wnum, italic)
+    links, glyphs = _glyph_links(family, wnum, italic,
+                                default_family, font_revision)
     fonts = {}
     runs: list[tuple[pygame.font.Font, str]] = []
     cur_font, cur = None, ""
     for ch in text:
-        link = next((l for l in links if _covers(l, ch)), links[0])
+        link = glyphs.get(ch)
+        if link is None:
+            link = next((l for l in links if _covers(l, ch)), links[0])
+            if len(glyphs) >= 2048:
+                glyphs.clear()
+            glyphs[ch] = link
         f = fonts.get(link)
         if f is None:
             f = fonts[link] = _render_font(link, px)

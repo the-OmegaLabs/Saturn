@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 import sys
 import time
+from types import SimpleNamespace
 
 import pygame
 
@@ -43,123 +44,7 @@ def _set_windows_dark_title_bar(hwnd: int, dark: bool) -> bool:
         return False
 
 
-class Window:
-    """Native window properties exposed through page.window."""
-
-    def __init__(self, app):
-        self._app = app
-        self._maximized = False
-        self._full_screen = False
-        self._minimized = False
-
-    @property
-    def width(self) -> int:
-        return self._app.outer_size[0]
-
-    @width.setter
-    def width(self, v: int):
-        self._set_size(int(v), self._app.outer_size[1])
-
-    @property
-    def height(self) -> int:
-        return self._app.outer_size[1]
-
-    @height.setter
-    def height(self, v: int):
-        self._set_size(self._app.outer_size[0], int(v))
-
-    @property
-    def title(self) -> str:
-        return self._app._title
-
-    @title.setter
-    def title(self, v: str):
-        self._app._title = v
-        self._app.post(lambda: setattr(self._app._window, "title", v))
-
-    @property
-    def icon(self):
-        return self._app._window_icon
-
-    @icon.setter
-    def icon(self, path):
-        self._app._window_icon = path
-
-        def _set_icon():
-            if path:
-                self._app._window.set_icon(pygame.image.load(path))
-            else:
-                self._app._apply_default_window_icon()
-
-        self._app.post(_set_icon)
-
-    # Native window state; all SDL calls marshaled to the UI thread
-    @property
-    def maximized(self) -> bool:
-        return self._maximized
-
-    @maximized.setter
-    def maximized(self, v: bool):
-        self._maximized = bool(v)
-        win = self._app._window
-        self._app.post(win.maximize if v else win.restore)
-
-    @property
-    def full_screen(self) -> bool:
-        return self._full_screen
-
-    @full_screen.setter
-    def full_screen(self, v: bool):
-        self._full_screen = bool(v)
-        win = self._app._window
-        self._app.post(win.set_fullscreen if v else win.set_windowed)
-
-    @property
-    def minimized(self) -> bool:
-        return self._minimized
-
-    @minimized.setter
-    def minimized(self, v: bool):
-        self._minimized = bool(v)
-        if v:
-            self._app.post(self._app._window.minimize)
-        else:
-            self._app.post(self._app._window.restore)
-
-    def _set_size(self, w, h):
-        # pygame-ce fires no WINDOWRESIZED for programmatic sets, and the GL
-        # context is UI-thread-bound — so the renderer update rides along
-        # with the SDL size change on the UI thread. Manual resizes still
-        # come through the WINDOWRESIZED event.
-        client_w, client_h = self._app.client_size_for_outer(w, h)
-        pixel_client = self._app.physical_size_for_logical(
-            client_w, client_h)
-
-        def _do():
-            self._app._window.size = pixel_client
-            self._app.renderer.on_resize(
-                client_w, client_h, pixel_size=pixel_client,
-                pixel_ratio=self._app.pixel_ratio)
-        self._app._outer_size[:] = [w, h]
-        self._app._size[:] = [client_w, client_h]
-        self._app.post(_do)
-        self._app.mark_dirty()
-
-    def close(self):
-        self._app.close()
-
-    def destroy(self):
-        self._app.close()
-
-    async def center(self):
-        # posted: SDL display calls are main-thread-only; runs after any
-        # size changes queued earlier, so it centers the final size
-        def _do():
-            sw, sh = pygame.display.get_desktop_sizes()[0]
-            w, h = self._app.outer_size
-            pw, ph = self._app.physical_size_for_logical(w, h)
-            self._app._window.position = ((sw - pw) // 2, (sh - ph) // 2)
-        self._app.post(_do)
+from .window import Window
 
 
 class _RendererSettings:
@@ -205,13 +90,14 @@ class Page(Control):
         self.controls: list[Control] = []
         self.bgcolor = None       # None → theme surface color
         self.padding = 10
-        self._title = ""
         self._theme_mode = ThemeMode.SYSTEM
-        colors.theme_dark = colors.system_prefers_dark()  # SYSTEM default
-        self._sync_native_title_bar()
-        self.theme = None       # ft.Theme(font_family=...) overrides default font
-        self.dark_theme = None
-        self._fonts: dict[str, str] = {}  # Font alias -> file path
+        self._platform_brightness = ("dark" if colors.system_prefers_dark()
+                                     else "light")
+        self._theme = None
+        self._dark_theme = None
+        self._theme_key = None
+        self._fonts: dict[str, str] = {}
+        self._fonts_snapshot = None
         self.vertical_alignment = MainAxisAlignment.START
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
@@ -219,6 +105,7 @@ class Page(Control):
         self.services: list = []          # Registered application services
         self.on_resize: list = []  # Resize event handlers
         self.on_keyboard_event: list = []
+        self.on_platform_brightness_change = None
         self._pressed = None
         self._hovered = None
         self._focused = None
@@ -231,6 +118,10 @@ class Page(Control):
         self._layout_key = None
         self._active_animations = set()
         self._animation_scan_needed = True
+        self._attached_roots = {}
+        self._attached_services = {}
+        self.page = self
+        self._apply_theme()
 
     # -- public API ---------------------------------------------------------
     @property
@@ -247,23 +138,60 @@ class Page(Control):
         return self._app.size[1]
 
     @property
+    def media(self):
+        """Measured native display density; dimensions remain logical pixels."""
+        return SimpleNamespace(device_pixel_ratio=self._app.pixel_ratio)
+
+    @property
     def theme_mode(self) -> ThemeMode:
         return self._theme_mode
 
     @theme_mode.setter
     def theme_mode(self, mode):
         self._theme_mode = mode if isinstance(mode, ThemeMode) else ThemeMode(mode)
-        # SYSTEM follows the OS app-mode preference (Windows dark mode)
-        colors.theme_dark = (self._theme_mode is ThemeMode.DARK
-                             or (self._theme_mode is ThemeMode.SYSTEM
-                                 and colors.system_prefers_dark()))
-        colors.apply_seed(getattr(self._theme, "color_scheme_seed", None),
-                          expressive=getattr(self._theme, "expressive", False))
-        self._sync_native_title_bar()
         self.update()
+
+    @property
+    def platform_brightness(self) -> str:
+        """Current OS application color preference: light or dark."""
+        return self._platform_brightness
+
+    def _refresh_platform_brightness(self):
+        colors._system_dark_cache = None
+        value = "dark" if colors.system_prefers_dark() else "light"
+        if value == self._platform_brightness:
+            return False
+        self._platform_brightness = value
+        self.update()
+        from .event import PlatformBrightnessChangeEvent
+        self._dispatch(self.on_platform_brightness_change,
+                       PlatformBrightnessChangeEvent(
+                           "platform_brightness_change", self,
+                           brightness=value))
+        return True
+
+    def _apply_theme(self):
+        dark = (self._theme_mode is ThemeMode.DARK or
+                (self._theme_mode is ThemeMode.SYSTEM and
+                 self._platform_brightness == "dark"))
+        effective = self._dark_theme if dark and self._dark_theme is not None else self._theme
+        key = (dark, getattr(effective, "font_family", None),
+               getattr(effective, "color_scheme_seed", None),
+               getattr(effective, "expressive", False))
+        if key == self._theme_key:
+            return
+        self._theme_key = key
+        colors.theme_dark = dark
+        colors.apply_seed(key[2], expressive=key[3])
+        from . import text
+        text.set_default_family(key[1])
+        self._sync_native_title_bar()
 
     def _sync_native_title_bar(self):
         dark = colors.theme_dark
+        brightness = getattr(self.window, "brightness", None)
+        if brightness is not None:
+            dark = getattr(brightness, "value", brightness) == "dark"
         self._app.post(lambda: _set_windows_dark_title_bar(
             self._app._window.handle, dark))
 
@@ -274,10 +202,15 @@ class Page(Control):
     @theme.setter
     def theme(self, t):
         self._theme = t
-        from . import text as _txt
-        _txt.default_family = t.font_family if t is not None else None
-        colors.apply_seed(getattr(t, "color_scheme_seed", None),
-                          expressive=getattr(t, "expressive", False))
+        self.update()
+
+    @property
+    def dark_theme(self):
+        return self._dark_theme
+
+    @dark_theme.setter
+    def dark_theme(self, theme):
+        self._dark_theme = theme
         self.update()
 
     @property
@@ -287,27 +220,32 @@ class Page(Control):
     @fonts.setter
     def fonts(self, fonts: dict[str, str]):
         self._fonts = dict(fonts or {})
-        from . import text as _txt
-        _txt.register_fonts(self._fonts)
+        self.update()
+
+    def _sync_fonts(self):
+        if self._fonts != self._fonts_snapshot:
+            from . import text
+            text.register_fonts(self._fonts, on_ready=self._font_ready)
+            self._fonts_snapshot = dict(self._fonts)
+
+    def _font_ready(self):
+        self._layout_dirty = True
+        self._app.mark_dirty()
 
     @property
     def title(self) -> str:
-        return self._title
+        return self.window.title
 
     @title.setter
     def title(self, v: str):
-        self._title = v
         self.window.title = v or "saturn"
 
     def add(self, *ctrls: Control):
         self.controls.extend(ctrls)
-        for c in ctrls:
-            c._attach(self, self)
         self.update()
 
     def insert(self, index, ctrl):
         self.controls.insert(index, ctrl)
-        ctrl._attach(self, self)
         self.update()
 
     def remove(self, ctrl):
@@ -355,7 +293,67 @@ class Page(Control):
             dialog._closed()
             self.update()
 
+    def _reconcile_roots(self):
+        """Attach direct list mutations without reattaching unchanged trees."""
+        roots = {id(control): (control, self) for control in self.controls}
+        roots.update({id(control): (control, None) for control in self.overlay})
+        removed = [control for ident, (control, _) in self._attached_roots.items()
+                   if ident not in roots]
+        self._attached_roots = roots
+        detached = set()
+        def collect(control):
+            detached.add(control)
+            for child in control._children():
+                collect(child)
+        for control in removed:
+            collect(control)
+        if detached:
+            # A subtree moved to another top-level root stays attached.
+            def retain(control):
+                detached.discard(control)
+                for child in control._children():
+                    retain(child)
+            for control, _ in roots.values():
+                retain(control)
+            if self._focused in detached:
+                self.focus(None)
+            if self._pressed in detached:
+                self._pressed._pressed = False
+                self._pressed = None
+            if self._hovered in detached:
+                self._hovered._hovered = False
+                self._hovered = None
+            self._active_animations.difference_update(detached)
+            for control in detached:
+                control.page = None
+                control.parent = None
+        # Store before attachment: attachment hooks can request an update.
+        for control, parent in roots.values():
+            if control.page is not self or control.parent is not parent:
+                control._attach(self, parent)
+
+    def _reconcile_services(self):
+        current = {id(service): service for service in self.services}
+        previous, self._attached_services = self._attached_services, current
+        for ident, service in previous.items():
+            if ident not in current and getattr(service, "page", None) is self:
+                service.page = None
+        for service in current.values():
+            if getattr(service, "page", None) is not self:
+                if hasattr(service, "_attach"):
+                    service._attach(self, self)
+                else:
+                    service.page = self
+
     def update(self):
+        if not hasattr(self, "_attached_roots"):
+            return
+        self._apply_theme()
+        self._sync_fonts()
+        self._reconcile_roots()
+        self._reconcile_services()
+        if self.disabled:
+            self._cancel_input()
         now = time.perf_counter()
         for control in [*getattr(self, "controls", []),
                         *getattr(self, "overlay", [])]:
@@ -377,12 +375,21 @@ class Page(Control):
         to `path` when given)."""
         return self._app.screenshot(path)
 
-    def _dispatch(self, handlers: list):
-        for h in list(handlers):
-            self._app.call(h, self)
+    def _dispatch(self, handlers, event=None):
+        from .event import ControlEvent, _invoke, normalize_handlers
+        event = event or ControlEvent("event", self)
+        for handler in normalize_handlers(handlers):
+            self._app.call(_invoke, handler, event)
+
+    def _notify_resize(self):
+        from .event import PageResizeEvent
+        self._dispatch(self.on_resize, PageResizeEvent(
+            "resize", self, width=self.width, height=self.height))
 
     # -- internals ---------------------------------------------------------
     def _hit_test(self, x, y):
+        if self.disabled or not self.visible:
+            return None
         for c in reversed(self.overlay):
             hit = c._hit_test(x, y)
             if hit is not None:
@@ -390,6 +397,8 @@ class Page(Control):
         return super()._hit_test(x, y)
 
     def _hit_test_hover(self, x, y):
+        if self.disabled or not self.visible:
+            return None
         for control in reversed(self.overlay):
             hit = control._hit_test_hover(x, y)
             if hit is not None:
@@ -412,17 +421,21 @@ class Page(Control):
         if animating:
             self._app.mark_dirty()
         r = self._app.renderer
-        r.clear(self.bgcolor or colors.Colors.SURFACE)
+        r.clear(self.bgcolor or self.window.bgcolor or colors.Colors.SURFACE)
         from .widgets.containers import Column
-        p = self.padding
-        layout_key = (self.width, self.height, r.scale, p,
+        from .types import as_padding
+        p = as_padding(self.padding)
+        layout_key = (self.width, self.height, r.scale,
+                      p.left, p.top, p.right, p.bottom,
                       self.vertical_alignment, self.horizontal_alignment,
                       self.spacing, tuple(self.controls))
         if self._layout_dirty or layout_key != self._layout_key:
             col = Column(*self.controls, alignment=self.vertical_alignment,
                          horizontal_alignment=self.horizontal_alignment,
                          spacing=self.spacing)
-            col._place(p, p, self.width - 2 * p, self.height - 2 * p, r.scale)
+            col._place(p.left, p.top,
+                       max(0, self.width - p.left - p.right),
+                       max(0, self.height - p.top - p.bottom), r.scale)
             self._layout_key = layout_key
             self._layout_dirty = False
         self._draw_all(r)
@@ -471,40 +484,69 @@ class Page(Control):
 
     def handle_event(self, e):
         if e.type == pygame.WINDOWRESIZED:
-            self._dispatch(self.on_resize)
+            self._notify_resize()
+            return
+        if self.disabled or not self.visible:
+            self._cancel_input()
             return
         if e.type == pygame.MOUSEWHEEL:
             # pygame reports wheel-up as positive; content offsets increase
             # toward later items, so down-scrolling needs the opposite sign.
-            pointer = self._pointer_pos or pygame.mouse.get_pos()
+            pointer = self._pointer_pos
+            if pointer is None:
+                pointer = self._app.logical_point(*pygame.mouse.get_pos())
             self._wheel(-e.y * 40, *pointer)
             return
         if e.type == pygame.TEXTINPUT:
-            if self._focused is not None:
+            if self._control_enabled(self._focused):
                 self._focused._text_input(e.text)
             return
         if e.type == pygame.TEXTEDITING:
-            if (self._focused is not None
+            if (self._control_enabled(self._focused)
                     and hasattr(self._focused, "_text_editing")):
                 self._focused._text_editing(
                     e.text, getattr(e, "start", 0), getattr(e, "length", 0))
             return
         if e.type == pygame.KEYDOWN:
+            from .event import KeyboardEvent
+            key_names = {
+                pygame.K_RETURN: "Enter", pygame.K_KP_ENTER: "Enter",
+                pygame.K_ESCAPE: "Escape", pygame.K_SPACE: " ",
+                pygame.K_BACKSPACE: "Backspace", pygame.K_TAB: "Tab",
+                pygame.K_DELETE: "Delete", pygame.K_INSERT: "Insert",
+                pygame.K_LEFT: "Arrow Left", pygame.K_RIGHT: "Arrow Right",
+                pygame.K_UP: "Arrow Up", pygame.K_DOWN: "Arrow Down",
+                pygame.K_HOME: "Home", pygame.K_END: "End",
+                pygame.K_PAGEUP: "Page Up", pygame.K_PAGEDOWN: "Page Down",
+            }
+            key = key_names.get(e.key, pygame.key.name(e.key))
+            if len(key) == 1 or key.startswith("f") and key[1:].isdigit():
+                key = key.upper()
+            mods = getattr(e, "mod", 0)
+            self._dispatch(self.on_keyboard_event, KeyboardEvent(
+                "keyboard_event", self, key=key,
+                shift=bool(mods & pygame.KMOD_SHIFT),
+                ctrl=bool(mods & pygame.KMOD_CTRL),
+                alt=bool(mods & pygame.KMOD_ALT),
+                meta=bool(mods & pygame.KMOD_GUI)))
             for control in reversed(self.overlay):
-                if control.handle_event(e):
+                if self._control_enabled(control) and control.handle_event(e):
                     return
-            self._dispatch(self.on_keyboard_event)
-            if self._focused is not None:
+            if self._control_enabled(self._focused):
                 self._focused._key(e)
 
     def _wheel(self, delta, x=None, y=None):
+        if self.disabled or not self.visible:
+            return
         if x is None or y is None:
             x, y = self._app.logical_point(*pygame.mouse.get_pos())
         lv = self._find_scrollable(x, y)
-        if lv is not None:
+        if self._control_enabled(lv):
             lv._wheel(delta)
 
     def _find_scrollable(self, x, y):
+        if self.disabled or not self.visible:
+            return None
         best = None
         for c in list(reversed(self.overlay)) + list(reversed(self.controls)):
             best = c._find_scrollable(x, y) or best
@@ -512,6 +554,8 @@ class Page(Control):
 
     # -- focus ---------------------------------------------------------------
     def focus(self, control):
+        if control is not None and not self._control_enabled(control):
+            return
         if self._focused is control:
             return
         from .event import fire
@@ -540,8 +584,31 @@ class Page(Control):
             pygame.key.stop_text_input()
         self.update()
 
+    def _control_enabled(self, control):
+        if control is None or self.disabled or not self.visible:
+            return False
+        node = control
+        while node is not None:
+            if node.disabled or not node.visible:
+                return False
+            node = node.parent
+        return control.page is self
+
+    def _cancel_input(self):
+        if self._focused is not None:
+            self.focus(None)
+        if self._pressed is not None:
+            self._pressed._pressed = False
+            self._pressed = None
+        if self._hovered is not None:
+            self._hovered._hovered = False
+            self._hovered = None
+
     # -- pointer plumbing (called from the UI loop) ------------------------
     def pointer_down(self, x, y, clicks=None):
+        if self.disabled or not self.visible:
+            self._cancel_input()
+            return
         self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
         now = time.perf_counter()
@@ -579,6 +646,9 @@ class Page(Control):
             self.update()
 
     def pointer_up(self, x, y):
+        if self.disabled or not self.visible:
+            self._cancel_input()
+            return
         self._pointer_pos = (x, y)
         hit = self._hit_test(x, y)
         if self._pressed is not None:
@@ -596,6 +666,9 @@ class Page(Control):
             self.update()
 
     def pointer_move(self, x, y):
+        if self.disabled or not self.visible:
+            self._cancel_input()
+            return
         self._pointer_pos = (x, y)
         if self._pressed is not None and hasattr(self._pressed, "_drag"):
             self._pressed._drag(x, y)

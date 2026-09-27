@@ -10,7 +10,9 @@ Usage:
 """
 from types import SimpleNamespace
 
-from .event import ControlEvent
+from .event import (
+    ControlEvent, KeyboardEvent, PageResizeEvent, PlatformBrightnessChangeEvent,
+)
 from .app import App, Renderer, run
 
 Render = Renderer
@@ -18,6 +20,7 @@ from ._gen.icons import Icons
 from .colors import BASELINE_DARK, BASELINE_LIGHT, Colors, parse_color, theme_dark
 from .control import Control
 from .page import Page, Window
+from .window import WindowEvent, WindowEventType, WindowResizeEdge
 from .services import (
     FilePicker,
     FilePickerFile,
@@ -117,6 +120,8 @@ from .compose import Compose
 
 __all__ = [
     "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
+    "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
+    "WindowEvent", "WindowEventType", "WindowResizeEdge",
     "Colors", "Icons", "parse_color",
     "Control", "Page", "Window", "Text", "Row", "Column", "Container",
     "Stack", "Divider", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",

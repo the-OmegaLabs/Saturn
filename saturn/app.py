@@ -3,10 +3,10 @@
 Thread rules:
 - The thread that calls run() owns the window: it pumps SDL events, re-layouts
   and redraws when dirty, with optional display refresh pacing.
-- main(page) and every event handler run off the UI thread (sync -> daemon
-  thread, async -> the app's asyncio loop), so blocking handlers never freeze
-  the window. Control state changes from those threads are only safe between
-  update() calls; update() just raises the dirty flag.
+- main(page) and every event handler run off the UI thread (sync -> a bounded
+  worker pool, async -> the app's asyncio loop), so blocking handlers do not
+  stop window event processing. Complete related control mutations before
+  calling update(); it reconciles ownership and requests layout/redrawing.
 """
 from __future__ import annotations
 
@@ -19,12 +19,14 @@ import queue
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pygame
 
 from .renderer import create_renderer
 from .renderer.base import Renderer as _RendererBase
+from .window import WindowEventType
 
 
 class Renderer(enum.Enum):
@@ -117,6 +119,7 @@ class App:
         self._ui_q: queue.SimpleQueue = queue.SimpleQueue()
         # background loop for async handlers / main coroutines
         self._loop = asyncio.new_event_loop()
+        self._executor = ThreadPoolExecutor(thread_name_prefix="saturn-handler")
         threading.Thread(target=self._loop.run_forever, daemon=True,
                          name="saturn-async").start()
         self.renderer: _RendererBase | None = None
@@ -132,6 +135,7 @@ class App:
         self._refresh_rate = 60
         self._window_icon = None
         self._pixel_ratio = 1.0
+        self._last_brightness_check = 0.0
 
     # -- lifecycle ------------------------------------------------------
     def start(self):
@@ -211,7 +215,7 @@ class App:
                     break
             for e in pygame.event.get():
                 if e.type in (pygame.QUIT, pygame.WINDOWCLOSE):
-                    self._closed.set()
+                    self.page.window._request_close()
                 elif e.type == pygame.WINDOWRESIZED:
                     self._resize_frame(e.x, e.y, present=False, dispatch=True)
                 elif e.type == pygame.WINDOWDISPLAYCHANGED:
@@ -229,6 +233,11 @@ class App:
                     self.page.handle_event(e)
                 else:
                     self.page.handle_event(e)
+                self.page.window._handle_event(e)
+            now = time.perf_counter()
+            if now - self._last_brightness_check >= 1.0:
+                self._last_brightness_check = now
+                self.page._refresh_platform_brightness()
             if self._dirty.is_set():
                 self._dirty.clear()
                 self.page.draw()
@@ -240,10 +249,12 @@ class App:
                 # animations remain uncapped when synchronization is off.
                 self._dirty.wait(0.004)
         self._remove_live_resize_watch()
+        self.page.window._dispose()
         if self.renderer is not None:
             self.renderer.close()
         self._window.destroy()
         pygame.display.quit()
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
     # -- cross-thread helpers -------------------------------------------
     def configure_renderer(self, *, anti_aliasing=None, vsync=None):
@@ -274,12 +285,22 @@ class App:
         self.mark_dirty()
 
     def call(self, fn, *args):
-        """Run a user callable off the UI thread (sync: thread, async: loop)."""
+        """Run a callable off the UI thread and await returned awaitables."""
         if inspect.iscoroutinefunction(fn):
-            asyncio.run_coroutine_threadsafe(fn(*args), self._loop)
+            future = asyncio.run_coroutine_threadsafe(fn(*args), self._loop)
+            future.add_done_callback(_report_async_error)
+            return future
         else:
-            # ponytail: one thread per handler, sequential dispatch if races show up
-            threading.Thread(target=_swallow, args=(fn, *args), daemon=True).start()
+            def invoke():
+                result = fn(*args)
+                if inspect.isawaitable(result):
+                    async def await_result():
+                        return await result
+                    future = asyncio.run_coroutine_threadsafe(await_result(), self._loop)
+                    future.add_done_callback(_report_async_error)
+                    return future
+                return result
+            return self._executor.submit(_swallow, invoke)
 
     def mark_dirty(self):
         self._dirty.set()
@@ -323,7 +344,8 @@ class App:
         if (dispatch and self.page is not None
                 and size != self._last_resize_dispatched_size):
             self._last_resize_dispatched_size = size
-            self.page._dispatch(self.page.on_resize)
+            self.page._notify_resize()
+            self.page.window._emit(WindowEventType.RESIZED)
         if present and self.page is not None and self.renderer is not None:
             self.page.draw()
             self.renderer.flip()
@@ -457,6 +479,8 @@ class App:
             return False
         self._pixel_ratio = ratio
         self._frame_size = self._measure_frame_size()
+        if self.page is not None:
+            self.page.window._apply_limits()
         return True
 
     def client_size_for_outer(self, width, height):
@@ -479,6 +503,10 @@ class App:
             outer = wintypes.RECT()
             client = wintypes.RECT()
             user32 = ctypes.windll.user32
+            user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            user32.GetWindowRect.restype = wintypes.BOOL
+            user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            user32.GetClientRect.restype = wintypes.BOOL
             if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
                 return (0, 0)
             if not user32.GetClientRect(hwnd, ctypes.byref(client)):
@@ -495,7 +523,17 @@ class App:
 
 def _swallow(fn, *args):
     try:
-        fn(*args)
+        return fn(*args)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+
+
+def _report_async_error(future):
+    if future.cancelled():
+        return
+    try:
+        future.result()
     except Exception:
         import traceback
         traceback.print_exc()

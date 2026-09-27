@@ -6,7 +6,7 @@ them off the UI thread via App.call.
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -22,6 +22,26 @@ class ControlEvent:
 
 
 @dataclass
+class PageResizeEvent(ControlEvent):
+    width: float = 0
+    height: float = 0
+
+
+@dataclass
+class KeyboardEvent(ControlEvent):
+    key: str = ""
+    shift: bool = False
+    ctrl: bool = False
+    alt: bool = False
+    meta: bool = False
+
+
+@dataclass
+class PlatformBrightnessChangeEvent(ControlEvent):
+    brightness: str = "light"
+
+
+@dataclass
 class TapEvent:
     kind: str
     local_position: tuple
@@ -32,11 +52,18 @@ class TapEvent:
         return None  # wired by fire() wrapper when possible
 
 
-def handlers_of(control, name: str) -> list:
-    hs = getattr(control, f"on_{name}", None)
+def normalize_handlers(hs) -> list:
+    """Accept a single callback and the existing callback-list syntax."""
     if hs is None:
         return []
-    return [hs] if callable(hs) else list(hs)
+    result = [hs] if callable(hs) else list(hs)
+    if not all(callable(handler) for handler in result):
+        raise TypeError("event handlers must be callable")
+    return result
+
+
+def handlers_of(control, name: str) -> list:
+    return normalize_handlers(getattr(control, f"on_{name}", None))
 
 
 def fire(control, name: str, data: Any = None) -> None:
@@ -56,4 +83,6 @@ def _invoke(h, ev):
         n = len(inspect.signature(h).parameters)
     except (TypeError, ValueError):
         n = 1
-    h(ev) if n else h()
+    # App.call also awaits returned awaitables, including wrapped async
+    # callbacks and ordinary callbacks which return a coroutine.
+    return h(ev) if n else h()
