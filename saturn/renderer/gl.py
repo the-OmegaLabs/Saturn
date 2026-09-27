@@ -20,6 +20,7 @@ import moderngl
 
 from ..colors import parse_color
 from .base import Renderer
+from .geometry import arc_triangles, polygon_triangles, stroke_triangles
 
 
 def _set_swap_interval(enabled: bool) -> bool:
@@ -46,7 +47,7 @@ uniform vec2 u_size;
 out vec2 v_local;
 flat out vec2 v_half;
 flat out vec2 v_rb;
-flat out vec4 v_color;
+out vec4 v_color;
 flat out vec4 v_border_color;
 void main() {
     vec2 out_pos = vec2(in_pos.x, u_size.y - in_pos.y);
@@ -64,7 +65,7 @@ RECT_FS = """
 in vec2 v_local;
 flat in vec2 v_half;
 flat in vec2 v_rb;
-flat in vec4 v_color;
+in vec4 v_color;
 flat in vec4 v_border_color;
 out vec4 frag;
 float sd_round(vec2 p, vec2 b, float r) {
@@ -143,9 +144,26 @@ uniform float u_ripple_radius;
 uniform vec4 u_color;
 uniform float u_hover;
 uniform float u_pressed;
+uniform float u_mode;
+uniform vec4 u_wave;
+uniform vec4 u_info;
 out vec4 frag;
+""" + Path(__file__).with_name('wave.glsl').read_text() + """
 void main() {
     vec2 p = v_uv * u_rect_size;
+    if (u_mode > .5) {
+        if (u_mode > 2.5) {
+            frag = vec4(u_color.rgb, u_color.a *
+                        elevation_shadow(p, u_rect_size, u_wave, u_info));
+            return;
+        }
+        float distance = u_mode < 1.5 ? wave_line_distance(p, u_wave, u_info) :
+                         wave_arc_distance(p - u_rect_size * .5, u_wave, u_info);
+        float aa = max(fwidth(distance), .001);
+        float alpha = 1.0 - smoothstep(-aa, aa, distance);
+        frag = vec4(u_color.rgb, u_color.a * alpha);
+        return;
+    }
     float radius = p.y < u_rect_size.y * 0.5
         ? (p.x < u_rect_size.x * 0.5 ? u_radii.x : u_radii.y)
         : (p.x < u_rect_size.x * 0.5 ? u_radii.w : u_radii.z);
@@ -168,6 +186,9 @@ void main() {
 class GLRenderer(Renderer):
     native_texture_scaling = True
     native_shape_overlay = True
+    native_geometry = True
+    native_texture_tint = True
+    native_shadow = True
     native_state_layer = True
     # text/icons are rendered at 2x and downsampled in blit (matches the
     # software backend's supersampling); rects get SDF AA at device resolution
@@ -276,7 +297,7 @@ class GLRenderer(Renderer):
         vertices.clear()
 
     def _draw_rect(self, corners, center, half, radius, border_w, color,
-                   border_color):
+                   border_color, coverage=None):
         """corners: 6 (x, y) tuples (two triangles, any winding)."""
         r, g, b, a = self._effect_color(color)
         if border_color is not None:
@@ -286,9 +307,16 @@ class GLRenderer(Renderer):
         color4 = (r / 255, g / 255, b / 255, a / 255)
         border4 = (br / 255, bg / 255, bb / 255, ba / 255)
         data = self._rect_vertices
-        for (px, py) in corners:
-            data.extend((px, py, *center, *half, radius, border_w,
-                         *color4, *border4))
+        # Repeat common fields in C instead of converting 16 Python floats
+        # for every triangle vertex in an animated rounded polygon.
+        block = array('f', (0, 0, *center, *half, radius, border_w,
+                            *color4, *border4)) * len(corners)
+        for index, (px, py) in enumerate(corners):
+            offset = index * 16
+            block[offset], block[offset + 1] = px, py
+            if coverage is not None:
+                block[offset + 11] = color4[3] * coverage[index]
+        data.extend(block)
         if len(data) >= 16 * 6 * 256:
             self._flush_rects()
 
@@ -335,12 +363,13 @@ class GLRenderer(Renderer):
                         border_w=width, border_color=color)
 
     def line(self, x1, y1, x2, y2, color, width=1):
-        # axis-aligned exact; diagonal = bounding quad (ponytail: tessellate when needed)
-        x1, y1 = self._translate(x1, y1)
-        x2, y2 = self._translate(x2, y2)
-        # _rect_call also applies the current translation, so remove it here.
-        tx, ty = self._translation_stack[-1]
-        x1, y1, x2, y2 = x1 - tx, y1 - ty, x2 - tx, y2 - ty
+        if width <= 0:
+            return
+        if x1 != x2 and y1 != y2:
+            points, coverage = stroke_triangles(
+                ((x1, y1), (x2, y2)), width, 1 / self.scale)
+            self._draw_geometry(points, coverage, color)
+            return
         x, y = min(x1, x2), min(y1, y2)
         w = abs(x2 - x1) or width
         h = abs(y2 - y1) or width
@@ -362,28 +391,28 @@ class GLRenderer(Renderer):
                             border_color=color)
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
-        x, y = self._translate(x, y)
-        sweep = end_angle - start_angle
-        if radius <= 0 or width <= 0 or sweep == 0:
+        points, coverage = arc_triangles(
+            x, y, radius, start_angle, end_angle, width, 1 / self.scale)
+        self._draw_geometry(points, coverage, color)
+
+    def _draw_geometry(self, points, coverage, color):
+        if not points:
             return
-        segments = max(8, int(abs(sweep) * radius / 3))
-        inner = max(0.0, radius - width)
-        corners = []
-        for index in range(segments):
-            a0 = start_angle + sweep * index / segments
-            a1 = start_angle + sweep * (index + 1) / segments
-            outer0 = (x + math.cos(a0) * radius,
-                      y + math.sin(a0) * radius)
-            outer1 = (x + math.cos(a1) * radius,
-                      y + math.sin(a1) * radius)
-            inner0 = (x + math.cos(a0) * inner,
-                      y + math.sin(a0) * inner)
-            inner1 = (x + math.cos(a1) * inner,
-                      y + math.sin(a1) * inner)
-            corners.extend((outer0, outer1, inner1,
-                            outer0, inner1, inner0))
-        self._draw_rect(corners, (x, y), (radius, radius), -1.0, 0.0,
-                        color, None)
+        tx, ty = self._translation_stack[-1]
+        points = [(x + tx, y + ty) for x, y in points]
+        self._draw_rect(points, (0, 0), (1, 1), -1, 0, color, None, coverage)
+
+    def polygon(self, points, color, *, center):
+        vertices, coverage = polygon_triangles(points, 1 / self.scale, center)
+        self._draw_geometry(vertices, coverage, color)
+
+    def polyline(self, points, color, width=1):
+        points = list(points)
+        vertices, coverage = stroke_triangles(points, width, 1 / self.scale)
+        self._draw_geometry(vertices, coverage, color)
+        if len(points) > 1 and width > 0:
+            for x, y in (points[0], points[-1]):
+                self.circle(x, y, width / 2, color)
 
     def _texture(self, surface):
         raw = pygame.image.tobytes(surface, "RGBA")
@@ -431,7 +460,7 @@ class GLRenderer(Renderer):
                                 surface.get_height() / s, alpha)
 
     def _draw_texture(self, tex, x, y, width, height, alpha=1.0, *,
-                      framebuffer_texture=False):
+                      framebuffer_texture=False, tint=(255, 255, 255, 255)):
         self._flush_rects()
         device_scale = self.scale
         x0 = round(x * device_scale) / device_scale
@@ -447,8 +476,9 @@ class GLRenderer(Renderer):
                  (x1, y1, 1.0, bottom_v), (x0, y0, 0.0, top_v),
                  (x1, y1, 1.0, bottom_v), (x0, y1, 0.0, bottom_v)]
         data = []
+        tr, tg, tb, ta = (c / 255 for c in tint)
         for vx, vy, u, v in verts:
-            data += [vx, vy, u, v, 1.0, 1.0, 1.0, alpha]
+            data += [vx, vy, u, v, tr, tg, tb, ta * alpha]
         self._tex_vbo.write(struct.pack(f"{len(data)}f", *data))
         tex.use(0)
         self._tex_vao.render(moderngl.TRIANGLES)
@@ -464,6 +494,11 @@ class GLRenderer(Renderer):
         alpha *= self.opacity
         self._draw_texture(self._cached_texture(surface), x, y,
                            width, height, alpha)
+
+    def blit_tinted_scaled(self, surface, x, y, width, height, color):
+        x, y = self._translate(x, y)
+        self._draw_texture(self._cached_texture(surface), x, y, width, height,
+                           self.opacity, tint=parse_color(color))
 
     def overlay_rect(self, x, y, w, h, color, radius=0):
         self._rect_call(x, y, w, h, color, radius=radius)  # blend handles alpha
@@ -488,6 +523,7 @@ class GLRenderer(Renderer):
         self._state_vbo.write(struct.pack("24f", *vertices))
         r, g, b, a = self._effect_color(color)
         program = self._prog_state
+        program["u_mode"].value = 0.0
         program["u_rect_size"].value = (x1 - x0, y1 - y0)
         program["u_radii"].value = tuple(float(v) for v in radii)
         program["u_ripple_center"].value = (
@@ -498,6 +534,38 @@ class GLRenderer(Renderer):
         program["u_hover"].value = max(0.0, min(1.0, hover))
         program["u_pressed"].value = max(0.0, min(1.0, pressed))
         self._state_vao.render(moderngl.TRIANGLES)
+
+    def _wave_quad(self, x, y, w, h, color, mode, wave, info):
+        if w <= 0 or h <= 0:
+            return
+        self._flush_rects()
+        x, y = self._translate(x, y)
+        vertices = (x, y, 0, 0, x + w, y, 1, 0, x + w, y + h, 1, 1,
+                    x, y, 0, 0, x + w, y + h, 1, 1, x, y + h, 0, 1)
+        self._state_vbo.write(struct.pack('24f', *vertices))
+        program = self._prog_state
+        program['u_mode'].value = float(mode)
+        program['u_rect_size'].value = (float(w), float(h))
+        program['u_wave'].value = tuple(float(v) for v in wave)
+        program['u_info'].value = tuple(float(v) for v in info)
+        program['u_color'].value = tuple(v / 255 for v in self._effect_color(color))
+        self._state_vao.render(moderngl.TRIANGLES)
+
+    def wave_line(self, x, y, w, h, a, b, amplitude, wavelength, phase, color, width):
+        self._wave_quad(x, y, w, h, color, 1, (a, b, amplitude, wavelength),
+                        (phase, width, h / 2, 0))
+
+    def wave_arc(self, x, y, w, h, radius, start, sweep, amplitude, waves,
+                 phase, color, width):
+        self._wave_quad(x, y, w, h, color, 2, (radius, start, sweep, amplitude),
+                        (phase, width, waves, 0))
+
+    def shadow(self, x, y, w, h, radii, elevation):
+        ambient, key = 1 + elevation * .7, .5 + elevation * .8
+        offset = elevation * .5
+        pad = math.ceil(3 * max(ambient, key) + offset)
+        self._wave_quad(x-pad, y-pad, w+2*pad, h+2*pad, (0, 0, 0, 255), 3,
+                        radii, (ambient, key, offset, pad))
 
     # -- clip -------------------------------------------------------------------
     def clip_push(self, x, y, w, h):

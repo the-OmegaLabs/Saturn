@@ -16,13 +16,23 @@ def _shapes():
     return json.loads((Path(__file__).parents[1] / '_gen' / 'loading_shapes.json').read_text())
 
 
-def _morph_points(curves, progress):
+def _morph_points(curves, progress, samples=8, tolerance=None):
     points = []
     p = max(0.0, min(1.0, progress))
     for start, end in curves:
         c = [a + (b - a) * p for a, b in zip(start, end)]
-        for i in range(8):
-            t = i / 8
+        count = samples
+        if tolerance is not None:
+            dx, dy = c[6] - c[0], c[7] - c[1]
+            length = math.hypot(dx, dy)
+            deviation = (max(abs((c[index] - c[0]) * dy -
+                                 (c[index + 1] - c[1]) * dx)
+                             for index in (2, 4)) / length if length else
+                         max(math.hypot(c[index] - c[0], c[index + 1] - c[1])
+                             for index in (2, 4)))
+            count = max(1, math.ceil(math.sqrt(deviation / tolerance)))
+        for i in range(count):
+            t = i / count
             u = 1 - t
             points.append((u**3*c[0] + 3*u*u*t*c[2] + 3*u*t*t*c[4] + t**3*c[6],
                            u**3*c[1] + 3*u*u*t*c[3] + 3*u*t*t*c[5] + t**3*c[7]))
@@ -51,11 +61,11 @@ class LoadingIndicator(Control):
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
 
-    def _geometry(self):
+    def _geometry(self, samples=8, tolerance=None):
         data = _shapes()
         if self.value is not None:
             progress = max(0.0, min(1.0, float(self.value)))
-            return _morph_points(data['determinate'], progress), progress * math.pi, 1.0
+            return _morph_points(data['determinate'], progress, samples, tolerance), progress * math.pi, 1.0
         index = int(self._elapsed / .65)
         t = self._elapsed % .65
         omega, damping = math.sqrt(200), .6
@@ -65,7 +75,7 @@ class LoadingIndicator(Control):
         if t > .6:
             progress = 1.0
         angle = (1 + index + progress) * math.pi/2 + self._elapsed/4.666 * math.tau
-        return _morph_points(data['sequence'][index % 7], progress), angle, 1 + max(0, progress-1)*.15
+        return _morph_points(data['sequence'][index % 7], progress, samples, tolerance), angle, 1 + max(0, progress-1)*.15
 
     def _draw(self, r, x, y):
         _, _, w, h = self._rect
@@ -74,18 +84,29 @@ class LoadingIndicator(Control):
         if self.contained or self.bgcolor is not None:
             r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor or colors.Colors.PRIMARY_CONTAINER),
                         radius=min(w, h)/2)
-        points, angle, bounce = self._geometry()
+        native = getattr(r, 'native_geometry', False)
+        # Adapt to actual cubic curvature and output size, rather than emitting
+        # eight points even for an almost straight subpixel curve segment.
+        tolerance = (.4 / (min(w, h) * (38/48) * _shapes()['scale'] *
+                           1.15 * getattr(r, 'pixel_ratio', 1)) if native else None)
+        points, angle, bounce = self._geometry(tolerance=tolerance)
         cx = (min(p[0] for p in points) + max(p[0] for p in points))/2
         cy = (min(p[1] for p in points) + max(p[1] for p in points))/2
-        scale = min(w, h) * r.scale * (38/48) * _shapes()['scale'] * bounce
+        device_scale = 1 if native else r.scale
+        scale = min(w, h) * device_scale * (38/48) * _shapes()['scale'] * bounce
         c, s = math.cos(angle), math.sin(angle)
-        pw, ph = max(1, round(w*r.scale)), max(1, round(h*r.scale))
+        pw, ph = (w, h) if native else (max(1, round(w*r.scale)), max(1, round(h*r.scale)))
         vertices = [(pw/2 + ((px-cx)*c-(py-cy)*s)*scale,
                      ph/2 + ((px-cx)*s+(py-cy)*c)*scale) for px, py in points]
-        surface = pygame.Surface((pw, ph), pygame.SRCALPHA)
         role = colors.Colors.ON_PRIMARY_CONTAINER if self.contained else colors.Colors.PRIMARY
-        pygame.draw.polygon(surface, colors.parse_color(self.color or role), vertices)
-        r.blit(surface, x, y)
+        color = colors.parse_color(self.color or role)
+        if native:
+            r.polygon([(x + px, y + py) for px, py in vertices], color,
+                      center=(x + w / 2, y + h / 2))
+        else:
+            surface = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            pygame.draw.polygon(surface, color, vertices)
+            r.blit(surface, x, y)
 
     def _tick_animations(self, now):
         active = super()._tick_animations(now)
@@ -141,8 +162,15 @@ class WavyProgressIndicator(Control):
         _, _, w, h = self._rect
         if w <= 0 or h <= 0:
             return
-        scale = r.scale
-        surface = pygame.Surface((max(1, round(w*scale)), max(1, round(h*scale))), pygame.SRCALPHA)
+        native = getattr(r, 'native_geometry', False)
+        scale = 1 if native else r.scale
+        surface = (None if native else pygame.Surface(
+            (max(1, round(w*scale)), max(1, round(h*scale))), pygame.SRCALPHA))
+        def draw_line(points, color, width):
+            if native:
+                r.polyline([(x + px, y + py) for px, py in points], color, width)
+            else:
+                _line(surface, points, color, width)
         active = colors.parse_color(self.color or colors.Colors.PRIMARY)
         track = colors.parse_color(self.bgcolor or colors.Colors.SECONDARY_CONTAINER)
         progress = max(0, min(1, self._display_value))
@@ -165,15 +193,19 @@ class WavyProgressIndicator(Control):
             def arc(a, b, wave, color):
                 if b <= a:
                     return
-                n = max(2, math.ceil((b-a)*radius*scale))
                 waves = max(1, round(math.tau*radius/wavelength))
+                if native:
+                    r.wave_arc(x, y, w, h, radius, a, b - a, wave, waves,
+                               phase, color, stroke)
+                    return
+                n = max(2, math.ceil((b-a)*radius*scale))
                 points = []
                 for i in range(n+1):
                     theta = a+(b-a)*i/n
                     rr = radius + wave*math.sin(theta*waves-phase)
                     points.append(((w/2+math.cos(theta)*rr)*scale,
                                    (h/2+math.sin(theta)*rr)*scale))
-                _line(surface, points, color, stroke*scale)
+                draw_line(points, color, stroke*scale)
             if sweep < math.tau:
                 arc(start+sweep+gap, start+math.tau-gap, 0, track)
             if sweep > 0:
@@ -187,21 +219,29 @@ class WavyProgressIndicator(Control):
                 a, b = left+length*max(0, p), left+length*min(1, p+.4)
             def straight(a, b):
                 if b > a:
-                    _line(surface, [(a*scale,h*scale/2),(b*scale,h*scale/2)], track, stroke*scale)
+                    draw_line([(a*scale,h*scale/2),(b*scale,h*scale/2)], track, stroke*scale)
             straight(left, a-4-stroke)
             straight(b+(4+stroke if b>a else 0), right)
             if b > a:
-                n = max(2, math.ceil((b-a)*scale))
-                points = []
-                for i in range(n+1):
-                    px = a+(b-a)*i/n
-                    taper = min(1, (px-a)/(wavelength/4), (b-px)/(wavelength/4))
-                    py = h/2 + amplitude*taper*math.sin(px/wavelength*math.tau-phase)
-                    points.append((px*scale,py*scale))
-                _line(surface, points, active, stroke*scale)
+                if native:
+                    r.wave_line(x, y, w, h, a, b, amplitude, wavelength,
+                                phase, active, stroke)
+                else:
+                    n = max(2, math.ceil((b-a)*scale))
+                    points = []
+                    for i in range(n+1):
+                        px = a+(b-a)*i/n
+                        taper = min(1, (px-a)/(wavelength/4), (b-px)/(wavelength/4))
+                        py = h/2 + amplitude*taper*math.sin(px/wavelength*math.tau-phase)
+                        points.append((px*scale,py*scale))
+                    draw_line(points, active, stroke*scale)
             if self.value is not None:
-                pygame.draw.circle(surface, active, (round(right*scale),round(h*scale/2)), max(1,round(2*scale)))
-        r.blit(surface, x, y)
+                if native:
+                    r.circle(x + right, y + h / 2, 2, active)
+                else:
+                    pygame.draw.circle(surface, active, (round(right*scale),round(h*scale/2)), max(1,round(2*scale)))
+        if not native:
+            r.blit(surface, x, y)
 
     def _tick_animations(self, now):
         active = super()._tick_animations(now)

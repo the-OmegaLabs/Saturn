@@ -21,6 +21,7 @@ import vulkan as vk
 
 from ..colors import parse_color
 from .base import Renderer
+from .geometry import arc_triangles, polygon_triangles, stroke_triangles
 from .software import SCALE, SoftwareRenderer
 
 
@@ -645,6 +646,9 @@ class VulkanRenderer(_VulkanSwapchain):
     _VERTEX_FLOATS = 25
     _VERTEX_STRIDE = _VERTEX_FLOATS * 4
     native_texture_scaling = True
+    native_geometry = True
+    native_texture_tint = True
+    native_shadow = True
     native_shape_overlay = True
     native_state_layer = True
 
@@ -1216,7 +1220,7 @@ class VulkanRenderer(_VulkanSwapchain):
     def _append_triangles(self, points, uvs, half, radius, border_width,
                           color, border_color, mode, texture,
                           state_radii=(0, 0, 0, 0),
-                          state_info=(0, 0, 0, 0)):
+                          state_info=(0, 0, 0, 0), coverage=None):
         if not points:
             return
         first = len(self._vertices) // self._VERTEX_FLOATS
@@ -1227,8 +1231,15 @@ class VulkanRenderer(_VulkanSwapchain):
                   *(c / 255.0 for c in brgba), float(mode),
                   *(float(v) for v in state_radii),
                   *(float(v) for v in state_info))
-        for (x, y), (u, v) in zip(points, uvs):
-            self._vertices.extend((*self._ndc(x, y), u, v, *common))
+        block = array('f', (0, 0, 0, 0, *common)) * len(points)
+        sx, sy = 2 * self.pixel_ratio / self._pixel_size[0], 2 * self.pixel_ratio / self._pixel_size[1]
+        for index, ((x, y), (u, v)) in enumerate(zip(points, uvs)):
+            offset = index * self._VERTEX_FLOATS
+            block[offset], block[offset + 1] = x * sx - 1, y * sy - 1
+            block[offset + 2], block[offset + 3] = u, v
+            if coverage is not None:
+                block[offset + 11] = common[7] * coverage[index]
+        self._vertices.extend(block)
         count = len(points)
         clip = self._clip_gpu[-1] if self._clip_gpu else (
             0, 0, self._pixel_size[0], self._pixel_size[1])
@@ -1242,7 +1253,7 @@ class VulkanRenderer(_VulkanSwapchain):
                      border_width=0.0, border_color=(0, 0, 0, 0),
                      texture=None, textured=False,
                      uv_bounds=(0.0, 0.0, 1.0, 1.0),
-                     state_radii=None, state_info=None):
+                     state_radii=None, state_info=None, mode=None):
         if width <= 0 or height <= 0:
             return
         x, y = self._translate(x, y)
@@ -1263,7 +1274,8 @@ class VulkanRenderer(_VulkanSwapchain):
         self._append_triangles(
             points, uvs, (width / 2, height / 2), radius,
             border_width, color, border_color,
-            (2.0 if state_radii is not None else
+            (mode if mode is not None else
+             2.0 if state_radii is not None else
              1.0 if textured else 0.0), texture,
             state_radii or (0, 0, 0, 0),
             state_info or (0, 0, 0, 0))
@@ -1301,12 +1313,32 @@ class VulkanRenderer(_VulkanSwapchain):
             state_info=(ripple_x - x, ripple_y - y,
                         ripple_radius, pressed))
 
+    def wave_line(self, x, y, w, h, a, b, amplitude, wavelength, phase, color, width):
+        self._append_quad(x, y, w, h, color, mode=3,
+                          state_radii=(a, b, amplitude, wavelength),
+                          state_info=(phase, width, h / 2, 0))
+
+    def wave_arc(self, x, y, w, h, radius, start, sweep, amplitude, waves,
+                 phase, color, width):
+        self._append_quad(x, y, w, h, color, mode=4,
+                          state_radii=(radius, start, sweep, amplitude),
+                          state_info=(phase, width, waves, 0))
+
+    def shadow(self, x, y, w, h, radii, elevation):
+        ambient, key = 1 + elevation * .7, .5 + elevation * .8
+        offset = elevation * .5
+        pad = math.ceil(3 * max(ambient, key) + offset)
+        self._append_quad(x-pad, y-pad, w+2*pad, h+2*pad, (0, 0, 0, 255), mode=5,
+                          state_radii=radii, state_info=(ambient, key, offset, pad))
+
     def stroke_rect(self, x, y, w, h, color, width=1, radius=0):
         self._append_quad(x, y, w, h, (0, 0, 0, 0),
                           radius=radius, border_width=width,
                           border_color=color)
 
     def line(self, x1, y1, x2, y2, color, width=1):
+        if width <= 0:
+            return
         if x1 == x2:
             self._append_quad(x1 - width / 2, min(y1, y2),
                               width, abs(y2 - y1) or width, color)
@@ -1315,17 +1347,9 @@ class VulkanRenderer(_VulkanSwapchain):
             self._append_quad(min(x1, x2), y1 - width / 2,
                               abs(x2 - x1) or width, width, color)
             return
-        dx, dy = x2 - x1, y2 - y1
-        length = math.hypot(dx, dy)
-        nx, ny = -dy / length * width / 2, dx / length * width / 2
-        tx, ty = self._translation_stack[-1]
-        points = tuple((px + tx, py + ty) for px, py in (
-            (x1 + nx, y1 + ny), (x2 + nx, y2 + ny),
-            (x2 - nx, y2 - ny), (x1 + nx, y1 + ny),
-            (x2 - nx, y2 - ny), (x1 - nx, y1 - ny)))
-        self._append_triangles(points, ((0, 0),) * 6,
-                               (1, 1), -1, 0, color,
-                               (0, 0, 0, 0), 0, self._gpu_white)
+        points, coverage = stroke_triangles(
+            ((x1, y1), (x2, y2)), width, 1 / self.pixel_ratio)
+        self._draw_geometry(points, coverage, color)
 
     def circle(self, x, y, radius, color, fill=True):
         self._append_quad(x - radius, y - radius,
@@ -1336,29 +1360,28 @@ class VulkanRenderer(_VulkanSwapchain):
                           border_color=(0, 0, 0, 0) if fill else color)
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
-        if radius <= 0 or width <= 0 or end_angle <= start_angle:
-            return
-        x, y = self._translate(x, y)
-        sweep = end_angle - start_angle
-        segments = max(8, int(abs(sweep) * radius / 3))
-        inner = max(0.0, radius - width)
-        points = []
-        for index in range(segments):
-            a0 = start_angle + sweep * index / segments
-            a1 = start_angle + sweep * (index + 1) / segments
-            outer0 = (x + math.cos(a0) * radius,
-                      y + math.sin(a0) * radius)
-            outer1 = (x + math.cos(a1) * radius,
-                      y + math.sin(a1) * radius)
-            inner0 = (x + math.cos(a0) * inner,
-                      y + math.sin(a0) * inner)
-            inner1 = (x + math.cos(a1) * inner,
-                      y + math.sin(a1) * inner)
-            points.extend((outer0, outer1, inner1,
-                           outer0, inner1, inner0))
+        points, coverage = arc_triangles(
+            x, y, radius, start_angle, end_angle, width, 1 / self.pixel_ratio)
+        self._draw_geometry(points, coverage, color)
+
+    def _draw_geometry(self, points, coverage, color):
+        tx, ty = self._translation_stack[-1]
+        points = [(x + tx, y + ty) for x, y in points]
         self._append_triangles(points, ((0, 0),) * len(points),
-                               (1, 1), -1, 0, color,
-                               (0, 0, 0, 0), 0, self._gpu_white)
+                               (1, 1), -1, 0, color, (0, 0, 0, 0),
+                               0, self._gpu_white, coverage=coverage)
+
+    def polygon(self, points, color, *, center):
+        vertices, coverage = polygon_triangles(points, 1 / self.pixel_ratio, center)
+        self._draw_geometry(vertices, coverage, color)
+
+    def polyline(self, points, color, width=1):
+        points = list(points)
+        vertices, coverage = stroke_triangles(points, width, 1 / self.pixel_ratio)
+        self._draw_geometry(vertices, coverage, color)
+        if len(points) > 1 and width > 0:
+            for x, y in (points[0], points[-1]):
+                self.circle(x, y, width / 2, color)
 
     def _texture_for_surface(self, surface, *, immutable=False):
         if immutable:
@@ -1469,6 +1492,11 @@ class VulkanRenderer(_VulkanSwapchain):
         self._append_quad(x, y, width, height,
                           (255, 255, 255,
                            max(0, min(255, round(alpha * 255)))),
+                          texture=texture, uv_bounds=uv, textured=True)
+
+    def blit_tinted_scaled(self, surface, x, y, width, height, color):
+        texture, uv = self._texture_for_surface(surface, immutable=True)
+        self._append_quad(x, y, width, height, parse_color(color),
                           texture=texture, uv_bounds=uv, textured=True)
 
     def clip_push(self, x, y, w, h):

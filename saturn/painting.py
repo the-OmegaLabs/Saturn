@@ -50,6 +50,11 @@ def draw_shadow(renderer, rect, radius, elevation):
     if elevation <= 0:
         return
     x, y, width, height = rect
+    if getattr(renderer, 'native_shadow', False):
+        if width > 0 and height > 0:
+            radii = radius if isinstance(radius, (tuple, list)) else (radius,) * 4
+            renderer.shadow(x, y, width, height, radii, elevation)
+        return
     # Soft shadows contain no sharp detail outside the covered silhouette.
     # Blur a reduced intermediate and upscale at presentation; animation must
     # not run two full-resolution Gaussian filters for every new width/radius.
@@ -60,8 +65,8 @@ def draw_shadow(renderer, rect, radius, elevation):
     args = (w, h, corners(radius, scale, w, h), round(elevation * 4) / 4, scale)
     if renderer.native_texture_scaling:
         surface, pad = _shadow(*args)
-        renderer.blit_scaled(surface, x - pad / scale, y - pad / scale,
-                             surface.get_width() / scale, surface.get_height() / scale)
+        renderer.blit_cached_scaled(surface, x - pad / scale, y - pad / scale,
+                                    surface.get_width() / scale, surface.get_height() / scale)
     else:
         # Software presentation needs device-sized pixels. Reuse the upscale
         # too, especially for menu items whose opacity changes every frame.

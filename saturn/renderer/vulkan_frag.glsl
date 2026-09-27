@@ -1,4 +1,5 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
 
 layout(set = 0, binding = 0) uniform sampler2D image_texture;
 
@@ -13,7 +14,24 @@ layout(location = 7) in vec4 in_state_radii;
 layout(location = 8) in vec4 in_state_info;
 layout(location = 0) out vec4 out_color;
 
+#include "wave.glsl"
+
 void main() {
+    if (in_mode > 2.5) {
+        vec2 p = in_uv * in_half_size * 2.0;
+        if (in_mode > 4.5) {
+            out_color = vec4(in_color.rgb, in_color.a *
+                elevation_shadow(p, in_half_size * 2.0, in_state_radii, in_state_info));
+            return;
+        }
+        float distance = in_mode < 3.5 ?
+            wave_line_distance(p, in_state_radii, in_state_info) :
+            wave_arc_distance(p - in_half_size, in_state_radii, in_state_info);
+        float feather = max(0.65 * fwidth(distance), 0.001);
+        float alpha = 1.0 - smoothstep(-feather, feather, distance);
+        out_color = vec4(in_color.rgb, in_color.a * alpha);
+        return;
+    }
     if (in_mode > 1.5) {
         vec2 size = in_half_size * 2.0;
         vec2 point = in_uv * size;

@@ -63,10 +63,17 @@ class Icon(Control):
         self._rect = (x, y, w, h)
 
     def _draw(self, r, x, y):
+        color = colors.parse_color(self.color or colors.Colors.ON_SURFACE)
+        gpu_tint = getattr(r, "native_texture_tint", False)
         surf = render_icon_cached(
             self.icon, round(self.size * r.scale),
-            colors.parse_color(self.color or colors.Colors.ON_SURFACE))
-        r.blit_cached(surf, x, y)
+            (255, 255, 255, 255) if gpu_tint else color)
+        if gpu_tint:
+            r.blit_tinted_scaled(surf, x, y,
+                                 surf.get_width() / r.scale,
+                                 surf.get_height() / r.scale, color)
+        else:
+            r.blit_cached(surf, x, y)
 
 
 class Image(Control):
@@ -109,7 +116,12 @@ class Image(Control):
         self._prepared_key = None
         return self._surface
 
-    def _prepare(self, source, width, height, tint):
+    def _prepare(self, source, width, height, tint, gpu_scale=False):
+        # Native sampling can upscale a bitmap; CPU minification and SVG
+        # rasterization are retained to preserve source detail at small sizes.
+        if (gpu_scale and not self._is_svg and
+                width >= source.get_width() and height >= source.get_height()):
+            width, height = source.get_size()
         key = (self._loaded_key, width, height, tint)
         if key != self._prepared_key:
             if self._is_svg:
@@ -159,8 +171,12 @@ class Image(Control):
         else:
             dw, dh = tw, th
             dx, dy = x, y
-        prepared = self._prepare(s, dw, dh, tint)
-        if getattr(r, "native_texture_scaling", False):
+        native = getattr(r, "native_texture_scaling", False)
+        gpu_tint = tint is not None and getattr(r, "native_texture_tint", False)
+        prepared = self._prepare(s, dw, dh, None if gpu_tint else tint, native)
+        if gpu_tint:
+            r.blit_tinted_scaled(prepared, dx, dy, dw / r.scale, dh / r.scale, tint)
+        elif native:
             r.blit_cached_scaled(prepared, dx, dy, dw / r.scale, dh / r.scale)
         else:
             r.blit(prepared, dx, dy)

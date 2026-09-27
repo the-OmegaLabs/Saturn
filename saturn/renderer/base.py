@@ -15,6 +15,9 @@ class Renderer(ABC):
     native_texture_scaling = False
     native_shape_overlay = False
     native_state_layer = False
+    native_geometry = False
+    native_texture_tint = False
+    native_shadow = False
     anti_aliasing = True
     vsync = True
     vsync_active = False
@@ -87,6 +90,31 @@ class Renderer(ABC):
     def blit_cached_scaled(self, surface, x, y, width, height,
                            alpha=1.0) -> None:
         self.blit_scaled(surface, x, y, width, height, alpha)
+
+    def blit_tinted_scaled(self, surface, x, y, width, height, color) -> None:
+        """Sample immutable pixels multiplied by an RGBA tint on the GPU."""
+        raise NotImplementedError
+
+    def polygon(self, points, color, *, center) -> None:
+        """Fill a radial polygon whose interior is visible from ``center``."""
+        raise NotImplementedError
+
+    def polyline(self, points, color, width=1) -> None:
+        """Draw a connected stroke with round endpoint caps on the GPU."""
+        raise NotImplementedError
+
+    def wave_line(self, x, y, w, h, a, b, amplitude, wavelength, phase, color, width):
+        """Draw an analytic sine-wave stroke, with no intermediate bitmap."""
+        raise NotImplementedError
+
+    def wave_arc(self, x, y, w, h, radius, start, sweep, amplitude, waves,
+                 phase, color, width):
+        """Draw an analytic circular wave, with no intermediate bitmap."""
+        raise NotImplementedError
+
+    def shadow(self, x, y, w, h, radii, elevation):
+        """Draw ambient and key elevation shadows analytically on the GPU."""
+        raise NotImplementedError
 
     @abstractmethod
     def clip_push(self, x, y, w, h) -> None: ...
