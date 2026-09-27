@@ -283,10 +283,11 @@ def page_for(name: str, category: str) -> str:
             "## Preview", "", f"![{name} control in the dark theme]({screenshot})", "",
             "## Example", "", "Run this code from the repository root to display the control shown above.", "",
             "```python", "import saturn", "", "", "def main(page: saturn.Page):",
+            "    page.window.width = 720", "    page.window.height = 360",
             "    page.theme_mode = saturn.ThemeMode.DARK",
             "    page.bgcolor = saturn.Colors.SURFACE",
             "    page.padding = 40", snippet, "    page.update()", "",
-            "", "saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)",
+            "", "saturn.run(main, backend=saturn.Renderer.SOFTWARE)",
             "```", "",
         ]
 

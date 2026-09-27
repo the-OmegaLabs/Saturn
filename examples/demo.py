@@ -12,6 +12,8 @@ from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header, demo_panel
 
 class Application:
     def create_window(self, page: saturn.Page):
+        page.window.width = DEMO_WIDTH
+        page.window.height = DEMO_HEIGHT
         page.title = "saturn demo"
         page.theme_mode = saturn.ThemeMode.DARK
         page.bgcolor = saturn.Colors.SURFACE
@@ -104,5 +106,4 @@ if __name__ == "__main__":
         "vulkan": saturn.Renderer.VULKAN,
         "software": saturn.Renderer.SOFTWARE,
     }[name]
-    app = saturn.run(main=Application().create_window, backend=backend,
-                 width=DEMO_WIDTH, height=DEMO_HEIGHT)
+    app = saturn.run(main=Application().create_window, backend=backend)

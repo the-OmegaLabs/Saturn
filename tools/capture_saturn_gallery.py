@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import saturn
-from examples.demo_common import DEMO_HEIGHT, DEMO_WIDTH
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,8 +53,7 @@ def main() -> None:
         print(destination)
         page.window.destroy()
 
-    saturn.run(capture, backend=saturn.Renderer.SOFTWARE,
-               width=DEMO_WIDTH, height=DEMO_HEIGHT)
+    saturn.run(capture, backend=saturn.Renderer.SOFTWARE)
 
 
 if __name__ == "__main__":

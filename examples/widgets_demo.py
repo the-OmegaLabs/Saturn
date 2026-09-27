@@ -6,6 +6,8 @@ ICON = "examples/assets/test_icon.png"
 
 class Application:
     def create_window(self, page: saturn.Page):
+        page.window.width = DEMO_WIDTH
+        page.window.height = DEMO_HEIGHT
         page.title = "saturn widgets"
         page.theme_mode = saturn.ThemeMode.DARK
         page.bgcolor = saturn.Colors.SURFACE
@@ -48,5 +50,4 @@ class Application:
 
 
 if __name__ == "__main__":
-    saturn.run(main=Application().create_window, backend=saturn.Renderer.VULKAN,
-           width=DEMO_WIDTH, height=DEMO_HEIGHT)
+    saturn.run(main=Application().create_window, backend=saturn.Renderer.VULKAN)

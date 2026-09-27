@@ -183,7 +183,13 @@ DESCRIPTIONS = {
     "args": "Positional arguments passed to the parent constructor.",
     "kwargs": "Keyword arguments passed to the parent constructor.",
     "base": "Keyword arguments passed to Control, such as width and height.",
-    "_flet_ignored": "Extra arguments accepted for Flet compatibility without automatic behavior.",
+    "foreground_color": "Foreground color of the floating action button.",
+    "max_length": "Maximum text length; None or -1 leaves it unlimited.",
+    "mini": "Use the small floating action button size.",
+    "obscuring_character": "Single character used to mask password text.",
+    "shift_enter": "Require Shift+Enter to insert a newline in a multiline field.",
+    "show_cursor": "Whether to display the input caret.",
+    "_flet_ignored": "Extra control arguments accepted for Flet compatibility without automatic behavior.",
 }
 
 EVENTS = {
@@ -211,8 +217,6 @@ EVENTS = {
 }
 
 OVERRIDES = {
-    ("run", "width"): "Initial application window width in pixels.",
-    ("run", "height"): "Initial application window height in pixels.",
     ("run", "title"): "Application window title.",
     ("Text", "value"): "Text content to display.",
     ("TextField", "value"): "Initial or current text field content.",

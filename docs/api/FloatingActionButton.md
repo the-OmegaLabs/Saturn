@@ -19,6 +19,8 @@ import saturn
 
 
 def main(page: saturn.Page):
+    page.window.width = 720
+    page.window.height = 360
     page.theme_mode = saturn.ThemeMode.DARK
     page.bgcolor = saturn.Colors.SURFACE
     page.padding = 40
@@ -26,7 +28,7 @@ def main(page: saturn.Page):
     page.update()
 
 
-saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
+saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ```
 
 **Base class:** `_ConcreteButton`
@@ -34,17 +36,20 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
 ## Constructor parameters
 
 ```python
-saturn.FloatingActionButton(icon=None, *, text: 'str | None' = None, size: 'str' = 'standard', expanded: 'bool' = True, bgcolor=None, color=None, elevation: 'float' = 6.0, on_click=None, on_hover=None, **base)
+saturn.FloatingActionButton(icon=None, *, content: 'str | None' = None, text: 'str | None' = None, mini: 'bool' = False, size: 'str' = 'standard', expanded: 'bool' = True, bgcolor=None, color=None, foreground_color=None, elevation: 'float' = 6.0, on_click=None, on_hover=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
 | `icon` | `—` | `None` | Icon to draw. |
+| `content` | `str | None` | `None` | Text or child control to display. |
 | `text` | `str | None` | `None` | Text displayed on the control. |
+| `mini` | `bool` | `False` | Use the small floating action button size. |
 | `size` | `str` | `'standard'` | Size of the text, icon, or control. |
 | `expanded` | `bool` | `True` | Whether the floating component or menu is expanded. |
 | `bgcolor` | `—` | `None` | Background color of the control or container. |
 | `color` | `—` | `None` | Color of foreground content, text, or drawing. |
+| `foreground_color` | `—` | `None` | Foreground color of the floating action button. |
 | `elevation` | `float` | `6.0` | Surface elevation, which determines shadow strength. |
 | `on_click` | `—` | `None` | Callback called when the control is clicked. |
 | `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |

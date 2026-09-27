@@ -113,13 +113,13 @@ def _set_gl_swap_interval(interval: int = 1) -> bool:
 
 
 class App:
-    def __init__(self, main, backend: Renderer, width: int, height: int, title: str):
+    def __init__(self, main, backend: Renderer, title: str = "saturn"):
         self._main = main
         self._backend = backend
         # Flet Window.width/height describe the native outer window. Page
         # width/height describe the drawable client area. SDL's Window.size
         # is client-only, so keep the two coordinate spaces separate.
-        self._outer_size = [int(width), int(height)]
+        self._outer_size = [800, 600]
         self._size = list(self._outer_size)
         self._frame_size = (0, 0)
         self._title = title
@@ -479,18 +479,18 @@ def _swallow(fn, *args):
         traceback.print_exc()
 
 
-def run(main, *, backend: Renderer | None = None, width: int = 800,
-        height: int = 600, title: str = "saturn", **_flet_ignored):
+def run(main, *, backend: Renderer | None = None, title: str = "saturn"):
     """Open a window, run `main(page)` and block until the window closes.
 
-    Extra flet-style run kwargs (view, assets_dir, host, port, ...) are
-    accepted and ignored so flet programs port with a one-line change.
+    Set window dimensions through `page.window.width` and
+    `page.window.height` in the entry point. Only the listed desktop
+    startup options are supported; unknown keyword arguments raise TypeError.
     Returns the App handle (after the window closes).
     """
     if backend is None:  # explicit selection and test hook via environment
         backend = Renderer(os.environ.get("SATURN_BACKEND", "opengl").lower())
 
-    app = App(main, backend, width, height, title)
+    app = App(main, backend, title=title)
     app.start()
     app.run_until_closed()
     return app

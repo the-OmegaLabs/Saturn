@@ -19,6 +19,8 @@ FAILURES = []
 
 
 def main(page: saturn.Page) -> None:
+    page.window.width = 720
+    page.window.height = 360
     DESTINATION.mkdir(parents=True, exist_ok=True)
     page.theme_mode = saturn.ThemeMode.DARK
     page.bgcolor = saturn.Colors.SURFACE
@@ -64,6 +66,6 @@ def main(page: saturn.Page) -> None:
 
 
 if __name__ == "__main__":
-    saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
+    saturn.run(main, backend=saturn.Renderer.SOFTWARE)
     if FAILURES:
         raise SystemExit(f"Control captures failed: {FAILURES}")

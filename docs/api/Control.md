@@ -48,4 +48,4 @@ saturn.Control(*, visible: 'bool' = True, disabled: 'bool' = False, opacity: 'fl
 | `animate_scale` | `—` | `None` | Animation settings applied when scale changes. |
 | `animate_offset` | `—` | `None` | Animation settings applied when offset changes. |
 | `on_animation_end` | `—` | `None` | Callback called when the control animation finishes. |
-| `**_flet_ignored` | `—` | `additional keyword arguments` | Extra arguments accepted for Flet compatibility without automatic behavior. |
+| `**_flet_ignored` | `—` | `additional keyword arguments` | Extra control arguments accepted for Flet compatibility without automatic behavior. |

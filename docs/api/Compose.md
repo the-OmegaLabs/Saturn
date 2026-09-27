@@ -1,9 +1,15 @@
 # Compose
 
-Namespace for Saturn's Material 3 Expressive theme and controls.
+Namespace for Saturn's Material 3 Expressive controls and theme; see the Compose guide for migration details.
 
-[← API index](./README.md) · [Compose guide and Flet verification](../compose.md)
+[← API index](./README.md)
 
-Source: [`saturn/compose.py`](../../saturn/compose.py).
+Source: [`saturn/compose.py`](../../saturn/compose.py) (line 65).
 
-Use `saturn.Compose.Theme()`, `saturn.Compose.Button(...)`, and the other members described in the [Compose guide](../compose.md). The existing top-level Expressive names remain available during migration.
+## Constructor parameters
+
+```python
+saturn.Compose()
+```
+
+No parameters are required.

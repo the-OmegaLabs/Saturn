@@ -15,6 +15,7 @@ Saturn is a lightweight UI framework for Python desktop applications. These docs
 | [Screenshot gallery](./gallery.md) | Dark theme layouts, buttons, inputs, and animated controls |
 | [Logo design](./branding.md) | Classic logo and transparent variant |
 | [Flet mapping and scope](./flet-mapping.md) | Name mappings and implemented coverage |
+| [Saturn.run and Flet.run](./run-comparison.md) | Startup parameters, window sizing, and runtime differences |
 | [Expressive controls](./expressive.md) | Expressive implementation notes and examples |
 | [Compose namespace and Flet verification](./compose.md) | Separate Expressive API and tested Flet compatibility limits |
 

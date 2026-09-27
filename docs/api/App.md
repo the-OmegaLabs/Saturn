@@ -4,7 +4,7 @@ Application object that manages windows, events, and rendering.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 113).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 115).
 
 > `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
@@ -27,13 +27,11 @@ Source: [`saturn/app.py`](../../saturn/app.py) (line 113).
 ## Constructor parameters
 
 ```python
-saturn.App(main, backend: 'Renderer', width: 'int', height: 'int', title: 'str')
+saturn.App(main, backend: 'Renderer', title: 'str' = 'saturn')
 ```
 
 | Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
 | `main` | `—` | `required` | Application entry point that receives a Page. |
-| `backend` | `Renderer` | `required` | Rendering backend to use. For `saturn.run()`, omission selects OpenGL unless `SATURN_BACKEND` overrides it. |
-| `width` | `int` | `required` | Specified control width. |
-| `height` | `int` | `required` | Specified control height. |
-| `title` | `str` | `required` | Title of a dialog, notification, or window. |
+| `backend` | `Renderer` | `required` | Rendering backend to use. For saturn.run(), omission selects OpenGL unless SATURN_BACKEND overrides it. |
+| `title` | `str` | `'saturn'` | Title of a dialog, notification, or window. |

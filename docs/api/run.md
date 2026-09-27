@@ -4,19 +4,16 @@ Starts a Saturn app and passes its Page to the entry point.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 480).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 482).
 
 ## Call parameters
 
 ```python
-saturn.run(main, *, backend: 'Renderer | None' = None, width: 'int' = 800, height: 'int' = 600, title: 'str' = 'saturn', **_flet_ignored)
+saturn.run(main, *, backend: 'Renderer | None' = None, title: 'str' = 'saturn')
 ```
 
 | Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
 | `main` | `—` | `required` | Application entry point that receives a Page. |
-| `backend` | `Renderer | None` | `None` | Rendering backend to use. Omission selects OpenGL unless `SATURN_BACKEND` overrides it. |
-| `width` | `int` | `800` | Initial application window width in pixels. |
-| `height` | `int` | `600` | Initial application window height in pixels. |
+| `backend` | `Renderer | None` | `None` | Rendering backend to use. For saturn.run(), omission selects OpenGL unless SATURN_BACKEND overrides it. |
 | `title` | `str` | `'saturn'` | Application window title. |
-| `**_flet_ignored` | `—` | `additional keyword arguments` | Extra arguments accepted for Flet compatibility without automatic behavior. |

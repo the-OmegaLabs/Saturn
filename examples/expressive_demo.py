@@ -37,6 +37,8 @@ def check():
 
 
 def main(page):
+    page.window.width = DEMO_WIDTH
+    page.window.height = DEMO_HEIGHT
     page.title = "Saturn · Expressive"
     page.theme = saturn.MaterialExpressiveTheme()
     page.theme_mode = saturn.ThemeMode.DARK
@@ -111,4 +113,4 @@ if __name__ == "__main__":
     if "--check" in sys.argv:
         check()
     else:
-        saturn.run(main, width=DEMO_WIDTH, height=DEMO_HEIGHT)
+        saturn.run(main)

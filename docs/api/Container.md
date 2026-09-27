@@ -4,7 +4,7 @@ Adds spacing, background, borders, and other decoration to a child.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 194).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 189).
 
 ## Preview
 
@@ -19,6 +19,8 @@ import saturn
 
 
 def main(page: saturn.Page):
+    page.window.width = 720
+    page.window.height = 360
     page.theme_mode = saturn.ThemeMode.DARK
     page.bgcolor = saturn.Colors.SURFACE
     page.padding = 40
@@ -26,7 +28,7 @@ def main(page: saturn.Page):
     page.update()
 
 
-saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
+saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ```
 
 **Base class:** [Control](./Control.md)

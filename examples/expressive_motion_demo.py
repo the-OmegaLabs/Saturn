@@ -5,6 +5,8 @@ from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header
 
 
 def main(page):
+    page.window.width = DEMO_WIDTH
+    page.window.height = DEMO_HEIGHT
     page.title = 'Saturn · Expressive motion'
     page.theme = saturn.MaterialExpressiveTheme()
     page.theme_mode = saturn.ThemeMode.DARK
@@ -49,4 +51,4 @@ def main(page):
 
 
 if __name__ == '__main__':
-    saturn.run(main,width=DEMO_WIDTH,height=DEMO_HEIGHT, backend=saturn.Renderer.VULKAN)
+    saturn.run(main, backend=saturn.Renderer.VULKAN)

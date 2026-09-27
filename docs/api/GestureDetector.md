@@ -4,7 +4,7 @@ Receives pointer and gesture events.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 383).
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 567).
 
 ## Preview
 
@@ -19,6 +19,8 @@ import saturn
 
 
 def main(page: saturn.Page):
+    page.window.width = 720
+    page.window.height = 360
     page.theme_mode = saturn.ThemeMode.DARK
     page.bgcolor = saturn.Colors.SURFACE
     page.padding = 40
@@ -26,7 +28,7 @@ def main(page: saturn.Page):
     page.update()
 
 
-saturn.run(main, backend=saturn.Renderer.SOFTWARE, width=720, height=360)
+saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ```
 
 **Base class:** [Control](./Control.md)
