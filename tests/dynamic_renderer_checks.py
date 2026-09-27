@@ -1,4 +1,4 @@
-"""Real GPU checks for 1x edge coverage and dynamic bitmap replacement.
+"""Real GPU checks for edge coverage and dynamic bitmap replacement.
 
 python -m tests.dynamic_renderer_checks
 python -m tests.dynamic_renderer_checks --stress
@@ -7,17 +7,14 @@ import argparse
 import math
 import statistics
 import time
-from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import patch
 
 import pygame
-import vulkan as vk
 
 import saturn as st
 from saturn.painting import draw_shadow
 from saturn.renderer import create_renderer
-from saturn.renderer.vulkan import VulkanRenderer
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -216,23 +213,18 @@ def main():
     pygame.init()
     try:
         for backend in (st.Renderer.OPENGL, st.Renderer.VULKAN):
-            # Force the Vulkan capability fallback while keeping AA requested.
-            context = (patch.object(VulkanRenderer, '_choose_sample_count',
-                                    return_value=vk.VK_SAMPLE_COUNT_1_BIT)
-                       if backend is st.Renderer.VULKAN else nullcontext())
-            with context:
-                window, renderer = make_renderer(backend)
-                try:
-                    check_edges(renderer)
-                    check_dynamic_geometry(renderer)
-                    check_tint_and_shadows(renderer)
-                    check_visual_reference(renderer)
-                    check_effects_and_resize(renderer, window)
-                    if args.stress:
-                        stress(renderer)
-                finally:
-                    renderer.close()
-                    window.destroy()
+            window, renderer = make_renderer(backend)
+            try:
+                check_edges(renderer)
+                check_dynamic_geometry(renderer)
+                check_tint_and_shadows(renderer)
+                check_visual_reference(renderer)
+                check_effects_and_resize(renderer, window)
+                if args.stress:
+                    stress(renderer)
+            finally:
+                renderer.close()
+                window.destroy()
     finally:
         pygame.quit()
     print('DYNAMIC RENDERER CHECKS PASS')

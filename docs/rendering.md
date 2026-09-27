@@ -22,14 +22,14 @@ Both options default to `True` and accept boolean values. They can also be
 changed after startup. Changes are queued and combined on the UI thread before
 the next frame; reading a setting returns the requested value immediately.
 Changing antialiasing invalidates layout so text and control textures use the
-new raster scale. Vulkan may rebuild its swapchain and sampling attachments.
+new raster scale. Vulkan may rebuild its swapchain and offscreen frame target.
 
 ## Backend behavior
 
 | Backend | `anti_aliasing` | `vsync` |
 | --- | --- | --- |
 | OpenGL | Enables additional 2× offscreen supersampling at display densities below 1.5; otherwise uses native display density | Requests SDL's GL swap interval; driver overrides are possible |
-| Vulkan | Enables supported 4× or 2× MSAA, falling back to 1×, and higher resolution text rasterization; coverage meshes smooth lines/arcs even at 1× | Uses FIFO when enabled; when disabled prefers immediate, then mailbox, then FIFO |
+| Vulkan | Matches OpenGL: additional 2× offscreen supersampling below display density 1.5, otherwise native density; GPU linear reduction includes SVG, text and texture detail | Uses FIFO when enabled; when disabled prefers immediate, then mailbox, then FIFO |
 | Software | Enables additional 2× raster supersampling below display density 1.5 | Uses application pacing at the display refresh rate; no native swap synchronization |
 
 Disabling antialiasing removes the additional sampling above. Font smoothing,
@@ -85,8 +85,10 @@ every pixel exactly; custom `Container.shadow` uses its existing primitive path.
 
 `python -m tests.dynamic_renderer_checks --stress` checks rendered silhouettes,
 clipping, opacity, resize, tint texture reuse, and animations with CPU bitmap
-creation disabled. It also forces Vulkan to 1× while requesting antialiasing;
-the local diagonal/arc checks produce 178/224 blended edge pixels.
+creation disabled. Vulkan uses a single-sample offscreen attachment with whole-frame
+supersampling rather than MSAA. `python -m tests.vulkan_supersampling_checks`
+compares SVG, text, fractional positions and clipping against OpenGL, checks
+antialiasing toggles and DPI changes, and checks cached image edges and frame replacement.
 
 After changing the Vulkan fragment source or shared `renderer/wave.glsl`, rebuild
 the checked-in shader with a developer-installed Khronos glslang compiler:

@@ -70,10 +70,10 @@ def check_backend(backend):
             renderer.on_resize(96, 64, pixel_size=(96, 64), pixel_ratio=1)
             assert renderer.anti_aliasing is enabled and renderer.vsync is enabled
             if backend is Renderer.VULKAN:
-                assert enabled or renderer._gpu_samples == vk.VK_SAMPLE_COUNT_1_BIT
+                assert renderer._gpu_samples == vk.VK_SAMPLE_COUNT_1_BIT
+                assert renderer._render_extent == ((192, 128) if enabled else (96, 64))
                 assert not enabled or renderer.present_mode == "fifo"
-            else:
-                assert renderer.scale == (2 if enabled else 1)
+            assert renderer.scale == (2 if enabled else 1)
             renderer.clear((25, 35, 45, 255))
             renderer.fill_rect(12, 12, 32, 24, (200, 80, 60, 255), radius=4)
             renderer.flip()

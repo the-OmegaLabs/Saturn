@@ -72,9 +72,8 @@ def check_hidden_swapchain():
             actual = frame.get_at(point)
             assert all(abs(actual[i] - expected[i]) <= 3 for i in range(3)), \
                 (point, actual, expected)
-        # Interpolated coverage meshes retain diagonal/arc edge smoothing;
-        # the forced 1x fallback is checked in dynamic_renderer_checks.
-        if renderer._gpu_samples != vk.VK_SAMPLE_COUNT_1_BIT:
+        # SSAA smooths geometry and texture detail with a single-sample target.
+        if renderer.anti_aliasing:
             renderer.clear((255, 255, 255, 255))
             renderer.line(8.2, 11.4, 87.6, 52.8,
                           (195, 38, 82, 255), width=1.25)

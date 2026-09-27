@@ -1,7 +1,8 @@
 """Vulkan GPU rendering backend.
 
 Widgets produce batched vertices and sampled textures. Vulkan rasterizes them
-directly into the swapchain; the original CPU presenter remains below only
+into a supersampled GPU target before reducing it into the swapchain; the
+original CPU presenter remains below only
 for shared instance/device setup and legacy compatibility helpers.
 """
 from __future__ import annotations
@@ -656,9 +657,12 @@ class VulkanRenderer(_VulkanSwapchain):
                  anti_aliasing: bool = True, vsync: bool = True):
         self._gpu_views = []
         self._gpu_framebuffers = []
-        self._gpu_msaa_image = None
-        self._gpu_msaa_memory = None
-        self._gpu_msaa_view = None
+        self._gpu_frame_image = None
+        self._gpu_frame_memory = None
+        self._gpu_frame_view = None
+        self._gpu_present_semaphores = []
+        self._ssaa = 1 if not anti_aliasing or pixel_ratio >= 1.5 else 2
+        self._render_extent = (1, 1)
         self._gpu_samples = None
         self._gpu_render_pass = None
         self._gpu_pipeline = None
@@ -700,8 +704,7 @@ class VulkanRenderer(_VulkanSwapchain):
         super().__init__(window, logical_size=logical_size,
                          pixel_ratio=pixel_ratio,
                          anti_aliasing=anti_aliasing, vsync=vsync)
-        # Keep text/image rasterization at 2x, then scale by the GPU sampler.
-        self.scale = (SCALE if anti_aliasing else 1) * self.pixel_ratio
+        self.scale = self._ssaa * self.pixel_ratio
         self._gpu_white = self._upload_texture(
             pygame.Surface((1, 1), pygame.SRCALPHA, 32),
             pixels=b"\xff\xff\xff\xff")
@@ -736,15 +739,23 @@ class VulkanRenderer(_VulkanSwapchain):
     def _create_swapchain(self):
         capabilities = self._get_surface_capabilities(
             self._physical_device, self._surface)
-        if not capabilities.supportedUsageFlags & vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT:
+        if not capabilities.supportedUsageFlags & vk.VK_IMAGE_USAGE_TRANSFER_DST_BIT:
             raise VulkanUnavailableError(
-                "the Vulkan surface does not support color-attachment rendering")
+                "the Vulkan surface does not support GPU frame reduction")
         self._gpu_capture_supported = bool(
             capabilities.supportedUsageFlags & vk.VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
         formats = self._get_surface_formats(self._physical_device, self._surface)
         self._surface_format = self._choose_surface_format(formats)
         extent = self._choose_extent(capabilities)
         self._extent = (int(extent.width), int(extent.height))
+        self._render_extent = tuple(v * self._ssaa for v in self._extent)
+        features = vk.vkGetPhysicalDeviceFormatProperties(
+            self._physical_device, self._surface_format.format).optimalTilingFeatures
+        required = (vk.VK_FORMAT_FEATURE_BLIT_SRC_BIT |
+                    vk.VK_FORMAT_FEATURE_BLIT_DST_BIT |
+                    vk.VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)
+        if features & required != required:
+            raise VulkanUnavailableError("the Vulkan format does not support linear frame reduction")
         image_count = capabilities.minImageCount + 1
         if capabilities.maxImageCount:
             image_count = min(image_count, capabilities.maxImageCount)
@@ -755,7 +766,7 @@ class VulkanRenderer(_VulkanSwapchain):
             imageFormat=self._surface_format.format,
             imageColorSpace=self._surface_format.colorSpace,
             imageExtent=extent, imageArrayLayers=1,
-            imageUsage=(vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+            imageUsage=(vk.VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                         (vk.VK_IMAGE_USAGE_TRANSFER_SRC_BIT
                          if self._gpu_capture_supported else 0)),
             imageSharingMode=(vk.VK_SHARING_MODE_CONCURRENT if separate
@@ -781,60 +792,31 @@ class VulkanRenderer(_VulkanSwapchain):
             self._create_gpu_render_pass()
             self._create_gpu_pipeline()
             self._gpu_pipeline_format = self._surface_format.format
-        if self._gpu_samples != vk.VK_SAMPLE_COUNT_1_BIT:
-            self._create_msaa_attachment()
-        self._gpu_views = [vk.vkCreateImageView(
-            self._device, vk.VkImageViewCreateInfo(
-                image=image, viewType=vk.VK_IMAGE_VIEW_TYPE_2D,
-                format=self._surface_format.format,
-                subresourceRange=vk.VkImageSubresourceRange(
-                    aspectMask=vk.VK_IMAGE_ASPECT_COLOR_BIT,
-                    baseMipLevel=0, levelCount=1,
-                    baseArrayLayer=0, layerCount=1)), None)
-            for image in self._swapchain_images]
+        self._create_frame_attachment()
+        self._gpu_present_semaphores = [vk.vkCreateSemaphore(
+            self._device, vk.VkSemaphoreCreateInfo(), None)
+            for _ in self._swapchain_images]
         self._gpu_framebuffers = [vk.vkCreateFramebuffer(
             self._device, vk.VkFramebufferCreateInfo(
                 renderPass=self._gpu_render_pass,
-                attachmentCount=(2 if self._gpu_msaa_view is not None else 1),
-                pAttachments=([self._gpu_msaa_view, view]
-                              if self._gpu_msaa_view is not None else [view]),
-                width=self._extent[0],
-                height=self._extent[1], layers=1), None)
-            for view in self._gpu_views]
+                attachmentCount=1, pAttachments=[self._gpu_frame_view],
+                width=self._render_extent[0],
+                height=self._render_extent[1], layers=1), None)]
 
     def _choose_sample_count(self):
-        if not self.anti_aliasing:
-            return vk.VK_SAMPLE_COUNT_1_BIT
-        limits = vk.vkGetPhysicalDeviceProperties(
-            self._physical_device).limits
-        supported = limits.framebufferColorSampleCounts
-        try:
-            image_props = vk.vkGetPhysicalDeviceImageFormatProperties(
-                self._physical_device, self._surface_format.format,
-                vk.VK_IMAGE_TYPE_2D, vk.VK_IMAGE_TILING_OPTIMAL,
-                vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0)
-            supported &= image_props.sampleCounts
-        except vk.VkErrorFormatNotSupported:
-            return vk.VK_SAMPLE_COUNT_1_BIT
-        except AttributeError:
-            # Old Vulkan Python wrappers may omit this optional query.
-            pass
-        for count in (vk.VK_SAMPLE_COUNT_4_BIT,
-                      vk.VK_SAMPLE_COUNT_2_BIT,
-                      vk.VK_SAMPLE_COUNT_1_BIT):
-            if supported & count:
-                return count
+        # Match OpenGL: supersample the entire frame, including texture detail.
         return vk.VK_SAMPLE_COUNT_1_BIT
 
-    def _create_msaa_attachment(self):
-        width, height = self._extent
+    def _create_frame_attachment(self):
+        width, height = self._render_extent
         image = vk.vkCreateImage(self._device, vk.VkImageCreateInfo(
             imageType=vk.VK_IMAGE_TYPE_2D,
             format=self._surface_format.format,
             extent=vk.VkExtent3D(width=width, height=height, depth=1),
             mipLevels=1, arrayLayers=1, samples=self._gpu_samples,
             tiling=vk.VK_IMAGE_TILING_OPTIMAL,
-            usage=vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            usage=(vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                   vk.VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
             sharingMode=vk.VK_SHARING_MODE_EXCLUSIVE,
             initialLayout=vk.VK_IMAGE_LAYOUT_UNDEFINED), None)
         requirements = vk.vkGetImageMemoryRequirements(self._device, image)
@@ -853,9 +835,9 @@ class VulkanRenderer(_VulkanSwapchain):
                     aspectMask=vk.VK_IMAGE_ASPECT_COLOR_BIT,
                     baseMipLevel=0, levelCount=1,
                     baseArrayLayer=0, layerCount=1)), None)
-        self._gpu_msaa_image = image
-        self._gpu_msaa_memory = memory
-        self._gpu_msaa_view = view
+        self._gpu_frame_image = image
+        self._gpu_frame_memory = memory
+        self._gpu_frame_view = view
 
     def _choose_extent(self, capabilities):
         if capabilities.currentExtent.width != 0xFFFFFFFF:
@@ -868,50 +850,29 @@ class VulkanRenderer(_VulkanSwapchain):
                        min(height, capabilities.maxImageExtent.height)))
 
     def _create_gpu_render_pass(self):
-        multisampled = self._gpu_samples != vk.VK_SAMPLE_COUNT_1_BIT
-        color_attachment = vk.VkAttachmentDescription(
+        color = vk.VkAttachmentDescription(
             format=self._surface_format.format,
-            samples=self._gpu_samples,
+            samples=vk.VK_SAMPLE_COUNT_1_BIT,
             loadOp=vk.VK_ATTACHMENT_LOAD_OP_CLEAR,
-            storeOp=(vk.VK_ATTACHMENT_STORE_OP_DONT_CARE if multisampled
-                     else vk.VK_ATTACHMENT_STORE_OP_STORE),
+            storeOp=vk.VK_ATTACHMENT_STORE_OP_STORE,
             stencilLoadOp=vk.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
             stencilStoreOp=vk.VK_ATTACHMENT_STORE_OP_DONT_CARE,
             initialLayout=vk.VK_IMAGE_LAYOUT_UNDEFINED,
-            finalLayout=(vk.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                         if multisampled else vk.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR))
-        attachments = [color_attachment]
+            finalLayout=vk.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
         reference = vk.VkAttachmentReference(
             attachment=0, layout=vk.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-        if multisampled:
-            attachments.append(vk.VkAttachmentDescription(
-                format=self._surface_format.format,
-                samples=vk.VK_SAMPLE_COUNT_1_BIT,
-                loadOp=vk.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                storeOp=vk.VK_ATTACHMENT_STORE_OP_STORE,
-                stencilLoadOp=vk.VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                stencilStoreOp=vk.VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                initialLayout=vk.VK_IMAGE_LAYOUT_UNDEFINED,
-                finalLayout=vk.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR))
-            resolve = vk.VkAttachmentReference(
-                attachment=1,
-                layout=vk.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-            subpass = vk.VkSubpassDescription(
-                pipelineBindPoint=vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                colorAttachmentCount=1, pColorAttachments=[reference],
-                pResolveAttachments=[resolve])
-        else:
-            subpass = vk.VkSubpassDescription(
-                pipelineBindPoint=vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
-                colorAttachmentCount=1, pColorAttachments=[reference])
+        subpass = vk.VkSubpassDescription(
+            pipelineBindPoint=vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
+            colorAttachmentCount=1, pColorAttachments=[reference])
         dependency = vk.VkSubpassDependency(
-            srcSubpass=vk.VK_SUBPASS_EXTERNAL, dstSubpass=0,
+            srcSubpass=0, dstSubpass=vk.VK_SUBPASS_EXTERNAL,
             srcStageMask=vk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            dstStageMask=vk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            dstAccessMask=vk.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+            dstStageMask=vk.VK_PIPELINE_STAGE_TRANSFER_BIT,
+            srcAccessMask=vk.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            dstAccessMask=vk.VK_ACCESS_TRANSFER_READ_BIT)
         self._gpu_render_pass = vk.vkCreateRenderPass(
             self._device, vk.VkRenderPassCreateInfo(
-                attachmentCount=len(attachments), pAttachments=attachments,
+                attachmentCount=1, pAttachments=[color],
                 subpassCount=1, pSubpasses=[subpass],
                 dependencyCount=1, pDependencies=[dependency]), None)
 
@@ -1001,15 +962,18 @@ class VulkanRenderer(_VulkanSwapchain):
         for framebuffer in self._gpu_framebuffers:
             vk.vkDestroyFramebuffer(self._device, framebuffer, None)
         self._gpu_framebuffers.clear()
-        if self._gpu_msaa_view is not None:
-            vk.vkDestroyImageView(self._device, self._gpu_msaa_view, None)
-            self._gpu_msaa_view = None
-        if self._gpu_msaa_image is not None:
-            vk.vkDestroyImage(self._device, self._gpu_msaa_image, None)
-            self._gpu_msaa_image = None
-        if self._gpu_msaa_memory is not None:
-            vk.vkFreeMemory(self._device, self._gpu_msaa_memory, None)
-            self._gpu_msaa_memory = None
+        for semaphore in self._gpu_present_semaphores:
+            vk.vkDestroySemaphore(self._device, semaphore, None)
+        self._gpu_present_semaphores.clear()
+        if self._gpu_frame_view is not None:
+            vk.vkDestroyImageView(self._device, self._gpu_frame_view, None)
+            self._gpu_frame_view = None
+        if self._gpu_frame_image is not None:
+            vk.vkDestroyImage(self._device, self._gpu_frame_image, None)
+            self._gpu_frame_image = None
+        if self._gpu_frame_memory is not None:
+            vk.vkFreeMemory(self._device, self._gpu_frame_memory, None)
+            self._gpu_frame_memory = None
         for view in self._gpu_views:
             vk.vkDestroyImageView(self._device, view, None)
         self._gpu_views.clear()
@@ -1242,7 +1206,7 @@ class VulkanRenderer(_VulkanSwapchain):
         self._vertices.extend(block)
         count = len(points)
         clip = self._clip_gpu[-1] if self._clip_gpu else (
-            0, 0, self._pixel_size[0], self._pixel_size[1])
+            0, 0, self._render_extent[0], self._render_extent[1])
         if self._draws and self._draws[-1][2] is texture and \
                 self._draws[-1][3] == clip:
             self._draws[-1][1] += count
@@ -1257,9 +1221,21 @@ class VulkanRenderer(_VulkanSwapchain):
         if width <= 0 or height <= 0:
             return
         x, y = self._translate(x, y)
+        if mode is None:
+            device_scale = self.scale
+            snapped_x = round(x * device_scale) / device_scale
+            snapped_y = round(y * device_scale) / device_scale
+            width = ((round(width * device_scale) / device_scale) if textured else
+                     round((x + width) * device_scale) / device_scale - snapped_x)
+            height = ((round(height * device_scale) / device_scale) if textured else
+                      round((y + height) * device_scale) / device_scale - snapped_y)
+            x, y = snapped_x, snapped_y
+        if width <= 0 or height <= 0:
+            return
         texture = texture or self._gpu_white
         # The one-pixel fringe is needed for smooth SDF coverage at edges.
-        pad = 0.0 if textured else 1.0 / self.pixel_ratio
+        pad = (1.0 / self.scale if not textured and mode is None and
+               state_radii is None else 0.0)
         x0, y0 = x - pad, y - pad
         x1, y1 = x + width + pad, y + height + pad
         points = ((x0, y0), (x1, y0), (x1, y1),
@@ -1348,7 +1324,7 @@ class VulkanRenderer(_VulkanSwapchain):
                               abs(x2 - x1) or width, width, color)
             return
         points, coverage = stroke_triangles(
-            ((x1, y1), (x2, y2)), width, 1 / self.pixel_ratio)
+            ((x1, y1), (x2, y2)), width, 1 / self.scale)
         self._draw_geometry(points, coverage, color)
 
     def circle(self, x, y, radius, color, fill=True):
@@ -1361,7 +1337,7 @@ class VulkanRenderer(_VulkanSwapchain):
 
     def arc(self, x, y, radius, start_angle, end_angle, color, width=1):
         points, coverage = arc_triangles(
-            x, y, radius, start_angle, end_angle, width, 1 / self.pixel_ratio)
+            x, y, radius, start_angle, end_angle, width, 1 / self.scale)
         self._draw_geometry(points, coverage, color)
 
     def _draw_geometry(self, points, coverage, color):
@@ -1372,12 +1348,12 @@ class VulkanRenderer(_VulkanSwapchain):
                                0, self._gpu_white, coverage=coverage)
 
     def polygon(self, points, color, *, center):
-        vertices, coverage = polygon_triangles(points, 1 / self.pixel_ratio, center)
+        vertices, coverage = polygon_triangles(points, 1 / self.scale, center)
         self._draw_geometry(vertices, coverage, color)
 
     def polyline(self, points, color, width=1):
         points = list(points)
-        vertices, coverage = stroke_triangles(points, width, 1 / self.pixel_ratio)
+        vertices, coverage = stroke_triangles(points, width, 1 / self.scale)
         self._draw_geometry(vertices, coverage, color)
         if len(points) > 1 and width > 0:
             for x, y in (points[0], points[-1]):
@@ -1433,6 +1409,15 @@ class VulkanRenderer(_VulkanSwapchain):
             padded = pygame.Surface((padded_w, padded_h), pygame.SRCALPHA, 32)
             padded.fill((0, 0, 0, 0))
             padded.blit(surface, (1, 1))
+            # Emulate independent CLAMP_TO_EDGE textures inside the atlas.
+            padded.blit(surface, (0, 1), (0, 0, 1, height))
+            padded.blit(surface, (width + 1, 1), (width - 1, 0, 1, height))
+            padded.blit(surface, (1, 0), (0, 0, width, 1))
+            padded.blit(surface, (1, height + 1), (0, height - 1, width, 1))
+            for px, py, sx, sy in ((0, 0, 0, 0), (width + 1, 0, width - 1, 0),
+                                  (0, height + 1, 0, height - 1),
+                                  (width + 1, height + 1, width - 1, height - 1)):
+                padded.set_at((px, py), surface.get_at((sx, sy)))
             self._pending_textures.append((
                 page["texture"][0], x, y, padded_w, padded_h,
                 pygame.image.tobytes(padded, "RGBA")))
@@ -1501,21 +1486,60 @@ class VulkanRenderer(_VulkanSwapchain):
 
     def clip_push(self, x, y, w, h):
         x, y = self._translate(x, y)
-        scale = self.pixel_ratio
+        scale = self.scale
         x0, y0 = round(x * scale), round(y * scale)
         x1, y1 = round((x + w) * scale), round((y + h) * scale)
         if self._clip_gpu:
             px, py, pw, ph = self._clip_gpu[-1]
             x0, y0 = max(x0, px), max(y0, py)
             x1, y1 = min(x1, px + pw), min(y1, py + ph)
-        x0 = max(0, min(self._pixel_size[0], x0))
-        y0 = max(0, min(self._pixel_size[1], y0))
-        x1 = max(x0, min(self._pixel_size[0], x1))
-        y1 = max(y0, min(self._pixel_size[1], y1))
+        x0 = max(0, min(self._render_extent[0], x0))
+        y0 = max(0, min(self._render_extent[1], y0))
+        x1 = max(x0, min(self._render_extent[0], x1))
+        y1 = max(y0, min(self._render_extent[1], y1))
         self._clip_gpu.append((x0, y0, x1 - x0, y1 - y0))
 
     def clip_pop(self):
         self._clip_gpu.pop()
+
+    def _record_frame_reduction(self, command, image_index):
+        image = self._swapchain_images[image_index]
+        subresource = vk.VkImageSubresourceRange(
+            aspectMask=vk.VK_IMAGE_ASPECT_COLOR_BIT,
+            baseMipLevel=0, levelCount=1, baseArrayLayer=0, layerCount=1)
+        barrier = vk.VkImageMemoryBarrier(
+            srcAccessMask=0, dstAccessMask=vk.VK_ACCESS_TRANSFER_WRITE_BIT,
+            oldLayout=vk.VK_IMAGE_LAYOUT_UNDEFINED,
+            newLayout=vk.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            srcQueueFamilyIndex=vk.VK_QUEUE_FAMILY_IGNORED,
+            dstQueueFamilyIndex=vk.VK_QUEUE_FAMILY_IGNORED,
+            image=image, subresourceRange=subresource)
+        vk.vkCmdPipelineBarrier(command, vk.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                vk.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                0, 0, None, 0, None, 1, [barrier])
+        layers = vk.VkImageSubresourceLayers(
+            aspectMask=vk.VK_IMAGE_ASPECT_COLOR_BIT,
+            mipLevel=0, baseArrayLayer=0, layerCount=1)
+        region = vk.VkImageBlit(
+            srcSubresource=layers,
+            srcOffsets=[vk.VkOffset3D(x=0, y=0, z=0),
+                        vk.VkOffset3D(x=self._render_extent[0],
+                                      y=self._render_extent[1], z=1)],
+            dstSubresource=layers,
+            dstOffsets=[vk.VkOffset3D(x=0, y=0, z=0),
+                        vk.VkOffset3D(x=self._extent[0], y=self._extent[1], z=1)])
+        # Replace the whole window, including alpha, just like GL's resolve.
+        vk.vkCmdBlitImage(command, self._gpu_frame_image,
+                          vk.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          image, vk.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          1, [region], vk.VK_FILTER_LINEAR)
+        barrier.srcAccessMask = vk.VK_ACCESS_TRANSFER_WRITE_BIT
+        barrier.dstAccessMask = 0
+        barrier.oldLayout = vk.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        barrier.newLayout = vk.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        vk.vkCmdPipelineBarrier(command, vk.VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                vk.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                0, 0, None, 0, None, 1, [barrier])
 
     def _record_gpu_draw(self, image_index):
         command = self._command_buffer
@@ -1526,23 +1550,21 @@ class VulkanRenderer(_VulkanSwapchain):
             float32=self._clear_color))
         area = vk.VkRect2D(
             offset=vk.VkOffset2D(x=0, y=0),
-            extent=vk.VkExtent2D(width=self._extent[0],
-                                 height=self._extent[1]))
+            extent=vk.VkExtent2D(width=self._render_extent[0],
+                                 height=self._render_extent[1]))
         begin = vk.VkRenderPassBeginInfo(
             renderPass=self._gpu_render_pass,
-            framebuffer=self._gpu_framebuffers[image_index],
+            framebuffer=self._gpu_framebuffers[0],
             renderArea=area,
-            clearValueCount=(2 if self._gpu_msaa_view is not None else 1),
-            pClearValues=([clear, clear] if self._gpu_msaa_view is not None
-                          else [clear]))
+            clearValueCount=1, pClearValues=[clear])
         vk.vkCmdBeginRenderPass(
             command, begin, vk.VK_SUBPASS_CONTENTS_INLINE)
         vk.vkCmdBindPipeline(
             command, vk.VK_PIPELINE_BIND_POINT_GRAPHICS,
             self._gpu_pipeline)
         vk.vkCmdSetViewport(command, 0, 1, [vk.VkViewport(
-            x=0.0, y=0.0, width=float(self._extent[0]),
-            height=float(self._extent[1]), minDepth=0.0, maxDepth=1.0)])
+            x=0.0, y=0.0, width=float(self._render_extent[0]),
+            height=float(self._render_extent[1]), minDepth=0.0, maxDepth=1.0)])
         if self._draws:
             vk.vkCmdBindVertexBuffers(command, 0, 1,
                                       [self._gpu_vertex_buffer], [0])
@@ -1558,6 +1580,7 @@ class VulkanRenderer(_VulkanSwapchain):
                 [texture[3]], 0, None)
             vk.vkCmdDraw(command, count, 1, first, 0)
         vk.vkCmdEndRenderPass(command)
+        self._record_frame_reduction(command, image_index)
         if self._gpu_capture_pending:
             image = self._swapchain_images[image_index]
             subresource = vk.VkImageSubresourceRange(
@@ -1565,7 +1588,7 @@ class VulkanRenderer(_VulkanSwapchain):
                 baseMipLevel=0, levelCount=1,
                 baseArrayLayer=0, layerCount=1)
             to_copy = vk.VkImageMemoryBarrier(
-                srcAccessMask=vk.VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                srcAccessMask=vk.VK_ACCESS_TRANSFER_WRITE_BIT,
                 dstAccessMask=vk.VK_ACCESS_TRANSFER_READ_BIT,
                 oldLayout=vk.VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 newLayout=vk.VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -1573,7 +1596,7 @@ class VulkanRenderer(_VulkanSwapchain):
                 dstQueueFamilyIndex=vk.VK_QUEUE_FAMILY_IGNORED,
                 image=image, subresourceRange=subresource)
             vk.vkCmdPipelineBarrier(
-                command, vk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                command, vk.VK_PIPELINE_STAGE_TRANSFER_BIT,
                 vk.VK_PIPELINE_STAGE_TRANSFER_BIT,
                 0, 0, None, 0, None, 1, [to_copy])
             region = vk.VkBufferImageCopy(
@@ -1640,17 +1663,18 @@ class VulkanRenderer(_VulkanSwapchain):
         vk.vkResetFences(self._device, 1, [self._in_flight])
         vk.vkResetCommandBuffer(self._command_buffer, 0)
         self._record_gpu_draw(image_index)
+        render_finished = self._gpu_present_semaphores[image_index]
         submit = vk.VkSubmitInfo(
             pWaitSemaphores=[self._image_available],
             pWaitDstStageMask=[
-                vk.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT],
+                vk.VK_PIPELINE_STAGE_TRANSFER_BIT],
             pCommandBuffers=[self._command_buffer],
-            pSignalSemaphores=[self._render_finished])
+            pSignalSemaphores=[render_finished])
         vk.vkQueueSubmit(self._graphics_queue, 1,
                          [submit], self._in_flight)
         self._pending_textures.clear()
         present = vk.VkPresentInfoKHR(
-            pWaitSemaphores=[self._render_finished],
+            pWaitSemaphores=[render_finished],
             pSwapchains=[self._swapchain],
             pImageIndices=[image_index])
         try:
@@ -1697,12 +1721,14 @@ class VulkanRenderer(_VulkanSwapchain):
         self._logical_size = (max(1, int(width)), max(1, int(height)))
         target = (tuple(max(1, int(v)) for v in pixel_size)
                   if pixel_size is not None else self._logical_size)
+        previous_ssaa = self._ssaa
         size_changed = target != self._pixel_size
         self._pixel_size = target
         if pixel_ratio is not None:
             self.pixel_ratio = max(1.0, float(pixel_ratio))
-        self.scale = (SCALE if self.anti_aliasing else 1) * self.pixel_ratio
-        if size_changed and self._swapchain is not None:
+        self._ssaa = 1 if not self.anti_aliasing or self.pixel_ratio >= 1.5 else 2
+        self.scale = self._ssaa * self.pixel_ratio
+        if (size_changed or previous_ssaa != self._ssaa) and self._swapchain is not None:
             self._recreate_swapchain()
 
     def configure(self, *, anti_aliasing: bool, vsync: bool):
@@ -1710,7 +1736,8 @@ class VulkanRenderer(_VulkanSwapchain):
             return
         self.anti_aliasing = anti_aliasing
         self.vsync = vsync
-        self.scale = (SCALE if anti_aliasing else 1) * self.pixel_ratio
+        self._ssaa = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2
+        self.scale = self._ssaa * self.pixel_ratio
         self._recreate_swapchain()
 
     def close(self):

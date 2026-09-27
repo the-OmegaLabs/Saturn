@@ -27,7 +27,7 @@ void main() {
         float distance = in_mode < 3.5 ?
             wave_line_distance(p, in_state_radii, in_state_info) :
             wave_arc_distance(p - in_half_size, in_state_radii, in_state_info);
-        float feather = max(0.65 * fwidth(distance), 0.001);
+        float feather = max(fwidth(distance), 0.001);
         float alpha = 1.0 - smoothstep(-feather, feather, distance);
         out_color = vec4(in_color.rgb, in_color.a * alpha);
         return;
@@ -45,13 +45,12 @@ void main() {
                  (in_half_size - corner_radius);
         float distance = length(max(q, 0.0)) +
                          min(max(q.x, q.y), 0.0) - corner_radius;
-        // OpenGL renders to a 2x target before downsampling. At a direct
-        // swapchain resolution, 0.65 pixel derivatives match that coverage.
-        float shape_feather = max(0.65 * fwidth(distance), 0.001);
+        // Match OpenGL coverage on the supersampled offscreen target.
+        float shape_feather = max(fwidth(distance), 0.001);
         float mask = 1.0 - smoothstep(
             -shape_feather, shape_feather, distance);
         float ripple_distance = length(point - in_state_info.xy);
-        float ripple_feather = max(0.65 * fwidth(ripple_distance), 0.001);
+        float ripple_feather = max(fwidth(ripple_distance), 0.001);
         float ripple = 1.0 - smoothstep(
             -ripple_feather, ripple_feather,
             ripple_distance - in_state_info.z);
@@ -73,7 +72,7 @@ void main() {
     float radius = min(in_radius, min(in_half_size.x, in_half_size.y));
     vec2 q = abs(local) - (in_half_size - radius);
     float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-    float feather = max(0.65 * fwidth(distance), 0.001);
+    float feather = max(fwidth(distance), 0.001);
     float outer = 1.0 - smoothstep(-feather, feather, distance);
     if (in_border_width <= 0.0) {
         out_color = vec4(in_color.rgb, in_color.a * outer);
