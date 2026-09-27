@@ -32,7 +32,9 @@ If you're looking to build a **web application**, [use Flet instead](https://fle
 
 The generated loading shapes in `saturn/_gen/loading_shapes.json` derive from AndroidX Compose Material 3 and Graphics Shapes. Their source files carry Android Open Source Project copyright notices; Saturn transformed the geometry into matching Bézier curves using JetBrains Compose Material 3 desktop and AndroidX Graphics Shapes. The derived geometry is distributed under Apache License 2.0. See the [source attribution and exact versions](./saturn/_gen/NOTICE.md) and the [full license text](./saturn/_gen/LICENSE-APACHE-2.0.txt).
 
-The [Aurora GLSL demo](./examples/orb_glsl.py) adapts Orb's Aurora fluid and glass shell, Copyright (c) 2026 LerSent001, under the [MIT license](./.static/shaders/ORB-LICENSE.txt). It is a single-pass example; the original particle-ribbon renderer and full preset editor are not included.
+### Orb GLSL demos
+
+The [Aurora GLSL demo](./examples/orb_glsl.py) adapts the Aurora fluid and glass shell from [LerSent001/orb](https://github.com/LerSent001/orb), Copyright (c) 2026 LerSent001. Orb is distributed under the [MIT license](https://github.com/LerSent001/orb/blob/main/LICENSE); the complete [license and copyright notice](./.static/shaders/ORB-LICENSE.txt) are retained beside the adapted GLSL sources. It is a single-pass example; the original particle-ribbon renderer and full preset editor are not included.
 
 ## Preview
 

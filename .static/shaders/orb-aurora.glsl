@@ -1,5 +1,6 @@
 // Aurora Veil and glass shell adapted from Orb effect.wgsl.
 // Copyright (c) 2026 LerSent001. MIT License: ORB-LICENSE.txt.
+// Original project: https://github.com/LerSent001/orb
 // This single-pass adaptation does not implement the particle-ribbon pipeline.
 #include "orb-noise.glsl"
 uniform float orb_radius;

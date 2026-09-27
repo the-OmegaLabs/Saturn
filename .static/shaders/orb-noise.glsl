@@ -1,5 +1,6 @@
 // Adapted from Orb effect.wgsl, Copyright (c) 2026 LerSent001.
 // MIT License: see ORB-LICENSE.txt in this directory.
+// Original project: https://github.com/LerSent001/orb
 float lqHash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
     p += vec2(dot(p, p + vec2(45.32)));

@@ -138,6 +138,7 @@ controls are simplified, output is converted to straight alpha, and the
 sphere edge uses derivative antialiasing. This is not a pixel-identical port
 of all presets or the particle-ribbon multipass renderer.
 
-Copyright (c) 2026 LerSent001. The [MIT license](../.static/shaders/ORB-LICENSE.txt)
-is retained beside the adapted source and attributed in the repository README.
+Original project: [LerSent001/orb](https://github.com/LerSent001/orb).
+Copyright (c) 2026 LerSent001. The complete [MIT license](../.static/shaders/ORB-LICENSE.txt)
+and copyright notice are retained beside the adapted source and attributed in the repository README.
 See [runnable demos](./effects-demos.md).

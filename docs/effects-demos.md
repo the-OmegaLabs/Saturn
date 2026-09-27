@@ -49,8 +49,10 @@ see [Shaders](./shaders.md). Software displays the static fallback color.
 
 ![Orb GLSL on Vulkan](../.static/shots/orb_glsl-main-vulkan.png)
 
-The Aurora noise/fluid and glass shell are adapted from Orb, Copyright (c)
-2026 LerSent001, with its MIT license retained. Other presets, the WebGPU
+The Aurora noise/fluid and glass shell are adapted from
+[LerSent001/orb](https://github.com/LerSent001/orb), Copyright (c) 2026 LerSent001,
+under the [MIT license](../.static/shaders/ORB-LICENSE.txt). The complete license
+and copyright notice are retained beside the GLSL sources. Other presets, the WebGPU
 editor and multipass particle ribbons are not part of this example.
 
 Each example exposes `build(page)` returning its controls/state. Native

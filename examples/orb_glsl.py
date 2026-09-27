@@ -1,5 +1,8 @@
 """Orb Aurora GLSL adaptation, with an owned native parameter editor.
 
+Source: https://github.com/LerSent001/orb
+Copyright (c) 2026 LerSent001. MIT License: .static/shaders/ORB-LICENSE.txt.
+
 python examples/orb_glsl.py --backend opengl --screen editor
 Vulkan custom GLSL requires glslangValidator on PATH, or SATURN_GLSLANG.
 """
