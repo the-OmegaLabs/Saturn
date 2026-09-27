@@ -4,7 +4,7 @@ Shows determinate or indeterminate progress as a horizontal bar.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 193).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 209).
 
 ## Preview
 

@@ -4,7 +4,7 @@ Compatibility alias for Renderer.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 30).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 32).
 
 **Base class:** `Enum`
 

@@ -4,7 +4,7 @@ Displays a local image or SVG.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 72).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 79).
 
 ## Preview
 

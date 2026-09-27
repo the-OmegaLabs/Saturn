@@ -4,7 +4,7 @@ Receives pointer and gesture events.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 567).
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 698).
 
 ## Preview
 

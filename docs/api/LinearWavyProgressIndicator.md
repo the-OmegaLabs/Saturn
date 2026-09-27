@@ -4,7 +4,7 @@ Linear wavy progress indicator.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 214).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 254).
 
 ## Preview
 

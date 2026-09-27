@@ -4,7 +4,7 @@ Shows progress with a wave stroke.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 106).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 127).
 
 ## Preview
 

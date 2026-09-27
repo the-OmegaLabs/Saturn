@@ -1,11 +1,11 @@
 # Saturn performance issues and fixes
 
-Updated: 2026-09-27. This checklist separates completed fixes from remaining work and items that need measurement. Optimizations stay in the existing controls; no `VirtualStudentList` is introduced. Measurements below are historical results from this machine, recorded on 2026-09-23.
+Updated: 2026-09-27. Optimizations stay in the existing controls; no `VirtualStudentList` is introduced. The original measurements below were recorded on 2026-09-23. The follow-up section records new measurements and acceptance checks from 2026-09-27.
 
 ## Completed
 
 - [x] **Default backend selection.** `saturn.run()` defaults to `Renderer.OPENGL`, with GPU primitives and batching. `Renderer.SOFTWARE` and `Renderer.VULKAN` remain explicit choices. Application entry scripts can override the default.
-- [x] **Invisible list items still drawn and hit-tested.** The original `ListView` clipped pixels but visited every control. It now uses sorted row coordinates and binary search to select draw, layout, and hit-test candidates within the viewport plus a 96 logical pixel preload margin. Control objects and event interfaces are preserved.
+- [x] **Invisible list items still drawn and hit-tested.** The original `ListView` clipped pixels but visited every control. It now uses sorted row coordinates and binary search to select draw, layout, and hit-test candidates within the viewport plus a 96 logical pixel preload margin, expanded for declared paint overflow. Control objects and event interfaces are preserved.
 - [x] **Scrolling and hovering trigger full-page layout.** `Page` separates layout updates from repaint requests; animations advance only active controls. Fixed-height rows and `item_extent` place subtrees on demand in the existing `ListView`. Resize reuses vertical positions and places nearby rows.
 - [x] **OpenGL allocates and submits a buffer for each rectangle.** Consecutive rectangles are batched in drawing order with reusable VBO/VAO resources. Texture changes still preserve alpha composition order.
 - [x] **OpenGL viewport returns to native pixel size after resize.** SDL can change the GL viewport outside ModernGL's cache, shifting 2x offscreen rendering into the lower-left corner. Each clear now binds the offscreen target and explicitly restores its viewport. A regression simulates an external `glViewport` change.
@@ -25,12 +25,32 @@ Updated: 2026-09-27. This checklist separates completed fixes from remaining wor
 - [x] **Duplicate attach.** Redundant subtree attachment was removed; event and animation regressions pass.
 - [x] **Renderer settings are unavailable through Page.** `page.renderer.anti_aliasing` and `page.renderer.vsync` accept booleans and default to `True`; `page.renderer.context` exposes the actual renderer. Changes are coalesced on the UI thread. Real software, OpenGL, and Vulkan windows passed option toggling, resize, and pixel checks. On this machine Vulkan toggled 1x/4x samples and immediate/FIFO presentation. See [Renderer settings](docs/rendering.md) for fallback behavior and the scope of antialiasing.
 
-## Remaining work / handle when needed
+## Completed follow-up work (2026-09-27)
 
-- [ ] **Initial layout of long variable-height lists still measures every row.** First intrinsic measurement of 5,000 rows takes about 320-360 ms here; continuous new-width resize is about 14 ms p95. Unknown wrapping heights cannot be guessed without corrupting scroll positions. For very large data with known row heights, set child `height` or `ListView.item_extent`.
-- [ ] **Large shadows or out-of-bounds transforms may exceed the 96-pixel preload margin.** Add visual regressions and expand the local margin when real controls require it.
-- [ ] **Other dynamic bitmaps still use CPU rasterization and texture uploads.** Investigate complex icons, shadows, and dynamic images according to actual hotspots. Static bitmaps and Material ripples are covered.
-- [ ] **Vulkan devices limited to 1x sampling may still show stepped triangle edges on diagonals and arcs.** Capability fallback keeps the backend usable; rounded SDF edges retain shader feathering.
+- [x] **Reduce initial variable-height layout overhead.** Exact single-line text measurement, shared font lookup caches, and fewer property reads reduce the existing list's initial cost. Three independent software-window comparisons of 5,000 rows measured median cold layout **256.867 → 127.638 ms** (50.3% lower), and cold first frame **298.081 → 169.827 ms**. Row heights and scroll extent remain exact; no estimated heights or replacement list are used. `tests/list_layout_checks.py` verifies variable heights at four widths and content invalidation.
+- [x] **Cull using declared paint overflow.** Shadows, Material elevation, offsets, nested descendants, absolute positions, and animation targets expand the local candidate range beyond 96 pixels. Ordinary rows keep the binary-search path. Pixel comparisons against uncropped drawing cover a 180-pixel blur, elevation 80, far offsets, nested/horizontal controls, width changes, and property updates; fixtures also prove that the old fixed margin omitted visible pixels.
+- [x] **Remove measured dynamic bitmap hotspots.** OpenGL and Vulkan draw LoadingIndicator geometry, analytic wavy progress, and Material elevation shadows on the GPU. Icon/image tint and bitmap enlargement reuse source textures. `tests/dynamic_renderer_checks.py` rejects CPU Surface creation during animation and pixel hashing during repeated tint changes, and verifies silhouettes, clipping, opacity, and resize. This removes per-frame bitmap allocation/uploads for the covered controls.
+- [x] **Smooth Vulkan lines and arcs at 1x sampling.** Interpolated coverage meshes feather triangle boundaries independently of hardware MSAA. Forced 1x real-window checks produce **178 diagonal / 224 arc blended edge pixels**. Rounded shapes retain analytic edge coverage. MSAA remains enabled when supported.
+- [x] **Align useful Page behavior.** Fonts accept local/assets paths and HTTP(S), including TTF/OTF/TTC/WOFF/WOFF2. Dictionary mutation, completed downloads, and removals invalidate layout and rendered caches. Typed keyboard, resize, and brightness events accept single/list callbacks, sync/async handlers, and zero/one argument. Direct list mutations, service ownership, asymmetric padding, effective dark themes, disabled input, title state, and measured display density are covered by `tests/page_compatibility_checks.py`.
+- [x] **Complete native Window properties and HWND access.** All 39 inspected shared public Window names are exposed, plus `title`, `hwnd`, and `native_handle`. Windows native checks cover sizing/limits, styles, fullscreen/state, positioning/centering, opacity/color key, taskbar progress/badge resources, and close interception. Advanced Windows-only settings fail explicitly on other platforms. See [Native windows](docs/window.md) and [Page comparison](docs/page-properties-comparison.md).
+
+### Practical constraints
+
+- Unknown variable row heights still require an O(N) initial exact measurement. The measured cost is reduced, not eliminated. Known-height data can use child `height` or `ListView.item_extent` to avoid intrinsic measurement.
+- Culling can account for declared built-in geometry. Custom drawing that extends beyond a control without declaring bounds needs a corresponding overflow rule and a pixel regression.
+- Initial image decoding, font/SVG rasterization, and high-quality bitmap reduction still use CPU source processing and cached textures. The full OpenGL/Vulkan frame and the dynamic effects above are rasterized on the GPU.
+- GPU elevation shadows approximate the original blur. Windows background transparency is color-keyed, not per-pixel desktop alpha. Other platform limits are documented in the Window guide.
+
+### Follow-up measurements
+
+A sequential 5,000-row, 40-frame variable-height resize sweep measured software /
+OpenGL / Vulkan draw-and-present p95 **10.487 / 11.910 / 13.136 ms**, with at most
+22 rows drawn. Window/attachment setup p95 was **2.449 / 2.530 / 10.238 ms**.
+
+A separate 24-control animation comparison measured old bitmaps → GPU p95
+**7.565 → 5.069 ms** on OpenGL and **9.024 → 7.951 ms** on forced-1x Vulkan.
+These are local wall-clock observations; driver scheduling and machine load vary.
+The concrete invariant is removal of the covered dynamic CPU bitmap paths.
 
 ## Stress evidence and commands
 
@@ -48,6 +68,10 @@ Updated: 2026-09-27. This checklist separates completed fixes from remaining wor
 .venv\Scripts\python.exe tests\vulkan_checks.py
 .venv\Scripts\python.exe tests\image_antialias_checks.py
 .venv\Scripts\python.exe tests\renderer_options_checks.py
+.venv\Scripts\python.exe tests\page_compatibility_checks.py
+.venv\Scripts\python.exe tests\window_checks.py
+.venv\Scripts\python.exe tests\list_layout_checks.py
+.venv\Scripts\python.exe -m tests.dynamic_renderer_checks --stress
 ```
 
 Local 800 x 600, 5,000-row, 60-frame continuous scroll: OpenGL drawing plus presentation p50 **2.83 ms**, p95 **3.14 ms**; software p50 **3.93 ms**, old CPU Vulkan p50 **4.87 ms**. About 20 of 5,000 rows entered drawing. Resize alternated 800 x 600 and 760 x 570 every two frames: OpenGL before optimization p50 **9.20 ms**, p95 **18.59 ms**, after optimization **1.21 / 2.07 ms**, plus about 2-4 ms of window/framebuffer setup. After GPU hover primitives on 2026-09-23, the same scenario measured **1.67 / 2.55 ms**. Machine and cache variations prevent attributing that difference solely to hover changes. Full-list jumps with resize measured **4.42 / 7.24 ms**.
@@ -139,16 +163,17 @@ Users could implement specialized controls without waiting for built-in widgets.
 
 ## 5. Native Window API
 
-Qt offers window size and position, minimum and maximum sizes, fullscreen, frameless and transparent windows, always-on-top behavior, and native handles. Saturn could progressively provide:
+Qt offers window size and position, minimum and maximum sizes, fullscreen, frameless and transparent windows, always-on-top behavior, and native handles. Saturn now implements the corresponding native desktop settings, with the platform and transparency limits described in [Native windows](docs/window.md):
 
 ```text
 page.window.title
-page.window.size
-page.window.position
-page.window.fullscreen
+page.window.width / height
+page.window.left / top
+page.window.full_screen
 page.window.resizable
-page.window.transparent
+page.window.bgcolor / opacity
 page.window.native_handle
+page.window.hwnd
 ```
 
 The Windows native handle is an HWND. These advanced capabilities matter for desktop tools, game launchers, OBS-style applications, desktop overlays, and system utilities, even when ordinary applications do not need them.

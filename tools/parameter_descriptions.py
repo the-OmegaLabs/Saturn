@@ -1,6 +1,12 @@
 """Plain-language explanations for Saturn constructor parameters."""
 
 DESCRIPTIONS = {
+    "shift": "Whether the Shift modifier was pressed for this event.",
+    "ctrl": "Whether the Control modifier was pressed for this event.",
+    "alt": "Whether the Alt modifier was pressed for this event.",
+    "meta": "Whether the platform Meta modifier was pressed for this event.",
+    "brightness": "Current system or native title-bar brightness: light or dark.",
+    "type": "The kind of native window event.",
     # Layout, presentation, and shared control state.
     "align": "Alignment of the control within the available area.",
     "alignment": "Alignment of child content within a container or layout.",
@@ -217,6 +223,12 @@ EVENTS = {
 }
 
 OVERRIDES = {
+    ("KeyboardEvent", "key"): "Pressed key name, such as S, Enter, or Arrow Left.",
+    ("KeyboardEvent", "name"): "Event name: keyboard_event.",
+    ("PageResizeEvent", "name"): "Event name: resize.",
+    ("PageResizeEvent", "width"): "Logical client width after resizing.",
+    ("PageResizeEvent", "height"): "Logical client height after resizing.",
+    ("PlatformBrightnessChangeEvent", "name"): "Event name: platform_brightness_change.",
     ("run", "title"): "Application window title.",
     ("Text", "value"): "Text content to display.",
     ("TextField", "value"): "Initial or current text field content.",

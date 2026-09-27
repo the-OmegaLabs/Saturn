@@ -4,7 +4,7 @@ Shows ongoing activity with an animated shape.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 32).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 42).
 
 ## Preview
 

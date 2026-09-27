@@ -4,7 +4,7 @@ Circular wavy progress indicator.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 218).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 258).
 
 ## Preview
 

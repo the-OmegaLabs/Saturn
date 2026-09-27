@@ -4,7 +4,7 @@ Draws a dividing line between adjacent content.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 394).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 399).
 
 ## Preview
 

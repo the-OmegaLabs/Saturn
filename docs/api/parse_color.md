@@ -4,7 +4,7 @@ Parses a color name, hex value, or color object into RGBA values.
 
 [← API index](./README.md)
 
-Source: [`saturn/colors.py`](../../saturn/colors.py) (line 159).
+Source: [`saturn/colors.py`](../../saturn/colors.py) (line 158).
 
 ## Call parameters
 

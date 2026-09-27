@@ -24,7 +24,7 @@ OUT = ROOT / "docs"
 API = OUT / "api"
 
 CATEGORIES = {
-    "App and page": "App Renderer Render run ControlEvent Control Page Window",
+    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
     "Expressive namespace": "Compose",
     "Layout and content": "Text Row Column Container Stack Divider Icon Image Card ListView GestureDetector ListItem",
     "Buttons and actions": "Button ElevatedButton FilledButton FilledTonalButton OutlinedButton TextButton IconButton ExpressiveButton ExpressiveIconButton SplitButton ButtonGroup ToggleButton ElevatedToggleButton FilledTonalToggleButton OutlinedToggleButton FloatingActionButton SmallFloatingActionButton MediumFloatingActionButton LargeFloatingActionButton ExtendedFloatingActionButton FloatingToolbar HorizontalFloatingToolbar VerticalFloatingToolbar FloatingActionButtonMenu FloatingActionButtonMenuItem",
@@ -40,9 +40,15 @@ DESCRIPTIONS = {
     "Render": "Compatibility alias for Renderer.",
     "run": "Starts a Saturn app and passes its Page to the entry point.",
     "ControlEvent": "Event data received by a control callback.",
+    "KeyboardEvent": "Pressed key and modifier flags supplied to a Page keyboard handler.",
+    "PageResizeEvent": "Logical client dimensions supplied to a Page resize handler.",
+    "PlatformBrightnessChangeEvent": "System light/dark preference supplied to a Page brightness handler.",
+    "WindowEvent": "Native desktop window state event with its owning Page.",
+    "WindowEventType": "Kinds of native window state events.",
+    "WindowResizeEdge": "Native edge or corner used to start resizing a window.",
     "Control": "Base class for visual controls, with size, state, and update methods.",
     "Page": "Application page that manages controls, themes, and dialogs.",
-    "Window": "Native window size, title, and state.",
+    "Window": "Native desktop window properties, events, and operating-system handles.",
     "Text": "Displays text with configurable size, weight, and color.",
     "Row": "Arranges child controls horizontally.",
     "Column": "Arranges child controls vertically.",
@@ -138,6 +144,11 @@ DESCRIPTIONS = {
 }
 
 METHOD_DESCRIPTIONS = {
+    ("Window", "center"): "Queue centering within the nearest monitor's work area.",
+    ("Window", "wait_until_ready_to_show"): "Wait until earlier UI queue operations have completed.",
+    ("Window", "to_front"): "Queue native window activation.",
+    ("Window", "start_dragging"): "Begin native Windows caption dragging when movement is enabled.",
+    ("Window", "start_resizing"): "Begin native Windows resizing at the requested edge.",
     "add": "Adds a child control to the end of a page or control list.",
     "all": "Creates the same setting for every side.",
     "center": "Creates a centered alignment value.",
@@ -238,7 +249,8 @@ def method_rows(obj: type) -> list[str]:
         except (TypeError, ValueError):
             signature = "(...)"
         detail = (inspect.getdoc(member) or "").splitlines()
-        summary = detail[0] if detail else METHOD_DESCRIPTIONS.get(name, "Performs the corresponding operation.")
+        summary = detail[0] if detail else METHOD_DESCRIPTIONS.get(
+            (obj.__name__, name), METHOD_DESCRIPTIONS.get(name, "Performs the corresponding operation."))
         rows.append(f"| {markdown_code(name + signature)} | {summary.replace('|', '\\|')} |")
     return rows
 
@@ -319,6 +331,9 @@ def page_for(name: str, category: str) -> str:
                           "`page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings",
                           "that default to `True`. `page.renderer.context` exposes the active backend renderer.",
                           "See [Renderer settings](../rendering.md) for backend behavior and threading rules.", ""]
+                lines += ["See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.", ""]
+            if name == "Window":
+                lines += ["See [Native desktop windows](../window.md) for property behavior, platform limits, handles, and close interception.", ""]
             if name in ("App", "Page", "Window"):
                 lines += ["> `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.", ""]
             methods = method_rows(obj)

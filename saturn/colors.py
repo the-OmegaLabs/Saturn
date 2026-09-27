@@ -118,8 +118,7 @@ _system_dark_cache: bool | None = None
 
 
 def system_prefers_dark() -> bool:
-    """Windows app-mode dark preference (ThemeMode.SYSTEM resolution);
-    cached once per run — flipping the OS theme mid-run is not a thing."""
+    """Windows app-mode preference, cached between Page preference polls."""
     global _system_dark_cache
     if _system_dark_cache is None:
         v = False

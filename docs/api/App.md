@@ -4,7 +4,7 @@ Application object that manages windows, events, and rendering.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 104).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 106).
 
 > `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
@@ -16,7 +16,7 @@ Source: [`saturn/app.py`](../../saturn/app.py) (line 104).
 | `close(self)` | Closes a window or expanded menu. |
 | `run_until_closed(self)` | Processes window events until the window closes. |
 | `configure_renderer(self, *, anti_aliasing=None, vsync=None)` | Coalesce rendering option changes before the next UI frame. |
-| `call(self, fn, *args)` | Run a user callable off the UI thread (sync: thread, async: loop). |
+| `call(self, fn, *args)` | Run a callable off the UI thread and await returned awaitables. |
 | `mark_dirty(self)` | Marks the interface for redrawing. |
 | `post(self, fn)` | Run a callable on the UI thread (required for SDL display calls). |
 | `set_text_input_rect(self, rect: 'pygame.Rect')` | Position SDL text input using a caret-relative exclusion area. |

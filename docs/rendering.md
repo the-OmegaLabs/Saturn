@@ -29,7 +29,7 @@ new raster scale. Vulkan may rebuild its swapchain and sampling attachments.
 | Backend | `anti_aliasing` | `vsync` |
 | --- | --- | --- |
 | OpenGL | Enables additional 2× offscreen supersampling at display densities below 1.5; otherwise uses native display density | Requests SDL's GL swap interval; driver overrides are possible |
-| Vulkan | Enables supported 4× or 2× MSAA, falling back to 1×, and higher resolution text rasterization | Uses FIFO when enabled; when disabled prefers immediate, then mailbox, then FIFO |
+| Vulkan | Enables supported 4× or 2× MSAA, falling back to 1×, and higher resolution text rasterization; coverage meshes smooth lines/arcs even at 1× | Uses FIFO when enabled; when disabled prefers immediate, then mailbox, then FIFO |
 | Software | Enables additional 2× raster supersampling below display density 1.5 | Uses application pacing at the display refresh rate; no native swap synchronization |
 
 Disabling antialiasing removes the additional sampling above. Font smoothing,
@@ -63,5 +63,38 @@ direct GPU calls from those handlers safe. Ordinary controls should use
 
 Run `python tests/renderer_options_checks.py` to verify option dispatch, Vulkan
 presentation fallbacks, sampling changes, resize, and pixels on all three backends.
+
+## Dynamic GPU drawing
+
+Both OpenGL and Vulkan rasterize the frame on the GPU. Adjacent compatible
+primitives preserve drawing order while sharing vertex batches and textures.
+The existing controls now use these GPU paths:
+
+- `LoadingIndicator`: an adaptive polygon mesh with interpolated edge coverage.
+- Linear/circular wavy progress: analytic shader strokes without frame bitmaps.
+- Material elevation shadows: an analytic Gaussian coverage approximation,
+  including corner radii, without new blurred textures during resize.
+- Icon and image color changes: reuse source textures and apply tint/opacity
+  in the GPU; bitmap enlargement uses native texture sampling.
+
+The CPU still constructs geometry, decodes images, rasterizes fonts and SVGs
+when needed, and smoothly reduces large bitmaps. These cached source operations
+are separate from full-frame rendering. Software retains bitmap drawing.
+Analytic elevation shadows approximate the original blur rather than matching
+every pixel exactly; custom `Container.shadow` uses its existing primitive path.
+
+`python -m tests.dynamic_renderer_checks --stress` checks rendered silhouettes,
+clipping, opacity, resize, tint texture reuse, and animations with CPU bitmap
+creation disabled. It also forces Vulkan to 1× while requesting antialiasing;
+the local diagonal/arc checks produce 178/224 blended edge pixels.
+
+After changing the Vulkan fragment source or shared `renderer/wave.glsl`, rebuild
+the checked-in shader with a developer-installed Khronos glslang compiler:
+
+```powershell
+glslang -V -S frag saturn/renderer/vulkan_frag.glsl -o saturn/renderer/vulkan_frag.spv
+```
+
+Applications load the packaged SPIR-V; no shader compiler is needed at runtime.
 
 [Documentation home](./README.md)
