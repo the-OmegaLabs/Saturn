@@ -4,7 +4,7 @@ Corner radii for each of the four corners.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 246).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 245).
 
 ## Public methods
 

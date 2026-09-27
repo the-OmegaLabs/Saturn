@@ -4,7 +4,7 @@ Space inside a control on each side.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 217).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 216).
 
 ## Public methods
 

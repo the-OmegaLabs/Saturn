@@ -4,7 +4,7 @@ Basic clickable button.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 291).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 290).
 
 ## Preview
 

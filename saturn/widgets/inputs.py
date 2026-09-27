@@ -161,7 +161,7 @@ class TextField(Control):
         self._paint_offset = (0.0, 0.0)
 
     def _style(self):
-        """(family, value size, value color) from the flet text_style."""
+        """(family, value size, value color) from text_style."""
         ts = self.text_style
         if ts is None:
             return None, self.text_size, colors.Colors.ON_SURFACE
@@ -1084,7 +1084,7 @@ class Switch(_Toggle):
                           radius=h / 2)
             r.opacity_pop()
         thumb_r = 8.0 + 4.0 * size_progress
-        # Flet's Material switch snaps its handle to the 28px pressed size;
+        # The Material switch snaps its handle to the 28px pressed size;
         # this is intentionally independent of the slower state-layer alpha.
         thumb_r += (14.0 - thumb_r) * self._thumb_press_progress
         tx = x + 16.0 + (w - 32.0) * progress
@@ -1442,7 +1442,7 @@ class DropdownOption(Control):
         self.content = content
 
 
-Option = DropdownOption  # legacy flet name
+Option = DropdownOption  # Convenience alias
 
 
 class _DropdownMenu(Control):

@@ -189,7 +189,7 @@ DESCRIPTIONS = {
     "obscuring_character": "Single character used to mask password text.",
     "shift_enter": "Require Shift+Enter to insert a newline in a multiline field.",
     "show_cursor": "Whether to display the input caret.",
-    "_flet_ignored": "Extra control arguments accepted for Flet compatibility without automatic behavior.",
+    "_ignored": "Additional control arguments currently accepted without behavior.",
 }
 
 EVENTS = {

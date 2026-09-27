@@ -151,5 +151,4 @@ __all__ = [
 ]
 __version__ = "0.1.0"
 
-# flet-style module aliases: ft.dropdown.Option(...)
 dropdown = SimpleNamespace(Option=Option, DropdownOption=DropdownOption)

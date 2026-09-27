@@ -1,6 +1,6 @@
 """Buttons: Button base + Filled/FilledTonal/Elevated/Outlined/Text + IconButton.
 
-flet 1.0 API: label via content= (str or Control), icon=, on_click, on_hover,
+Button API: label via content= (str or Control), icon=, on_click, on_hover,
 color/bgcolor, disabled.
 """
 from __future__ import annotations
@@ -286,8 +286,7 @@ class ExpressiveButton(Button):
         super().__init__(content, size=size, shape=shape, **kwargs)
 
 
-# Flet 1.0 renamed ElevatedButton to Button. Its defaults remain the Material
-# elevated-button surface/elevation rather than a high-emphasis filled button.
+# Button uses the Material elevated-button surface and elevation.
 class _ConcreteButton(Button):
     variant_bg = colors.Colors.SURFACE_CONTAINER_LOW
     variant_fg = colors.Colors.PRIMARY

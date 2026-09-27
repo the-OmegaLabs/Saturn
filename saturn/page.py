@@ -1,4 +1,4 @@
-"""Page and Window (flet 1.0 subset; dialogs/services land in later milestones)."""
+"""Root page and native window configuration."""
 from __future__ import annotations
 
 import ctypes
@@ -44,7 +44,7 @@ def _set_windows_dark_title_bar(hwnd: int, dark: bool) -> bool:
 
 
 class Window:
-    """flet `page.window` subset."""
+    """Native window properties exposed through page.window."""
 
     def __init__(self, app):
         self._app = app
@@ -93,7 +93,7 @@ class Window:
 
         self._app.post(_set_icon)
 
-    # flet Window booleans; all SDL calls marshaled to the UI thread
+    # Native window state; all SDL calls marshaled to the UI thread
     @property
     def maximized(self) -> bool:
         return self._maximized
@@ -178,13 +178,13 @@ class Page(Control):
         self._sync_native_title_bar()
         self.theme = None       # ft.Theme(font_family=...) overrides default font
         self.dark_theme = None
-        self._fonts: dict[str, str] = {}  # flet page.fonts: alias -> file path
-        self.vertical_alignment = MainAxisAlignment.START    # flet BasePage
+        self._fonts: dict[str, str] = {}  # Font alias -> file path
+        self.vertical_alignment = MainAxisAlignment.START
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
         self.overlay: list[Control] = []  # drawn + hit-tested above the tree
-        self.services: list = []          # Flet 1.0 service registration parity
-        self.on_resize: list = []  # flet-style event handler lists
+        self.services: list = []          # Registered application services
+        self.on_resize: list = []  # Resize event handlers
         self.on_keyboard_event: list = []
         self._pressed = None
         self._hovered = None
@@ -199,7 +199,7 @@ class Page(Control):
         self._active_animations = set()
         self._animation_scan_needed = True
 
-    # -- flet API ---------------------------------------------------------
+    # -- public API ---------------------------------------------------------
     @property
     def width(self) -> float:
         return self._app.size[0]
@@ -331,11 +331,11 @@ class Page(Control):
         self._app.mark_dirty()
 
     def run_task(self, handler, *args):
-        """flet run_task: schedule a coroutine handler on the app's loop."""
+        """Schedule a coroutine handler on the application event loop."""
         return self._app.call(handler, *args)
 
     async def take_screenshot(self, path: str | None = None):
-        """flet-style async screenshot; returns the frame surface (and saves
+        """Return the captured frame surface (and save
         to `path` when given)."""
         return self._app.screenshot(path)
 

@@ -4,7 +4,7 @@ Rotation angle and center of a control.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 335).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 334).
 
 ## Constructor parameters
 

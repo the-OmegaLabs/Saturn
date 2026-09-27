@@ -4,7 +4,7 @@ Space outside a control on each side.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 242).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 241).
 
 **Base class:** [Padding](./Padding.md)
 

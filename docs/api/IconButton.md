@@ -4,7 +4,7 @@ Compact action button presented as an icon.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 300).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 299).
 
 ## Preview
 

@@ -1,6 +1,6 @@
 """Scrolling: ListView (vertical/horizontal, wheel + drag) and GestureDetector.
 
-flet 1.0 subset: ListView(controls, horizontal, spacing, padding, on_scroll,
+ListView(controls, horizontal, spacing, padding, on_scroll,
 auto_scroll, scroll_to()); GestureDetector(content, on_tap, on_hover...).
 """
 from __future__ import annotations
@@ -82,7 +82,7 @@ class ListView(Control):
 
     # -- layout --------------------------------------------------------------
     def _intrinsic(self, max_w, max_h, scale):
-        # fills the box the parent gives it (flet ListView expands)
+        # fills the box the parent gives it (ListView expands)
         return (self._width if self._width is not None else (max_w or 0),
                 self._height if self._height is not None else (max_h or 0))
 

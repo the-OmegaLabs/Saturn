@@ -1,4 +1,4 @@
-"""Event model: ControlEvent + handler dispatch (flet semantics).
+"""ControlEvent values and handler dispatch.
 
 Handlers may take zero args or one event arg, sync or async — dispatch runs
 them off the UI thread via App.call.

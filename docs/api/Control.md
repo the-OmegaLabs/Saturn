@@ -17,7 +17,7 @@ Source: [`saturn/control.py`](../../saturn/control.py) (line 24).
 ## Constructor parameters
 
 ```python
-saturn.Control(*, visible: 'bool' = True, disabled: 'bool' = False, opacity: 'float' = 1.0, expand: 'bool | int | None' = None, tooltip: 'str | None' = None, data=None, width: 'float | None' = None, height: 'float | None' = None, margin=None, align: 'Alignment | None' = None, left: 'float | None' = None, top: 'float | None' = None, right: 'float | None' = None, bottom: 'float | None' = None, rotate=None, scale=None, offset=None, animate_opacity=None, animate_size=None, animate_position=None, animate_align=None, animate_margin=None, animate_rotation=None, animate_scale=None, animate_offset=None, on_animation_end=None, **_flet_ignored)
+saturn.Control(*, visible: 'bool' = True, disabled: 'bool' = False, opacity: 'float' = 1.0, expand: 'bool | int | None' = None, tooltip: 'str | None' = None, data=None, width: 'float | None' = None, height: 'float | None' = None, margin=None, align: 'Alignment | None' = None, left: 'float | None' = None, top: 'float | None' = None, right: 'float | None' = None, bottom: 'float | None' = None, rotate=None, scale=None, offset=None, animate_opacity=None, animate_size=None, animate_position=None, animate_align=None, animate_margin=None, animate_rotation=None, animate_scale=None, animate_offset=None, on_animation_end=None, **_ignored)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -48,4 +48,4 @@ saturn.Control(*, visible: 'bool' = True, disabled: 'bool' = False, opacity: 'fl
 | `animate_scale` | `—` | `None` | Animation settings applied when scale changes. |
 | `animate_offset` | `—` | `None` | Animation settings applied when offset changes. |
 | `on_animation_end` | `—` | `None` | Callback called when the control animation finishes. |
-| `**_flet_ignored` | `—` | `additional keyword arguments` | Extra control arguments accepted for Flet compatibility without automatic behavior. |
+| `**_ignored` | `—` | `additional keyword arguments` | Additional control arguments currently accepted without behavior. |

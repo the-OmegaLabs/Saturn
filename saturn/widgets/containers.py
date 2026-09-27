@@ -5,7 +5,7 @@ Layout protocol (two passes, absolute rects):
   _place(x, y, w, h, scale)                    final box; sets _rect, recurses
 Draw pass: _draw_all walks the tree and renders at the absolute rects.
 
-Row/Column implement the flet flex subset: alignment (MainAxisAlignment),
+Row/Column arrange children using flex layout: alignment (MainAxisAlignment),
 cross alignment (CrossAxisAlignment), spacing, tight, expand on children.
 Container adds padding/margin/bgcolor/border/border_radius/alignment.
 Stack children position via their own left/top/right/bottom.
@@ -270,10 +270,8 @@ class Container(Control):
             cw = ch = 0.0
         w = self._width if self._width is not None else cw + pad_w
         h = self._height if self._height is not None else ch + pad_h
-        # Flutter's parent constraints win over a child's requested size.
-        # This is observable in Flet when, for example, a width=460 card is
-        # placed in a 330px-wide page: it shrinks to the available width
-        # instead of overflowing symmetrically outside the window.
+        # Parent constraints limit the child's requested size. A 460px card
+        # placed in a 330px page shrinks to the available width.
         if max_w is not None:
             w = min(w, max_w)
         if max_h is not None:
@@ -357,7 +355,7 @@ class Stack(Control):
             ws, hs = max(ws, w), max(hs, h)
         w = self._width if self._width is not None else ws
         h = self._height if self._height is not None else hs
-        # flet/Flutter: the Stack itself fits its constraints; oversized
+        # Layout rule: the Stack itself fits its constraints; oversized
         # children still overflow at draw time
         if max_w is not None:
             w = min(w, max_w)
@@ -372,7 +370,7 @@ class Stack(Control):
                 continue
             if k.expand and k.left is None and k.top is None \
                     and k.right is None and k.bottom is None:
-                # flet: an expand child of a Stack stretches to the stack
+                # an expand child of a Stack stretches to the stack
                 k._place(x, y, w, h, scale)
                 continue
             ml, mt, mr, mb = _margins(k)

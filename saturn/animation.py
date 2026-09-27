@@ -1,4 +1,4 @@
-"""Implicit-animation primitives matching Flet 1.0 / Flutter timing."""
+"""Implicit-animation primitives and easing functions."""
 from __future__ import annotations
 
 import math
@@ -9,7 +9,7 @@ from .types import Animation, AnimationCurve, Duration
 
 
 def animation_spec(value) -> tuple[float, AnimationCurve] | None:
-    """Resolve Flet's AnimationValue shorthand to seconds + curve."""
+    """Resolve animation shorthand to seconds and an easing curve."""
     if value is None or value is False:
         return None
     if value is True:
@@ -79,7 +79,7 @@ def _bounce_out(t: float) -> float:
 
 
 def ease(curve: AnimationCurve, t: float) -> float:
-    """Evaluate Flutter-compatible easing. Overshooting curves stay un-clamped."""
+    """Evaluate the selected easing curve. Overshooting curves stay un-clamped."""
     t = max(0.0, min(1.0, float(t)))
     if t in (0.0, 1.0):
         return t

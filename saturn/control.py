@@ -22,7 +22,7 @@ class _Tween:
 
 
 class Control:
-    """Base of all controls. Mirrors flet `Control` + `LayoutControl` subset."""
+    """Base control with layout, state, animation, and event properties."""
 
     def __init__(self, *, visible: bool = True, disabled: bool = False,
                  opacity: float = 1.0, expand: bool | int | None = None,
@@ -36,7 +36,7 @@ class Control:
                  animate_position=None, animate_align=None,
                  animate_margin=None, animate_rotation=None,
                  animate_scale=None, animate_offset=None,
-                 on_animation_end=None, **_flet_ignored):
+                 on_animation_end=None, **_ignored):
         object.__setattr__(self, "_animation_overrides", {})
         object.__setattr__(self, "_animation_targets", {})
         object.__setattr__(self, "_animations", {})

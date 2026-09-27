@@ -4,7 +4,7 @@ Icon button with Expressive size and shape changes.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 405).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 404).
 
 ## Preview
 

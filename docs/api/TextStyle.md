@@ -4,7 +4,7 @@ Combines text size, weight, color, spacing, and other styles.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 352).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 351).
 
 ## Constructor parameters
 

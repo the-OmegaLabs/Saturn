@@ -4,7 +4,7 @@ Configures a hint shown on hover or long press.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 364).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 363).
 
 ## Constructor parameters
 

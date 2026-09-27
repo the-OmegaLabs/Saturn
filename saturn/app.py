@@ -116,7 +116,7 @@ class App:
     def __init__(self, main, backend: Renderer, title: str = "saturn"):
         self._main = main
         self._backend = backend
-        # Flet Window.width/height describe the native outer window. Page
+        # Window.width/height describe the native outer window. Page
         # width/height describe the drawable client area. SDL's Window.size
         # is client-only, so keep the two coordinate spaces separate.
         self._outer_size = [800, 600]
@@ -180,7 +180,7 @@ class App:
             self._backend, self._window,
             logical_size=client, pixel_ratio=self._pixel_ratio)
         # SDL/pygame can retain the set_mode creation size after the native
-        # Window client area is adjusted for Flet's outer-size semantics.
+        # Window client area is adjusted for the requested outer dimensions.
         # Seed every renderer from the authoritative final client size so
         # GL's viewport/scissor and screenshot dimensions match SOFTWARE.
         self.renderer.on_resize(

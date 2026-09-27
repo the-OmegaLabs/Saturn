@@ -4,7 +4,7 @@ How an image scales or crops within a space.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 180).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 179).
 
 **Base class:** `Enum`
 

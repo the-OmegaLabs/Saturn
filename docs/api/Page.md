@@ -23,8 +23,8 @@ Source: [`saturn/page.py`](../../saturn/page.py) (line 165).
 | `pop_dialog(self, dialog=None)` | Closes the current dialog or snackbar. |
 | `update(self)` | Requests a redraw of this control and its changes. |
 | `repaint(self)` | Redraw when geometry has not changed (scroll, hover, ripple). |
-| `run_task(self, handler, *args)` | flet run_task: schedule a coroutine handler on the app's loop. |
-| `take_screenshot(self, path: 'str | None' = None)` | flet-style async screenshot; returns the frame surface (and saves |
+| `run_task(self, handler, *args)` | Schedule a coroutine handler on the application event loop. |
+| `take_screenshot(self, path: 'str | None' = None)` | Return the captured frame surface (and save |
 | `draw(self)` | Requests a draw of the current page. |
 | `handle_event(self, e)` | Handles an incoming control event. |
 | `focus(self, control)` | Gives the control input focus. |

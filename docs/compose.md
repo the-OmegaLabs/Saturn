@@ -48,7 +48,7 @@ saturn.run(main, backend=saturn.Renderer.OPENGL)
 | `ElevatedButton`、`ListItem`、`LoadingIndicator`、`SplitButton`、`ButtonGroup` | Flet 1.0.1 顶层无这些名称 | Saturn 扩展，归入 `Compose`；旧顶层别名暂留供迁移 |
 | `MaterialExpressiveTheme` | Flet 1.0.1 顶层无此名称 | `Compose.Theme` 是 Saturn 扩展 |
 
-**接口边界：**目前不能把 Saturn 描述为 Flet 1.0.1 全量兼容实现。`Control` 的 `**_flet_ignored` 以及若干控件的 `**base` 会接收部分参数但不产生对应效果。后续修复应优先处理常用属性的真实行为；暂不支持的属性应写入文档或显式提示。
+**接口边界：**目前不能把 Saturn 描述为 Flet 1.0.1 全量兼容实现。`Control` 的 `**_ignored` 以及若干控件的 `**base` 会接收部分参数但不产生对应效果。后续修复应优先处理常用属性的真实行为；暂不支持的属性应写入文档或显式提示。
 
 ## 迁移与后续任务
 

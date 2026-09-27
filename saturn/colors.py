@@ -1,7 +1,7 @@
 """Color parsing + Material 3 semantic role resolution.
 
 parse_color is the single ColorValue entry point: hex strings (#RGB, #RRGGBB,
-#AARRGGBB — flet puts alpha first), ints (0xAARRGGBB), (r,g,b) tuples,
+#AARRGGBB with alpha first), ints (0xAARRGGBB), (r,g,b) tuples,
 Colors members, and named values ("red", "red500") or M3 role names
 ("primary", "onSurface") resolved against the active theme brightness.
 """
@@ -11,8 +11,7 @@ import sys
 
 from ._gen.colors import MATERIAL, Colors  # noqa: F401  (re-exported)
 
-# M3 baseline schemes (the classic 2021 spec defaults; Flutter derives these
-# from a seed color now, we ship the baseline tables).
+# Material 3 baseline schemes from the 2021 specification.
 BASELINE_LIGHT = {
     "primary": "6750A4", "onprimary": "FFFFFF",
     "primarycontainer": "EADDFF", "onprimarycontainer": "21005D",
@@ -62,8 +61,7 @@ BASELINE_DARK = {
     "ontertiaryfixed": "FFD8E4", "ontertiaryfixedvariant": "EFB8C8",
 }
 
-# Flutter 3 / Flet 1.0 ColorScheme.fromSeed for Material indigo (#3F51B5),
-# captured from the reference renderer. Keep this exact table for the common
+# Seed palette for Material indigo (#3F51B5). Keep this table for the common
 # named seed while a general HCT generator remains outside Saturn's light
 # dependency budget.
 INDIGO_LIGHT = {
@@ -138,7 +136,7 @@ def system_prefers_dark() -> bool:
 
 
 def apply_seed(seed, *, expressive: bool = False) -> None:
-    """Apply a known Flet ColorScheme.fromSeed table to semantic roles."""
+    """Apply a supported seed palette to semantic color roles."""
     role_overrides.clear()
     if seed is None:
         if expressive and not theme_dark:
@@ -185,20 +183,20 @@ def parse_color(value) -> tuple[int, int, int, int]:
         s = "".join(c * 2 for c in s)
     if len(s) == 6:
         return _hex_to_rgba(s)
-    if len(s) == 8:  # flet/Flutter convention: #AARRGGBB
+    if len(s) == 8:  # Alpha-first hexadecimal: #AARRGGBB
         a = int(s[0:2], 16)
         return (int(s[2:4], 16), int(s[4:6], 16), int(s[6:8], 16), a)
     raise ValueError(f"cannot parse color: {value!r}")
 
 
 def with_opacity(opacity: float, color) -> str:
-    """flet Colors.with_opacity: `color` at the given opacity, as #AARRGGBB
+    """Return `color` at the given opacity as #AARRGGBB
     (parse_color reads it back)."""
     r, g, b, _ = parse_color(color)
     a = round(max(0.0, min(1.0, opacity)) * 255)
     return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
 
 
-# Colors is generated ("do not edit"); flet exposes with_opacity on it, so
-# attach here. Enum classes accept new non-member attributes.
+# Attach the opacity helper outside the generated Colors enum.
+# Enum classes accept new non-member attributes.
 Colors.with_opacity = staticmethod(with_opacity)

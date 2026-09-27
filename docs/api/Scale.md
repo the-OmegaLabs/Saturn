@@ -4,7 +4,7 @@ Horizontal and vertical scale of a control.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 324).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 323).
 
 ## Constructor parameters
 

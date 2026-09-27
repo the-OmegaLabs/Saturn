@@ -13,7 +13,7 @@ LONG1 = 450
 LONG2 = 500
 
 # Private curve names are resolved by ``animation.ease``. Keeping them out of
-# AnimationCurve preserves Flet's public enum while matching Material Web's
+# AnimationCurve keeps general easing names while these match Material Web's
 # exact cubic-bezier values.
 STANDARD = "materialStandard"
 STANDARD_ACCELERATE = "materialStandardAccelerate"

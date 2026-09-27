@@ -67,7 +67,7 @@ _fvar_cache: dict[str, float | None] = {}  # path -> default wght (None: static)
 
 # set by Page.theme (ft.Theme(font_family=...)); None = bundled Inter
 default_family: str | None = None
-# aliases registered via page.fonts = {"name": path} (flet API)
+# aliases registered via page.fonts = {"name": path}
 registered_fonts: dict[str, str] = {}
 font_revision = 0
 
@@ -78,9 +78,8 @@ _icon_cache: dict = {}
 _icon_surface_cache: OrderedDict = OrderedDict()
 _probe_cache: dict[tuple, _freetype.Font] = {}
 _cover_cache: dict[tuple, bool] = {}
-# Flet renders the default ``Icons`` family filled. Saturn's generated icon
-# values are Material Symbols codepoints, so use the FILL=1 static instance of
-# that same font rather than Flet's runtime-ID based Material Icons asset.
+# Generated icon values are Material Symbols codepoints. Use the filled
+# static font instance for the default Icons family.
 # Regular-first async instancing (see module docstring)
 on_weight_ready = None                          # set by App.start(): mark_dirty
 _pending_inst: set[tuple[str, int]] = set()     # (path, wnum) being instanced
@@ -609,9 +608,8 @@ def measure(text: str, size: float, *, scale: float = 1.0, bold: bool = False,
 def line_height(size: float, *, scale: float = 1.0, bold: bool = False,
                 italic: bool = False, family: str | None = None,
                 text: str | None = None, weight: int | None = None) -> float:
-    # Flutter's default text line box is 10/7 of the logical font size. It
-    # is deliberately independent of rasterizer metrics: a 30px Text is a
-    # 43px layout box in Flet even when the rendered glyph bitmap is shorter.
+    # The line box is 10/7 of the logical font size, independent of rasterizer
+    # metrics: a 30px Text has a 43px box even if its glyph bitmap is shorter.
     return float(max(1, round(size * 10 / 7)))
 
 

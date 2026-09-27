@@ -4,7 +4,7 @@ Material Expressive color theme.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 174).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 173).
 
 **Base class:** [Theme](./Theme.md)
 

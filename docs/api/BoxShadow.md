@@ -4,7 +4,7 @@ Spread, blur, color, and offset of a control shadow.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 344).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 343).
 
 ## Constructor parameters
 

@@ -1,4 +1,4 @@
-"""Small desktop service subset compatible with Flet 1.0."""
+"""Desktop file selection and application services."""
 from __future__ import annotations
 
 import asyncio

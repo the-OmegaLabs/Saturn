@@ -4,7 +4,7 @@ Two-dimensional displacement and its hit-test behavior.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 316).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 315).
 
 ## Constructor parameters
 

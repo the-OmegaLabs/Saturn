@@ -1,6 +1,6 @@
 """Dialogs: AlertDialog, SnackBar, DialogControl base.
 
-Usage (flet 1.0):
+Usage:
     page.show_dialog(ft.AlertDialog(title=..., content=..., actions=[...]))
     page.pop_dialog()
     snack = ft.SnackBar(ft.Text("saved")); page.show_dialog(snack)
@@ -225,7 +225,7 @@ class AlertDialog(DialogControl):
 
 
 class SnackBar(DialogControl):
-    # flet: a SnackBar is a notice, not a modal barrier — page stays live
+    # a SnackBar is a notice, not a modal barrier — page stays live
     _barrier = False
 
     def __init__(self, content, *, action=None, bgcolor=None, duration: int = 4000,
@@ -274,9 +274,7 @@ class SnackBar(DialogControl):
                 self.action, on_click=self._on_action)
             action_w = self._action_control._intrinsic(w, h, scale)[0] + 16
             self._action_control._attach(self.page, self)
-        # Flet's default SnackBarBehavior is FIXED: a full-width, square
-        # bar flush with the bottom edge. Floating/margined styling requires
-        # explicit behavior/margin properties and is not the default.
+        # The default snackbar fills the bottom edge with square corners.
         bar_w = w
         bar_h = 48.0
         self._bar_rect = (x, y + h - bar_h, bar_w, bar_h)

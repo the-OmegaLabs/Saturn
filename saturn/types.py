@@ -1,11 +1,11 @@
-"""Enums and value types shared by controls (flet 1.0 subset)."""
+"""Enums and value types shared by Saturn controls."""
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
 
 
-# -- enums (member values mirror flet exactly) --------------------------------
+# -- enums --------------------------------
 class MainAxisAlignment(enum.Enum):
     START = "start"
     END = "end"
@@ -89,7 +89,7 @@ class TooltipTriggerMode(enum.Enum):
 
 
 class AnimationCurve(enum.Enum):
-    """Flet/Flutter animation curve names."""
+    """Available animation easing curves."""
     BOUNCE_IN = "bounceIn"
     BOUNCE_IN_OUT = "bounceInOut"
     BOUNCE_OUT = "bounceOut"
@@ -136,7 +136,7 @@ class AnimationCurve(enum.Enum):
 
 @dataclass
 class Duration:
-    """Flet-compatible duration value."""
+    """Duration value with time-unit conversion helpers."""
     microseconds: int = 0
     milliseconds: int = 0
     seconds: int = 0
@@ -163,11 +163,10 @@ class Animation:
 
 @dataclass
 class Theme:
-    """flet Theme subset. font_family overrides the default UI font
+    """Application theme. font_family overrides the default UI font
     (bundled Inter) for the whole app via page.theme."""
     font_family: str | None = None
-    # ponytail: accepted for flet parity, stored only — M3 tone generation
-    # from the seed (primary/surface hues) when a port needs it
+    # Supported seed colors select a predefined Material 3 role palette.
     color_scheme_seed: str | None = None
 
 
@@ -280,7 +279,7 @@ class BorderSide:
 
 @dataclass
 class OutlineInputBorder:
-    """Flet 1.0 outline border used by form-field controls."""
+    """Outline border configuration for form fields."""
     border_radius: object = 4.0
     side: BorderSide = field(default_factory=BorderSide)
     gap_padding: float = 4.0
@@ -295,7 +294,7 @@ class Border:
 
     @classmethod
     def all(cls, width: float | None = None, color=None):
-        # flet order: Border.all(width, color)
+        # Argument order: Border.all(width, color)
         side = BorderSide(width if width is not None else 1.0, color)
         return cls(side, side, side, side)
 
@@ -363,7 +362,7 @@ class TextStyle:
 
 @dataclass
 class Tooltip:
-    """Flet-compatible tooltip value used by every Control.tooltip."""
+    """Tooltip configuration used by Control.tooltip."""
     message: str
     decoration: object = None
     enable_feedback: bool | None = None
@@ -384,7 +383,7 @@ class Tooltip:
     size_constraints: object = None
 
 
-# -- shorthand resolvers (flet *Value unions) ----------------------------------
+# -- shorthand value resolvers ----------------------------------
 def as_padding(v) -> Padding:
     """PaddingValue: number | Padding | Margin | None."""
     if v is None:

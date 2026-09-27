@@ -1,7 +1,7 @@
-"""Material 3 Expressive API grouped separately from Flet-style controls.
+"""Material 3 Expressive API grouped separately from standard controls.
 
 Most names reuse the existing public classes. Button variants wrap those
-classes to opt into Expressive sizing while the Flet-style defaults stay put.
+classes to opt into Expressive sizing while the standard defaults stay put.
 """
 
 from .types import MaterialExpressiveTheme
