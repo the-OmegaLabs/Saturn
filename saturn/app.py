@@ -685,6 +685,7 @@ def run(main, *, backend: Renderer | None = None, title: str = "saturn"):
     `page.window.height` in the entry point. Only the listed desktop
     startup options are supported; unknown keyword arguments raise TypeError.
     Returns the App handle (after the window closes).
+    The active backend name is available as `page.renderer.name` in main.
     """
     if backend is None:  # explicit selection and test hook via environment
         backend = Renderer(os.environ.get("SATURN_BACKEND", "opengl").lower())

@@ -196,6 +196,7 @@ void main() {
 
 
 class GLRenderer(Renderer):
+    name = "opengl"
     native_texture_scaling = True
     native_shape_overlay = True
     native_geometry = True

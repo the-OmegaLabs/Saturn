@@ -60,7 +60,7 @@ Earlier Saturn callbacks received Page directly. Replace `current_page.width` wi
 
 `page.width` and `page.height` remain read-only **client** dimensions. Set native outer dimensions through `page.window.width` and `.height`. Native constraints, position, stacking, close handling, framing, and `hwnd` are implemented separately; see the [window guide](./window.md) for their platform/backend limits.
 
-Renderer configuration remains a Saturn extension: `page.renderer.anti_aliasing`, `.vsync`, and `.context`. See [Renderer settings](./rendering.md).
+Renderer configuration remains a Saturn extension: `page.renderer.anti_aliasing`, `.vsync`, `.context`, and the read-only `.name` identifying the active backend. See [Renderer settings](./rendering.md).
 
 ## Evidence and acceptance checks
 

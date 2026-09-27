@@ -30,6 +30,8 @@ def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
 
 
 class SoftwareRenderer(Renderer):
+    name = "software"
+
     def __init__(self, window=None, *, logical_size=None,
                  pixel_ratio: float = 1.0, anti_aliasing: bool = True,
                  vsync: bool = True):

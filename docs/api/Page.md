@@ -4,7 +4,7 @@ Application page that manages controls, themes, and dialogs.
 
 [← API index](./README.md)
 
-Source: [`saturn/page.py`](../../saturn/page.py) (line 82).
+Source: [`saturn/page.py`](../../saturn/page.py) (line 88).
 
 **Base class:** [Control](./Control.md)
 
@@ -12,6 +12,7 @@ Source: [`saturn/page.py`](../../saturn/page.py) (line 82).
 
 `page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings
 that default to `True`. `page.renderer.context` exposes the active backend renderer.
+`page.renderer.name` reports `software`, `opengl` or `vulkan`, or `None` before startup.
 See [Renderer settings](../rendering.md) for backend behavior and threading rules.
 
 See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.

@@ -41,11 +41,22 @@ polling waits briefly to avoid spinning a CPU core.
 
 ## Active renderer
 
+`page.renderer.name` is the read-only name of the current backend:
+`"software"`, `"opengl"` or `"vulkan"`. It reads the active context, rather
+than the requested startup setting. It is available inside `main(page)` and
+event handlers; before a native window starts, it returns `None`. A Subpage
+reports its own window's backend.
+
+```python
+print(self.page.renderer.name)  # "vulkan", for example
+```
+
 `page.renderer.context` is the active backend renderer object. It is read-only;
 the backend itself is selected through `saturn.run(..., backend=...)`.
 
 ```python
 context = page.renderer.context
+name = page.renderer.name
 requested = page.renderer.vsync
 actual_native_sync = context.vsync_active
 ```

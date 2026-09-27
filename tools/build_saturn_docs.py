@@ -338,6 +338,7 @@ def page_for(name: str, category: str) -> str:
                 lines += ["## Renderer settings", "",
                           "`page.renderer.anti_aliasing` and `page.renderer.vsync` are boolean settings",
                           "that default to `True`. `page.renderer.context` exposes the active backend renderer.",
+                          "`page.renderer.name` reports `software`, `opengl` or `vulkan`, or `None` before startup.",
                           "See [Renderer settings](../rendering.md) for backend behavior and threading rules.", ""]
                 lines += ["See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.", ""]
             if name == "Window":

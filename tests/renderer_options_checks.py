@@ -25,6 +25,17 @@ def check_dispatch():
     app.renderer = SimpleNamespace(configure=lambda **kw: applied.append(kw))
     settings = _RendererSettings(app)
     assert settings.context is app.renderer
+    app.renderer = None
+    assert settings.name is None
+    app.renderer = SimpleNamespace(name='vulkan',configure=lambda **kw:applied.append(kw))
+    app._backend = Renderer.OPENGL
+    assert settings.name == 'vulkan'  # Inspect the context, not the requested backend.
+    try:
+        settings.name='opengl'
+    except AttributeError:
+        pass
+    else:
+        raise AssertionError('Renderer name must be read-only')
     settings.anti_aliasing = False
     settings.vsync = False
     assert not settings.anti_aliasing and not settings.vsync
@@ -65,6 +76,9 @@ def check_backend(backend):
     renderer = None
     try:
         renderer = create_renderer(backend, window, anti_aliasing=False, vsync=False)
+        settings = _RendererSettings(SimpleNamespace(renderer=renderer))
+        assert settings.name == backend.value
+        assert settings.name == settings.context.name
         for enabled in (False, True, False):
             renderer.configure(anti_aliasing=enabled, vsync=enabled)
             renderer.on_resize(96, 64, pixel_size=(96, 64), pixel_ratio=1)

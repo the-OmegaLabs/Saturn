@@ -650,6 +650,7 @@ class VulkanRenderer(_VulkanSwapchain):
     full-frame CPU pygame surface or swapchain upload in the normal path.
     """
 
+    name = "vulkan"
     _VERTEX_FLOATS = 25
     _VERTEX_STRIDE = _VERTEX_FLOATS * 4
     native_texture_scaling = True

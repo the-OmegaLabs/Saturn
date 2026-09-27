@@ -54,6 +54,12 @@ class _RendererSettings:
         self._app = app
 
     @property
+    def name(self) -> str | None:
+        """Active backend: software, opengl or vulkan; None before startup."""
+        context = self.context
+        return context.name if context is not None else None
+
+    @property
     def anti_aliasing(self) -> bool:
         return self._app._anti_aliasing
 
