@@ -24,6 +24,12 @@ classifiers = [
 [project.optional-dependencies]
 web = ["fastapi>=0.115", "uvicorn>=0.30", "websockets>=13"]
 
+[dependency-groups]
+examples = ["fastapi>=0.115", "uvicorn>=0.30", "websockets>=13"]
+
+[tool.uv]
+default-groups = ["examples"]
+
 [[project.authors]]
 name = "Stevesuk"
 email = "stevesukawa@outlook.com"

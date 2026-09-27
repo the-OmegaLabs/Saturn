@@ -655,6 +655,14 @@ web = [
     { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
+[package.dev-dependencies]
+examples = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+    { name = "websockets", version = "16.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "websockets", version = "17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "brotli", specifier = ">=1.1.0" },
@@ -670,6 +678,13 @@ requires-dist = [
     { name = "websockets", marker = "extra == 'web'", specifier = ">=13" },
 ]
 provides-extras = ["web"]
+
+[package.metadata.requires-dev]
+examples = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "uvicorn", specifier = ">=0.30" },
+    { name = "websockets", specifier = ">=13" },
+]
 
 [[package]]
 name = "saturn-fonts-cjk"

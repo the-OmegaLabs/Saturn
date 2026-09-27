@@ -1,12 +1,16 @@
 """Full Saturn demo showing the core controls together.
 
 Run with:
-    .venv/Scripts/python.exe examples/demo.py                     # OPENGL
-    .venv/Scripts/python.exe examples/demo.py --backend vulkan    # VULKAN
+    uv run examples/demo.py                          # Web
+    uv run examples/demo.py --port 12342             # Web, preferred port
+    uv run examples/demo.py --backend opengl         # Native OpenGL
+    uv run examples/demo.py --backend vulkan         # Native Vulkan
 """
 import argparse
 
 import saturn
+import saturn.web
+
 from demo_common import DEMO_HEIGHT, DEMO_WIDTH, brand_header, demo_panel
 
 
@@ -98,12 +102,28 @@ class Application:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", choices=("opengl", "vulkan", "software"),
-                        default="opengl")
-    name = parser.parse_args().backend
-    backend = {
-        "opengl": saturn.Renderer.OPENGL,
-        "vulkan": saturn.Renderer.VULKAN,
-        "software": saturn.Renderer.SOFTWARE,
-    }[name]
-    app = saturn.run(main=Application().create_window, backend=backend)
+    parser.add_argument('--port', type=int, default=12342)
+    parser.add_argument('--backend', choices=('opengl','vulkan','software'))
+    args = parser.parse_args()
+    if args.backend:
+        backend = {'opengl':saturn.Renderer.OPENGL, 'vulkan':saturn.Renderer.VULKAN,
+                   'software':saturn.Renderer.SOFTWARE}[args.backend]
+        saturn.run(main=Application().create_window,backend=backend)
+    else:
+        import errno
+        import socket
+        import uvicorn
+        with socket.socket() as listener:
+            try:
+                listener.bind(('127.0.0.1',args.port))
+            except OSError as error:
+                if error.errno != errno.EADDRINUSE and getattr(error,'winerror',None) != 10048:
+                    raise
+                listener.bind(('127.0.0.1',0))
+                print(f'Port {args.port} is already in use; using an available port.',flush=True)
+            port=listener.getsockname()[1]
+            listener.listen(2048)
+            print(f'Saturn demo: http://127.0.0.1:{port}/',flush=True)
+            config=uvicorn.Config(saturn.web.create_app(Application().create_window),
+                                  host='127.0.0.1',port=port)
+            uvicorn.Server(config).run(sockets=[listener])

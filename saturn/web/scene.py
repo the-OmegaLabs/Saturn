@@ -50,7 +50,7 @@ def css(value):
 
 def build_scene(session, view):
     import pygame
-    from ..widgets import Text, Container, Row, Column, Stack, TextField, Checkbox, Switch, ListView, Image, Divider
+    from ..widgets import Text, Container, Row, Column, Stack, TextField, Checkbox, Switch, ListView, Image, Divider, Icon, IconButton, Slider, Dropdown, ProgressRing, ProgressBar, AlertDialog, SnackBar
     from ..widgets.shader import Shader
     from ..widgets.buttons import FilledButton
     ButtonBase = FilledButton.__mro__[1]
@@ -83,7 +83,11 @@ def build_scene(session, view):
         node = dict(id=identifier, kind=kind, bounds=list(bounds), **props)
         nodes[identifier] = node
         order.append(identifier)
-    def walk(control, disabled=False, clips=(), offset=(0, 0), opacity=1, scrollers=(), animation=None):
+    def icon_font():
+        if 'SaturnIcons' not in fonts:
+            fonts['SaturnIcons'] = session.runtime.resources.register(text.ICON_FONT_PATH)
+        return 'SaturnIcons'
+    def walk(control, disabled=False, clips=(), offset=(0, 0), opacity=1, scrollers=(), animation=None, overlay=False):
         active.add(control)
         identifier = session.control_id(control)
         if not control.visible:
@@ -94,7 +98,7 @@ def build_scene(session, view):
         bounds = (x, y, w, h)
         opacity *= object.__getattribute__(control, '__dict__').get('opacity', control.opacity)
         common = dict(control=identifier, disabled=disabled, opacity=opacity,
-                      clips=[list(c) for c in clips], scrollers=list(scrollers))
+                      clips=[list(c) for c in clips], scrollers=list(scrollers), overlay=overlay)
         spec = animation_spec(control.animate_opacity)
         if spec:
             animation = dict(duration=spec[0]*1000, curve=getattr(spec[1], 'value', 'linear'))
@@ -107,14 +111,43 @@ def build_scene(session, view):
                 weight=text.weight_num(control.weight), italic=control.italic,
                 font=font(control.font_family), color=css(control.color or "onsurface"), align=align, **common)
         elif isinstance(control, ButtonBase):
-            _, _, _, _, size, weight, _, _ = control._metrics()
+            _, _, icon_size, gap, size, weight, _, _ = control._metrics()
+            icon = control.icon
+            glyph = chr(int(icon)) if isinstance(icon, int) else None
             add(identifier, "button", bounds, text=control._label(), size=size,
                 weight=weight, font=font(), color=css(control._fg_raw()),
                 background=css(control._bg() or "transparent"), radius=control._radius(h),
                 border=css(control.variant_border) if control.variant_border else None,
-                clickable=bool(control.on_click), **common)
+                clickable=bool(control.on_click), icon=glyph, icon_font=icon_font() if glyph else None,
+                icon_size=icon_size, icon_gap=gap, **common)
             for child in control._children():
-                walk(child, disabled, clips, offset, opacity, scrollers, animation)
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
+        elif isinstance(control, (Icon, IconButton)):
+            interactive = isinstance(control, IconButton)
+            icon = control._current_icon() if interactive else control.icon
+            glyph = chr(int(icon)) if isinstance(icon, int) else ''
+            add(identifier, 'button' if interactive else 'icon', bounds, text='',
+                icon=glyph, icon_font=icon_font(), icon_size=control.icon_size if interactive else control.size,
+                icon_gap=0, size=14, font=font(), color=css((control.icon_color if interactive else control.color) or 'primary'),
+                background=css((control.bgcolor if interactive else None) or 'transparent'),
+                radius=h/2, clickable=interactive and bool(control.on_click),
+                aria_label=str(control.tooltip or 'Icon button') if interactive else '', **common)
+            for child in control._children():
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
+        elif isinstance(control, Slider):
+            add(identifier, 'slider', bounds, value=control.value, minimum=control.min,
+                maximum=control.max, step=(control.max-control.min)/control.divisions if control.divisions else 'any',
+                color=css(control.active_color or 'primary'), label=control.label or 'Slider', **common)
+        elif isinstance(control, Dropdown):
+            add(identifier, 'select', bounds, value=control.value, label=control.label or control.hint_text or 'Dropdown',
+                placeholder=control.hint_text or control.label or 'Select…',
+                options=[dict(key=o.key, text=o.text or str(o.key), disabled=o.disabled) for o in control.options if o.visible],
+                size=control.text_size or 16, font=font(), color=css(control.color or 'onsurface'),
+                background=css(control.bgcolor or 'surfacecontainerhighest'), border=css(control.border_color or 'outline'), **common)
+        elif isinstance(control, (ProgressRing, ProgressBar)):
+            add(identifier, 'progress', bounds, value=control.value, circular=isinstance(control,ProgressRing),
+                stroke=getattr(control,'stroke_width',4), color=css(control.color or 'primary'),
+                background=css(control.bgcolor or 'secondarycontainer'), **common)
         elif isinstance(control, TextField):
             add(identifier, "input", bounds, value=str(control.value), label=control.label,
                 placeholder=control.hint_text or "", password=control.password,
@@ -128,7 +161,7 @@ def build_scene(session, view):
         elif isinstance(control, (Checkbox, Switch)):
             add(identifier, "toggle", bounds, label=str(control.label or ""),
                 value=bool(control.value), size=14, font=font(),
-                color=css("onsurface"), background=css("primary"), **common)
+                color=css("onsurface"), background=css("primary"), toggle_type='switch' if isinstance(control,Switch) else 'checkbox', **common)
         elif isinstance(control, ListView):
             add(identifier, "scroll", bounds, content_size=control._content_size,
                 horizontal=control.horizontal, offset=control._offset, **common)
@@ -138,7 +171,7 @@ def build_scene(session, view):
             for child in candidates:
                 child._place(*child._rect, 1)
                 walk(child, disabled, (*clips, bounds), offset, opacity,
-                     (*scrollers, [identifier, control.horizontal]), animation)
+                     (*scrollers, [identifier, control.horizontal]), animation, overlay)
         elif isinstance(control, Container):
             radius = control.border_radius
             if radius is not None and not isinstance(radius, (int, float)):
@@ -146,17 +179,38 @@ def build_scene(session, view):
             add(identifier, "rect", bounds, background=css(control.bgcolor or "transparent"),
                 radius=radius or 0, clickable=bool(getattr(control, "on_click", None)), **common)
             for child in control._children():
-                walk(child, disabled, clips, offset, opacity, scrollers, animation)
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
         elif isinstance(control, (Row, Column, Stack, RadioGroup)):
             for child in control._children():
-                walk(child, disabled, clips, offset, opacity, scrollers, animation)
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
         elif isinstance(control, Divider):
             add(identifier, "rect", (x, y+h/2, w, control.thickness),
                 background=css(control.color or "outlinevariant"), radius=0, **common)
         elif isinstance(control, Image):
             if not isinstance(control.src, str) or control.src.startswith(("http:", "https:", "data:")):
                 raise NotImplementedError("Web Image currently requires a local file path")
-            add(identifier, "image", bounds, resource=session.runtime.resources.register(control.src), **common)
+            add(identifier, "image", bounds, resource=session.runtime.resources.register(control.src),
+                fit=getattr(control.fit,'value',control.fit) or 'contain', tint=css(control.color) if control.color else None,
+                radius=control.border_radius if isinstance(control.border_radius,(int,float)) else 0, **common)
+        elif isinstance(control, AlertDialog):
+            add(identifier, 'barrier', bounds, background=css(control.barrier_color or '#52000000'),
+                clickable=not control.modal, aria_label='Dismiss dialog', **common)
+            add(identifier+':card', 'rect', control._card_rect, background=css(control.bgcolor or 'surfacecontainerhigh'),
+                radius=28, block_pointer=True, dialog_title=control._title_text(), **common)
+            if control._title_text():
+                add(identifier+':title', 'text', control._title_rect, text=control._title_text(), lines=[control._title_text()],
+                    size=24, weight=500, italic=False, font=font(), line_height=control._title_rect[3],
+                    color=css('onsurface'), align='start', **common)
+            for child in control._children():
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
+        elif isinstance(control, SnackBar):
+            add(identifier, 'rect', control._bar_rect, background=css(control.bgcolor or 'inversesurface'), radius=4, **common)
+            if isinstance(control.content,str):
+                tx,ty=control._text_position
+                add(identifier+':text','text',(tx,ty,control._bar_rect[2]-32,24), text=control.content,lines=[control.content],
+                    size=14,weight=400,italic=False,font=font(),line_height=24,color=css('oninversesurface'),align='start', **common)
+            for child in control._children():
+                walk(child, disabled, clips, offset, opacity, scrollers, animation, overlay)
         elif isinstance(control, Shader):
             add(identifier, "rect", bounds, background=css(control.fallback_color or control.color), radius=0, **common)
         else:
@@ -181,9 +235,11 @@ def build_scene(session, view):
                        max(0, view.height-p.top-p.bottom), 1)
             for control in page.controls:
                 if page.visible:
-                    walk(control, page.disabled, opacity=page.opacity)
+                    walk(control, page.disabled or any(isinstance(o,AlertDialog) for o in page.overlay), opacity=page.opacity)
             for control in page.overlay:
-                walk(control, page.disabled)
+                if getattr(control,'_overlay_fill',False):
+                    control._place(0,0,view.width,view.height,1)
+                walk(control, page.disabled, overlay=True)
             background = css(page.bgcolor or "surface")
         # Removed controls cannot remain valid event targets.
         for control in list(session.ids):

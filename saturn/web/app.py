@@ -235,6 +235,8 @@ class WebRuntime:
             node = view.scene.get('nodes', {}).get(message.get('control'))
             if node is None or node['kind'] != 'scroll':
                 raise ValueError("Unknown scroll target")
+            if node.get('disabled'):
+                raise ValueError("Scroll target is disabled")
             offset = message.get('offset', 0)
             if not isinstance(offset, (int, float)) or not math.isfinite(offset):
                 raise ValueError("Invalid scroll offset")
@@ -263,23 +265,66 @@ class WebRuntime:
         if control is None or node is None:
             raise ValueError("Control does not belong to this view")
         name = message.get('name')
-        from ..widgets import TextField, Checkbox, Switch, Container
+        from ..widgets import TextField, Checkbox, Switch, Container, IconButton, Slider, Dropdown
+        from ..widgets.dialogs import DialogControl
         from ..widgets.buttons import FilledButton
-        supported = {'click'} if isinstance(control, (FilledButton.__mro__[1], Container)) else (
+        supported = {'dismiss'} if isinstance(control,DialogControl) else (
+            {'click'} if isinstance(control, (FilledButton.__mro__[1], Container, IconButton)) else (
             {'change', 'focus', 'blur', 'submit'} if isinstance(control, TextField) else
-            {'change'} if isinstance(control, (Checkbox, Switch)) else set())
+            {'change','change_start','change_end'} if isinstance(control,Slider) else
+            {'select'} if isinstance(control,Dropdown) else
+            {'change'} if isinstance(control, (Checkbox, Switch)) else set()))
         if name not in supported:
             raise ValueError("Event is not supported by this control")
         event = WebEvent(name, control, data=message.get('value'),
                          session=session.id, client_id=view.client_id, message_id=identifier)
         ack = dict(type='ack', id=identifier, control=control_id, version=message.get('version', 0))
         async def apply():
+            if node.get('disabled'):
+                raise ValueError("Control is disabled in this view")
+            from ..widgets import AlertDialog
+            barriers=[o for o in session.page.overlay if isinstance(o,AlertDialog)]
+            if barriers:
+                ancestors=[]
+                ancestor=control
+                while ancestor is not None:
+                    ancestors.append(ancestor)
+                    ancestor=ancestor.parent
+                if barriers[-1] not in ancestors:
+                    raise ValueError("Control is behind an open dialog")
             parent = control
             while parent is not None:
                 if not parent.visible or parent.disabled or parent.page is not session.page:
                     raise ValueError("Control is disabled, hidden or detached")
                 parent = parent.parent
-            if name == 'change':
+            if name == 'dismiss':
+                if control.modal:
+                    raise ValueError("Modal dialog cannot be dismissed by its barrier")
+                session.page.pop_dialog(control)
+                return
+            elif isinstance(control,Slider):
+                value=message.get('value')
+                if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):
+                    raise ValueError("Slider value must be finite")
+                value=max(control.min,min(control.max,value))
+                if control.divisions and control.max>control.min:
+                    step=(control.max-control.min)/control.divisions
+                    value=control.min+round((value-control.min)/step)*step
+                if control.round:
+                    value=round(value,control.round)
+                event.data=value
+                if name=='change':
+                    control.value=value
+                    session.page.update()
+            elif name == 'select':
+                option=next((o for o in control.options if o.key==message.get('value') and o.visible and not o.disabled),None)
+                if option is None:
+                    raise ValueError("Unknown or disabled Dropdown option")
+                control.value=option.key
+                control.text=option.text or str(option.key)
+                event.data=option.key
+                session.page.update()
+            elif name == 'change':
                 if isinstance(control, TextField):
                     if control.read_only:
                         raise ValueError("TextField is read-only")

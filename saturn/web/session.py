@@ -10,8 +10,8 @@ from uuid import uuid4
 from ..event import _invoke, normalize_handlers
 from ..page import Page
 from ..types import ThemeMode
-from .context import NativeWindowUnavailable, current_session, current_view
-from .events import WebEvents
+from .context import WebWindow, current_session, current_view
+from .events import WebEvents, WebEvent
 
 
 async def invoke(fn, *args):
@@ -168,7 +168,7 @@ class WebPage(Page):
 
     def __init__(self, session):
         super().__init__(SessionApp(session))
-        self.window = NativeWindowUnavailable()
+        self.window = WebWindow(self)
         self._web = WebSettings(self)
         self._title = "Saturn Web"
         self._platform_brightness = "light"
@@ -228,6 +228,43 @@ class WebPage(Page):
     def open_subpage(self, *args, **kwargs):
         raise NotImplementedError("Native Subpages require a desktop runtime")
 
+    def show_dialog(self, dialog):
+        from ..widgets.dialogs import DialogControl,SnackBar
+        if not isinstance(dialog,DialogControl):
+            raise TypeError("show_dialog expects AlertDialog or SnackBar")
+        if dialog in self.overlay:
+            return
+        dialog.open=True
+        self.overlay.append(dialog)
+        self.update()
+        if isinstance(dialog,SnackBar):
+            self._dispatch(dialog.on_visible, WebEvent('visible',dialog,
+                session=self.web.session,client_id=self.web.client_id))
+            duration=getattr(dialog.duration,'in_milliseconds',dialog.duration)
+            if duration and duration>0 and not (dialog.persist is True or (dialog.persist is None and dialog.action)):
+                session=self._app.session
+                view=current_view.get()
+                def timer():
+                    if session.closed or dialog not in self.overlay:
+                        return
+                    handle=session.runtime.loop.call_later(duration/1000,
+                        lambda: session.enqueue([lambda:self.pop_dialog(dialog)],None,view))
+                    session.dialog_timers[dialog]=handle
+                session.runtime.schedule(timer)
+
+    def pop_dialog(self, dialog=None):
+        if dialog is None:
+            dialog=self.overlay[-1] if self.overlay else None
+        if dialog not in self.overlay:
+            return
+        if timer:=self._app.session.dialog_timers.pop(dialog,None):
+            timer.cancel()
+        self.overlay.remove(dialog)
+        dialog.open=False
+        self._dispatch(dialog.on_dismiss, WebEvent('dismiss',dialog,
+            session=self.web.session,client_id=self.web.client_id))
+        self.update()
+
     def run_task(self, *args, **kwargs):
         raise NotImplementedError("Web background tasks must be owned by the ASGI application's lifespan")
 
@@ -255,6 +292,7 @@ class Session:
         self.revision = self.sequence = 0
         self.input_revisions, self.input_owners = {}, {}
         self.on_connect = self.on_disconnect = None
+        self.dialog_timers = {}
         self.queue = asyncio.Queue(maxsize=runtime.max_pending_events)
         self.lock = asyncio.Lock()
         self.worker = self.flush = self.expiry = None
@@ -338,6 +376,9 @@ class Session:
         self.page._app._closed.set()
         if self.expiry:
             self.expiry.cancel()
+        for timer in self.dialog_timers.values():
+            timer.cancel()
+        self.dialog_timers.clear()
         tasks = [t for t in (self.worker, self.flush) if t and t is not asyncio.current_task()]
         for task in tasks:
             task.cancel()

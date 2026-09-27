@@ -17,6 +17,13 @@ class WebEvent(ControlEvent):
     width: int = 0
     height: int = 0
 
+    def __post_init__(self):
+        self._page = self.control.page
+
+    @property
+    def page(self):
+        return self._page
+
 
 class WebEvents:
     def __init__(self, settings):
