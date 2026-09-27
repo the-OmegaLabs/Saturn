@@ -76,6 +76,12 @@ class _VulkanSwapchain(SoftwareRenderer):
             (size[0] * self._aa_scale, size[1] * self._aa_scale),
             pygame.SRCALPHA, 32)
         self._clip: list[tuple] = []
+        # SoftwareRenderer's clip helpers also track transformed raster layers.
+        # Vulkan windows cannot run its constructor (there is no SDL Surface).
+        self._transform_layers = []
+        self._transform_translation = (0.0, 0.0)
+        self._buf_origin = (0.0, 0.0)
+        self._layer_empty = False
         self._apply_clip()
 
         self._closed = False
@@ -708,6 +714,13 @@ class VulkanRenderer(_VulkanSwapchain):
         self._gpu_white = self._upload_texture(
             pygame.Surface((1, 1), pygame.SRCALPHA, 32),
             pixels=b"\xff\xff\xff\xff")
+
+    def transform_push(self, matrix, *, bounds=None):
+        # GPU vertices use the common matrix stack, never software bitmap layers.
+        Renderer.transform_push(self, matrix, bounds=bounds)
+
+    def transform_pop(self):
+        Renderer.transform_pop(self)
 
     def _create_gpu_globals(self):
         binding = vk.VkDescriptorSetLayoutBinding(
