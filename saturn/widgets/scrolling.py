@@ -6,6 +6,7 @@ auto_scroll, scroll_to()); GestureDetector(content, on_tap, on_hover...).
 from __future__ import annotations
 
 import time
+import math
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 
@@ -26,6 +27,103 @@ _SCROLLBAR_FADE_DELAY = 0.6
 _SCROLLBAR_IDLE_OPACITY = 0.48
 _SCROLLBAR_ACTIVE_OPACITY = 0.64
 _OVERSCAN = 96.0  # logical pixels for shadows and nearby incoming rows
+
+
+def _elevation_outset(state):
+    overrides = state.get("_animation_overrides", {})
+    elevation = max(float(state.get("_elevation_progress") or 0),
+                    float(overrides.get("_elevation_progress") or 0))
+    if elevation <= 0:
+        return 0.0
+    # Native shadow envelope plus the rounding allowance for the reduced
+    # software blur intermediate (as small as half a logical pixel scale).
+    return math.ceil(3 * max(1 + elevation * .7, .5 + elevation * .8)
+                     + elevation * .5) + 4
+
+
+def _has_paint_overflow(control, width, height):
+    """Cheap declaration scan; ordinary row trees need no bounds math."""
+    state = object.__getattribute__(control, "__dict__")
+    overrides = state.get("_animation_overrides", {})
+    if (state.get("shadow") or state.get("offset") is not None or
+            overrides.get("shadow") or overrides.get("offset") is not None):
+        return True
+    if "_elevation_progress" in state and _elevation_outset(state) > _OVERSCAN:
+        return True
+    if isinstance(control, Container) and state.get("border_radius"):
+        return False
+    children = state.get("controls")
+    if children is None:
+        content = state.get("content")
+        children = (content,) if isinstance(content, Control) else ()
+    for child in children:
+        if not isinstance(child, Control):
+            continue
+        child_state = object.__getattribute__(child, "__dict__")
+        if not child_state.get("visible", True):
+            continue
+        if (child_state.get("left") or child_state.get("top") or
+                child_state.get("_width") is not None or
+                child_state.get("_height") is not None or
+                _has_paint_overflow(child, width, height)):
+            return True
+    return False
+
+
+def _paint_outsets(control, width, height):
+    """Conservative overflow for declared shadows, offsets and Stack boxes.
+
+    Descendants outside a rounded Container are clipped. Other descendants
+    may paint outside the row; their overflow contributes to the row guard.
+    Read both the current animated value and its target so an animation
+    cannot disappear halfway through a paint-only frame.
+    """
+    state = object.__getattribute__(control, "__dict__")
+    overrides = state.get("_animation_overrides", {})
+    elevation = _elevation_outset(state) if "_elevation_progress" in state else 0.0
+    left = top = right = bottom = elevation
+    for shadow in (state.get("shadow"), overrides.get("shadow")):
+        for sh in shadow if isinstance(shadow, list) else ([shadow] if shadow else []):
+            grow = max(0.0, float(sh.blur_radius)) + float(sh.spread_radius or 0.0)
+            left = max(left, grow - sh.offset.x)
+            top = max(top, grow - sh.offset.y)
+            right = max(right, grow + sh.offset.x)
+            bottom = max(bottom, grow + sh.offset.y)
+    # Container clips descendants after drawing its own shadow/background.
+    clipped = isinstance(control, Container) and state.get("border_radius")
+    if not clipped:
+        children = state.get("controls")
+        if children is None:
+            content = state.get("content")
+            children = [content] if content is not None else ()
+        for child in children:
+            if not isinstance(child, Control):
+                continue
+            child_state = object.__getattribute__(child, "__dict__")
+            if not child_state.get("visible", True):
+                continue
+            cw = max(width, float(child_state.get("_width") or 0.0))
+            ch = max(height, float(child_state.get("_height") or 0.0))
+            cl, ct, cr, cb = _paint_outsets(child, cw, ch)
+            # Absolute Stack positions and oversized descendants can escape
+            # even without an offset or shadow on the top-level row.
+            cx = float(child_state.get("left") or 0.0)
+            cy = float(child_state.get("top") or 0.0)
+            left = max(left, cl - cx)
+            top = max(top, ct - cy)
+            right = max(right, cr + cx + cw - width)
+            bottom = max(bottom, cb + cy + ch - height)
+    min_x = min_y = max_x = max_y = 0.0
+    for offset in (state.get("offset"), overrides.get("offset")):
+        if offset is not None:
+            dx, dy = offset if isinstance(offset, tuple) else (offset.x, offset.y)
+            min_x, min_y = min(min_x, dx), min(min_y, dy)
+            max_x, max_y = max(max_x, dx), max(max_y, dy)
+    left += -min_x * width
+    top += -min_y * height
+    right += max_x * width
+    bottom += max_y * height
+    return left, top, right, bottom
 
 
 class ListView(Control):
@@ -66,6 +164,9 @@ class ListView(Control):
         self._layout_item_extent = None
         self._intrinsic_cache = OrderedDict()
         self._geometry_cache = OrderedDict()
+        self._paint_outsets = {}
+        self._overflow_controls = []
+        self._paint_guard_before = self._paint_guard_after = 0.0
         self._scrollbar_dragging = False
         self._scrollbar_drag_delta = 0.0
         self._scrollbar_hovered = False
@@ -92,6 +193,7 @@ class ListView(Control):
         controls = tuple(self.controls)
         layout_dirty = (self.page is None or
                         getattr(self.page, "_layout_dirty", True))
+        rescan_outsets = layout_dirty or self._layout_controls != controls
         # A paint-only resize may change the viewport without changing row
         # content. Content updates mark the page layout dirty and invalidate
         # these variable-height measurements.
@@ -117,6 +219,8 @@ class ListView(Control):
             if self.auto_scroll:
                 self._offset = max(0.0, self._content_size - view)
             self._lazy_layout_version.clear()
+            if self._overflow_controls:
+                self._refresh_paint_outsets()
             self._layout_lazy_candidates(scale)
             return
         # A drag often revisits the last few widths. For variable-height
@@ -150,6 +254,8 @@ class ListView(Control):
                                        max(0.0, total - view)))
             if self.auto_scroll:
                 self._offset = max(0.0, total - view)
+            if self._overflow_controls:
+                self._refresh_paint_outsets()
             self._layout_lazy_candidates(scale)
             return
         self._rect = (x, y, w, h)
@@ -260,6 +366,7 @@ class ListView(Control):
             starts[i] >= starts[i - 1] and ends[i] >= ends[i - 1]
             for i in range(1, len(starts)))
         self._content_size = max(0.0, total - self.spacing)
+        self._refresh_paint_outsets(rescan=rescan_outsets)
         if not self.horizontal and not fixed_axis_layout:
             self._geometry_cache[geometry_key] = (
                 placed, starts, ends, self._ordered_items,
@@ -372,9 +479,32 @@ class ListView(Control):
     def _candidates(self, low, high):
         if not self._ordered_items:
             return self._placed_controls
+        # A row below the viewport can cast a shadow upward, and a row
+        # above it can cast one downward. Keep the bisect path while using
+        # bounds derived from actual declared effects, not a fixed limit.
+        low -= self._paint_guard_after
+        high += self._paint_guard_before
         first = bisect_left(self._item_ends, low)
         last = bisect_right(self._item_starts, high)
         return self._placed_controls[first:last]
+
+    def _refresh_paint_outsets(self, *, rescan=False):
+        outsets = {}
+        before = after = 0.0
+        axis = 0 if self.horizontal else 1
+        if rescan:
+            self._overflow_controls = [
+                child for child in self._placed_controls
+                if _has_paint_overflow(child, child._rect[2], child._rect[3])]
+        for child in self._overflow_controls:
+            width, height = child._rect[2], child._rect[3]
+            overflow = _paint_outsets(child, width, height)
+            if any(overflow):
+                outsets[child] = overflow
+                before = max(before, overflow[axis])
+                after = max(after, overflow[axis + 2])
+        self._paint_outsets = outsets
+        self._paint_guard_before, self._paint_guard_after = before, after
 
     def _layout_lazy_candidates(self, scale):
         x, y, w, h = self._rect
@@ -413,9 +543,10 @@ class ListView(Control):
                                       axis_start + axis_size + guard):
                 if c.visible:
                     cx, cy, cw, ch = c._rect
+                    pl, pt, pr, pb = self._paint_outsets.get(c, (0, 0, 0, 0))
                     if (cw > 0 and ch > 0 and
-                            (cx + cw < left or cx > right or
-                             cy + ch < top or cy > bottom)):
+                            (cx + cw + pr < left or cx - pl > right or
+                             cy + ch + pb < top or cy - pt > bottom)):
                         continue
                     c._draw_all(r, ox - off_x, oy - off_y)
             r.clip_pop()

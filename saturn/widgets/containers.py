@@ -258,18 +258,23 @@ class Container(Control):
         return [self.content] if self.content is not None else []
 
     def _intrinsic(self, max_w, max_h, scale):
-        padding = as_padding(self.padding)
+        state = object.__getattribute__(self, "__dict__")
+        overrides = state.get("_animation_overrides")
+        if overrides:
+            state = state | overrides
+        padding = as_padding(state["padding"])
         pad_w = padding.left + padding.right
         pad_h = padding.top + padding.bottom
-        if self.content is not None:
-            cw, ch = self.content._intrinsic(
+        content = state["content"]
+        if content is not None:
+            cw, ch = content._intrinsic(
                 max(0.0, max_w - pad_w) if max_w is not None else None,
                 max(0.0, max_h - pad_h) if max_h is not None else None,
                 scale)
         else:
             cw = ch = 0.0
-        w = self._width if self._width is not None else cw + pad_w
-        h = self._height if self._height is not None else ch + pad_h
+        w = state["_width"] if state["_width"] is not None else cw + pad_w
+        h = state["_height"] if state["_height"] is not None else ch + pad_h
         # Parent constraints limit the child's requested size. A 460px card
         # placed in a 330px page shrinks to the available width.
         if max_w is not None:

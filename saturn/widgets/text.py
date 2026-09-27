@@ -42,52 +42,87 @@ class Text(Control):
 
     # -- layout hooks (flex engine drives these) ---------------------------
     def _intrinsic(self, max_w, max_h, scale):
-        key = (self.value, self.size, self.weight, self.italic,
-               self.font_family, font_state.default_family,
-               font_state.font_revision, self.no_wrap, self.max_lines,
-               max_w, scale, self._width, self._height)
-        cached = self._measure_cache.get(key)
-        if cached is not None:
-            self._measure_cache.move_to_end(key)
-            return cached
-        kw = self._style(scale)
-        if self.no_wrap:
-            # Explicit newlines still create lines when soft wrapping is off.
-            lines = self.value.split("\n")[:self.max_lines]
-            w = max((line_width(line, self.size, **kw) for line in lines),
-                    default=0.0)
-            h = line_height(self.size, scale=scale,
-                            family=family_for(self.value, self.font_family)) * len(lines)
+        # Measuring many ordinary Text controls should not repeatedly look
+        # up the same animation override map for every style field. Custom
+        # subclasses keep normal attribute/property resolution.
+        if type(self) is Text:
+            state = object.__getattribute__(self, "__dict__")
+            overrides = state["_animation_overrides"]
+            if overrides:
+                state = state | overrides
+            value, size = state["value"], state["size"]
+            weight, italic = state["weight"], state["italic"]
+            family = state["font_family"]
+            no_wrap, max_lines = state["no_wrap"], state["max_lines"]
+            fixed_w, fixed_h = state["_width"], state["_height"]
+            cache = state["_measure_cache"]
         else:
-            lines = self._wrapped(max_w if max_w is not None else 10_000,
-                                  scale, kw)
-            w = max((line_width(l, self.size, **kw) for l in lines),
+            value, size = self.value, self.size
+            weight, italic, family = self.weight, self.italic, self.font_family
+            no_wrap, max_lines = self.no_wrap, self.max_lines
+            fixed_w, fixed_h, cache = self._width, self._height, self._measure_cache
+        key = (value, size, weight, italic, family,
+               font_state.default_family, font_state.font_revision,
+               no_wrap, max_lines, max_w, scale, fixed_w, fixed_h)
+        cached = cache.get(key)
+        if cached is not None:
+            cache.move_to_end(key)
+            return cached
+        kw = dict(scale=scale, weight=weight_num(weight), italic=italic,
+                  family=family_for(value, family))
+        available = max_w if max_w is not None else 10_000
+        single_width = None
+        if "\n" not in value and (max_lines is None or max_lines >= 1):
+            candidate = line_width(value, size, **kw)
+            if no_wrap or candidate <= available:
+                single_width = candidate
+        if single_width is not None:
+            # Exact common case: neither a wrapping cache nor a second
+            # width lookup is needed to measure an unbroken fitting line.
+            w, h = single_width, line_height(size, scale=scale, family=kw["family"])
+        elif no_wrap:
+            # Explicit newlines still create lines when soft wrapping is off.
+            lines = value.split("\n")[:max_lines]
+            w = max((line_width(line, size, **kw) for line in lines),
                     default=0.0)
-            h = line_height(self.size, scale=scale,
-                            family=family_for(self.value, self.font_family)) * len(lines)
-        if self._width is not None:
-            w = self._width
-        if self._height is not None:
-            h = self._height
-        self._measure_cache[key] = (w, h)
-        if len(self._measure_cache) > 4:
-            self._measure_cache.popitem(last=False)
+            h = line_height(size, scale=scale, family=kw["family"]) * len(lines)
+        else:
+            lines = self._wrapped(available, scale, kw)
+            w = max((line_width(l, size, **kw) for l in lines),
+                    default=0.0)
+            h = line_height(size, scale=scale, family=kw["family"]) * len(lines)
+        if fixed_w is not None:
+            w = fixed_w
+        if fixed_h is not None:
+            h = fixed_h
+        cache[key] = (w, h)
+        if len(cache) > 4:
+            cache.popitem(last=False)
         return w, h
 
     def _wrapped(self, width, scale, kw):
-        key = (self.value, self.size, self.weight, self.italic,
-               self.font_family, font_state.default_family,
-               font_state.font_revision, self.max_lines, width, scale)
-        cached = self._wrap_cache.get(key)
+        if type(self) is Text:
+            state = object.__getattribute__(self, "__dict__")
+            if state["_animation_overrides"]:
+                state = state | state["_animation_overrides"]
+            value, size, max_lines = state["value"], state["size"], state["max_lines"]
+            weight, italic, family = state["weight"], state["italic"], state["font_family"]
+            cache = state["_wrap_cache"]
+        else:
+            value, size, max_lines = self.value, self.size, self.max_lines
+            weight, italic, family = self.weight, self.italic, self.font_family
+            cache = self._wrap_cache
+        key = (value, size, weight, italic, family, font_state.default_family,
+               font_state.font_revision, max_lines, width, scale)
+        cached = cache.get(key)
         if cached is None:
             cached = wrap(
-                self.value, width, self.size,
-                max_lines=self.max_lines, **kw) or [""]
-            self._wrap_cache[key] = cached
-            if len(self._wrap_cache) > 4:
-                self._wrap_cache.popitem(last=False)
+                value, width, size, max_lines=max_lines, **kw) or [""]
+            cache[key] = cached
+            if len(cache) > 4:
+                cache.popitem(last=False)
         else:
-            self._wrap_cache.move_to_end(key)
+            cache.move_to_end(key)
         return cached
 
     def _place(self, x, y, w, h, scale):
