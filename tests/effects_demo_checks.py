@@ -6,7 +6,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import pygame
 import saturn as st
 from saturn.event import fire
-from examples import subpage_settings, shader_gallery, shader_playground, orb_glsl
+from examples import subpage_settings, shader_gallery, shader_playground, orb_glsl, orb_gallery
 
 
 def run(backend,module):
@@ -42,6 +42,13 @@ def run(backend,module):
             demo["open_screen"]("settings")
             pump()
             assert child.window.visible and field.value=="Test workspace"
+        elif module is orb_gallery:
+            assert len(demo['shaders'])==13
+            assert all(s.error is None for s in demo['shaders']), [s.error for s in demo['shaders']]
+            for shader in demo['shaders']:
+                shader.animate=False
+                shader.time=2.25
+            pump()
         elif module is shader_gallery:
             demo["palette"].value="violet"
             fire(demo["palette"],"select")
@@ -60,15 +67,25 @@ def run(backend,module):
                     x,y,w,h=shader._rect
                     center=shot.get_at((round(x+w/2),round(y+h/2)))
                     assert max(center[:3])-min(center[:3])>20,center
-                    shader.uniforms["glass"]=False
+                    shader.uniforms["orb_glassEnabled"]=0.
                     shader.update()
                     pump()
                     app._activate()
                     app.page.draw()
                     other=app.renderer.screenshot()
                     assert pygame.image.tobytes(shot,"RGB")!=pygame.image.tobytes(other,"RGB")
-                    shader.uniforms["glass"]=True
+                    shader.uniforms["orb_glassEnabled"]=1.
                     shader.update()
+                    demo['select_preset']('particleRibbon')
+                    pump()
+                    assert shader.error is None, shader.error
+                    assert shader.buffer is not None
+                    demo['select_preset']('chromaticMetal')
+                    pump()
+                    assert shader.buffer is None
+                    assert shader.uniforms['orb_style']==22.
+                    demo['reset']()
+                    demo['select_preset']('aurora')
             else:
                 slider=next(c for c in child.controls if isinstance(c,st.Slider))
                 slider.value=1.8
@@ -91,5 +108,5 @@ def run(backend,module):
 
 if __name__=="__main__":
     backend=st.Renderer(sys.argv[1] if len(sys.argv)>1 else 'opengl')
-    for module in (subpage_settings,shader_gallery,shader_playground,orb_glsl):
+    for module in (subpage_settings,shader_gallery,shader_playground,orb_glsl,orb_gallery):
         run(backend,module)
