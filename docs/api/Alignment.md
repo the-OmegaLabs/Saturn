@@ -4,7 +4,7 @@ Horizontal and vertical alignment of a child in a container.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 187).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 291).
 
 ## Constructor parameters
 

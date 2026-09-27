@@ -4,7 +4,7 @@ Basic clickable button.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 290).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 386).
 
 ## Preview
 
@@ -36,7 +36,7 @@ The public name `saturn.Button` refers to the implementation class `_ConcreteBut
 ## Constructor parameters
 
 ```python
-saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, expressive=False, size=None, shape='round', **base)
+saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, clip_behavior=None, expressive=False, size=None, shape='round', **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -55,6 +55,7 @@ saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=N
 | `on_blur` | `—` | `None` | Callback called when the control loses focus. |
 | `autofocus` | `—` | `False` | Try to focus this control when the page opens. |
 | `url` | `—` | `None` | Destination opened when the button is clicked. |
+| `clip_behavior` | `—` | `None` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
 | `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
 | `size` | `—` | `None` | Size of the text, icon, or control. |
 | `shape` | `—` | `'round'` | Base shape of the button. |

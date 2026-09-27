@@ -4,7 +4,7 @@ Material Expressive button with changing size and shape.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 280).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 376).
 
 ## Preview
 

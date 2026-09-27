@@ -4,7 +4,7 @@ Width and color of one border side.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 270).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 374).
 
 ## Public methods
 

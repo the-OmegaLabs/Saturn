@@ -22,6 +22,8 @@ See [Page fonts and events](../page.md) for font registration, typed callbacks, 
 
 | Method | Description |
 | --- | --- |
+| `go(self, route)` | Set the application route and notify each window's route handler. |
+| `open_subpage(self, main=None, *, title='Settings', modal=False, anchor='center', offset=None, follow_parent=False, backend=None)` | Create an owned native child window and return its Subpage handle. |
 | `add(self, *ctrls: 'Control')` | Adds a child control to the end of a page or control list. |
 | `insert(self, index, ctrl)` | Inserts a child control at a specified position. |
 | `remove(self, ctrl)` | Removes a specified control from its container. |
@@ -35,7 +37,7 @@ See [Page fonts and events](../page.md) for font registration, typed callbacks, 
 | `take_screenshot(self, path: 'str | None' = None)` | Return the captured frame surface (and save |
 | `draw(self)` | Requests a draw of the current page. |
 | `handle_event(self, e)` | Handles an incoming control event. |
-| `focus(self, control)` | Gives the control input focus. |
+| `focus(self, control)` | Focus this attached control when keyboard focus is enabled. |
 | `pointer_down(self, x, y, clicks=None)` | Handles a pointer press. |
 | `pointer_up(self, x, y)` | Handles a pointer release. |
 | `pointer_move(self, x, y)` | Handles pointer movement. |

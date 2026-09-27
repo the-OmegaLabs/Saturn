@@ -24,16 +24,21 @@ OUT = ROOT / "docs"
 API = OUT / "api"
 
 CATEGORIES = {
-    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
+    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
+    "Navigation and effects": "Subpage Shader ShaderEffect",
+    "Input border styles": "NoInputBorder UnderlineInputBorder",
     "Expressive namespace": "Compose",
     "Layout and content": "Text Row Column Container Stack Divider Icon Image Card ListView GestureDetector ListItem",
     "Buttons and actions": "Button ElevatedButton FilledButton FilledTonalButton OutlinedButton TextButton IconButton ExpressiveButton ExpressiveIconButton SplitButton ButtonGroup ToggleButton ElevatedToggleButton FilledTonalToggleButton OutlinedToggleButton FloatingActionButton SmallFloatingActionButton MediumFloatingActionButton LargeFloatingActionButton ExtendedFloatingActionButton FloatingToolbar HorizontalFloatingToolbar VerticalFloatingToolbar FloatingActionButtonMenu FloatingActionButtonMenuItem",
     "Input and feedback": "TextField Checkbox Switch Radio RadioGroup Dropdown DropdownOption Option Slider AlertDialog SnackBar ProgressBar ProgressRing LoadingIndicator WavyProgressIndicator LinearWavyProgressIndicator CircularWavyProgressIndicator",
     "File services": "FilePicker FilePickerFile FilePickerFileType FilePickerResultEvent FilePickerUploadEvent FilePickerUploadFile",
-    "Styles and types": "Colors Icons parse_color Alignment Animation AnimationCurve Border BorderRadius BorderSide BoxShadow BoxFit CrossAxisAlignment Duration FontWeight KeyboardType LabelPosition MainAxisAlignment MaterialExpressiveTheme Margin Offset OutlineInputBorder Padding Rotate Scale ScrollMode TextAlign Theme ThemeMode TextOverflow TextStyle Tooltip TooltipTriggerMode",
+    "Styles and types": "Colors Icons parse_color Alignment Animation AnimationCurve Border BorderRadius BorderSide BoxShadow BoxFit CrossAxisAlignment Duration FontWeight KeyboardType LabelPosition MainAxisAlignment MaterialExpressiveTheme Margin Offset OutlineInputBorder Padding Rotate Scale ScrollMode TextAlign Theme ThemeMode TextOverflow TextStyle Tooltip TooltipTriggerMode ButtonStyle ControlState BoxConstraints MouseCursor Ref RoundedRectangleBorder StadiumBorder CircleBorder ImageRepeat FilterQuality ClipBehavior BoxShape StrokeCap VisualDensity TextSelection TextAffinity InputFilter TextCapitalization SliderInteraction LinearGradient",
 }
 
 DESCRIPTIONS = {
+    "Subpage": "Owned native child window with Page controls, independent rendering and shared application routing; see the Subpage guide.",
+    "Shader": "Built-in effects or custom GLSL fragment backgrounds on OpenGL and Vulkan; see the Shader guide.",
+    "ShaderEffect": "Built-in procedural effects supported by OpenGL and Vulkan.",
     "Compose": "Namespace for Saturn's Material 3 Expressive controls and theme; see the Compose guide for migration details.",
     "App": "Application object that manages windows, events, and rendering.",
     "Renderer": "Selects the software, OpenGL, or Vulkan backend.",
@@ -262,7 +267,7 @@ def parameter_rows(name: str, obj: object) -> list[str]:
         return []
     rows = []
     for param in signature.parameters.values():
-        if param.name in ("self", "cls"):
+        if param.name in ("self", "cls") or param.name.startswith("_"):
             continue
         annotation = "—" if param.annotation is inspect.Signature.empty else str(param.annotation).strip("'")
         default = ("additional keyword arguments" if param.kind is inspect.Parameter.VAR_KEYWORD else
@@ -274,6 +279,8 @@ def parameter_rows(name: str, obj: object) -> list[str]:
         elif param.kind is inspect.Parameter.VAR_KEYWORD:
             label = "**" + label
         explanation = describe(name, param.name).replace("|", "\\|")
+        if param.name in getattr(obj, "__unsupported_parameters__", set()):
+            explanation = "Unsupported for non-default requests. " + explanation
         rows.append(f"| {markdown_code(label)} | {markdown_code(annotation)} | {markdown_code(default)} | {explanation} |")
     return rows
 
@@ -340,7 +347,9 @@ def page_for(name: str, category: str) -> str:
             if methods:
                 lines += ["## Public methods", "", "| Method | Description |", "| --- | --- |", *methods, ""]
     try:
-        signature = str(inspect.signature(obj))
+        public_signature = inspect.signature(obj)
+        signature = str(public_signature.replace(parameters=[p for p in public_signature.parameters.values()
+                                                               if not p.name.startswith("_")]))
     except (TypeError, ValueError):
         signature = "(...)"
     heading = "Constructor parameters" if inspect.isclass(obj) else "Call parameters"

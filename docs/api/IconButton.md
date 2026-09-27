@@ -4,7 +4,7 @@ Compact action button presented as an icon.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 299).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 395).
 
 ## Preview
 
@@ -33,15 +33,21 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 
 **Base class:** [Control](./Control.md)
 
+## Public methods
+
+| Method | Description |
+| --- | --- |
+| `focus(self)` | Focus this attached control when keyboard focus is enabled. |
+
 ## Constructor parameters
 
 ```python
-saturn.IconButton(icon, *, icon_size: 'float | None' = None, icon_color=None, selected_icon=None, selected=False, bgcolor=None, hover_color=None, tooltip=None, on_click=None, on_hover=None, expressive=False, size=None, shape='round', **base)
+saturn.IconButton(icon=None, *, icon_size: 'float | None' = None, icon_color=None, selected_icon=None, selected=False, bgcolor=None, hover_color=None, tooltip=None, on_click=None, on_hover=None, selected_icon_color=None, highlight_color=None, style=None, autofocus=False, disabled_color=None, focus_color=None, splash_color=None, splash_radius=None, alignment=None, padding=None, enable_feedback=None, url=None, mouse_cursor=None, visual_density=None, size_constraints=None, on_long_press=None, on_focus=None, on_blur=None, expressive=False, size=None, shape='round', **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
-| `icon` | `—` | `required` | Icon to draw. |
+| `icon` | `—` | `None` | Icon to draw. |
 | `icon_size` | `float | None` | `None` | Displayed icon size. |
 | `icon_color` | `—` | `None` | Foreground color of the icon. |
 | `selected_icon` | `—` | `None` | Alternate icon shown when selected. |
@@ -51,6 +57,24 @@ saturn.IconButton(icon, *, icon_size: 'float | None' = None, icon_color=None, se
 | `tooltip` | `—` | `None` | Short hint shown on hover. |
 | `on_click` | `—` | `None` | Callback called when the control is clicked. |
 | `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
+| `selected_icon_color` | `—` | `None` | Color for selected icon. |
+| `highlight_color` | `—` | `None` | Color for highlight. |
+| `style` | `—` | `None` | Additional button style settings. |
+| `autofocus` | `—` | `False` | Try to focus this control when the page opens. |
+| `disabled_color` | `—` | `None` | Color for disabled. |
+| `focus_color` | `—` | `None` | Color for focus. |
+| `splash_color` | `—` | `None` | Color for splash. |
+| `splash_radius` | `—` | `None` | Pointer feedback radius limit. |
+| `alignment` | `—` | `None` | Alignment of child content within a container or layout. |
+| `padding` | `—` | `None` | Space around the control's content. |
+| `enable_feedback` | `—` | `None` | Unsupported for non-default requests. Provide interaction feedback when enabled. |
+| `url` | `—` | `None` | Destination opened when the button is clicked. |
+| `mouse_cursor` | `—` | `None` | Cursor displayed while hovering over the control. |
+| `visual_density` | `—` | `None` | Compact, comfortable, or standard control sizing where supported. |
+| `size_constraints` | `—` | `None` | Allowed minimum and maximum dimensions. |
+| `on_long_press` | `—` | `None` | Callback called when the control is long pressed. |
+| `on_focus` | `—` | `None` | Callback called when the control gains focus. |
+| `on_blur` | `—` | `None` | Callback called when the control loses focus. |
 | `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
 | `size` | `—` | `None` | Size of the text, icon, or control. |
 | `shape` | `—` | `'round'` | Base shape of the button. |

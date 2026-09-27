@@ -2,11 +2,19 @@
 
 [← Documentation home](../README.md) · [Screenshot gallery](../gallery.md)
 
-This index covers the 107 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
+This index covers the 135 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
 
 ## App and page
 
-[App](./App.md) · [Renderer](./Renderer.md) · [Render](./Render.md) · [run](./run.md) · [ControlEvent](./ControlEvent.md) · [KeyboardEvent](./KeyboardEvent.md) · [PageResizeEvent](./PageResizeEvent.md) · [PlatformBrightnessChangeEvent](./PlatformBrightnessChangeEvent.md) · [WindowEvent](./WindowEvent.md) · [WindowEventType](./WindowEventType.md) · [WindowResizeEdge](./WindowResizeEdge.md) · [Control](./Control.md) · [Page](./Page.md) · [Window](./Window.md)
+[App](./App.md) · [Renderer](./Renderer.md) · [Render](./Render.md) · [run](./run.md) · [ControlEvent](./ControlEvent.md) · [KeyboardEvent](./KeyboardEvent.md) · [PageResizeEvent](./PageResizeEvent.md) · [PlatformBrightnessChangeEvent](./PlatformBrightnessChangeEvent.md) · [TextSelectionChangeEvent](./TextSelectionChangeEvent.md) · [LayoutSizeChangeEvent](./LayoutSizeChangeEvent.md) · [RouteChangeEvent](./RouteChangeEvent.md) · [WindowEvent](./WindowEvent.md) · [WindowEventType](./WindowEventType.md) · [WindowResizeEdge](./WindowResizeEdge.md) · [Control](./Control.md) · [Page](./Page.md) · [Window](./Window.md)
+
+## Navigation and effects
+
+[Subpage](./Subpage.md) · [Shader](./Shader.md) · [ShaderEffect](./ShaderEffect.md)
+
+## Input border styles
+
+[NoInputBorder](./NoInputBorder.md) · [UnderlineInputBorder](./UnderlineInputBorder.md)
 
 ## Expressive namespace
 
@@ -30,7 +38,7 @@ This index covers the 107 public symbols currently in `saturn.__all__`, with one
 
 ## Styles and types
 
-[Colors](./Colors.md) · [Icons](./Icons.md) · [parse_color](./parse_color.md) · [Alignment](./Alignment.md) · [Animation](./Animation.md) · [AnimationCurve](./AnimationCurve.md) · [Border](./Border.md) · [BorderRadius](./BorderRadius.md) · [BorderSide](./BorderSide.md) · [BoxShadow](./BoxShadow.md) · [BoxFit](./BoxFit.md) · [CrossAxisAlignment](./CrossAxisAlignment.md) · [Duration](./Duration.md) · [FontWeight](./FontWeight.md) · [KeyboardType](./KeyboardType.md) · [LabelPosition](./LabelPosition.md) · [MainAxisAlignment](./MainAxisAlignment.md) · [MaterialExpressiveTheme](./MaterialExpressiveTheme.md) · [Margin](./Margin.md) · [Offset](./Offset.md) · [OutlineInputBorder](./OutlineInputBorder.md) · [Padding](./Padding.md) · [Rotate](./Rotate.md) · [Scale](./Scale.md) · [ScrollMode](./ScrollMode.md) · [TextAlign](./TextAlign.md) · [Theme](./Theme.md) · [ThemeMode](./ThemeMode.md) · [TextOverflow](./TextOverflow.md) · [TextStyle](./TextStyle.md) · [Tooltip](./Tooltip.md) · [TooltipTriggerMode](./TooltipTriggerMode.md)
+[Colors](./Colors.md) · [Icons](./Icons.md) · [parse_color](./parse_color.md) · [Alignment](./Alignment.md) · [Animation](./Animation.md) · [AnimationCurve](./AnimationCurve.md) · [Border](./Border.md) · [BorderRadius](./BorderRadius.md) · [BorderSide](./BorderSide.md) · [BoxShadow](./BoxShadow.md) · [BoxFit](./BoxFit.md) · [CrossAxisAlignment](./CrossAxisAlignment.md) · [Duration](./Duration.md) · [FontWeight](./FontWeight.md) · [KeyboardType](./KeyboardType.md) · [LabelPosition](./LabelPosition.md) · [MainAxisAlignment](./MainAxisAlignment.md) · [MaterialExpressiveTheme](./MaterialExpressiveTheme.md) · [Margin](./Margin.md) · [Offset](./Offset.md) · [OutlineInputBorder](./OutlineInputBorder.md) · [Padding](./Padding.md) · [Rotate](./Rotate.md) · [Scale](./Scale.md) · [ScrollMode](./ScrollMode.md) · [TextAlign](./TextAlign.md) · [Theme](./Theme.md) · [ThemeMode](./ThemeMode.md) · [TextOverflow](./TextOverflow.md) · [TextStyle](./TextStyle.md) · [Tooltip](./Tooltip.md) · [TooltipTriggerMode](./TooltipTriggerMode.md) · [ButtonStyle](./ButtonStyle.md) · [ControlState](./ControlState.md) · [BoxConstraints](./BoxConstraints.md) · [MouseCursor](./MouseCursor.md) · [Ref](./Ref.md) · [RoundedRectangleBorder](./RoundedRectangleBorder.md) · [StadiumBorder](./StadiumBorder.md) · [CircleBorder](./CircleBorder.md) · [ImageRepeat](./ImageRepeat.md) · [FilterQuality](./FilterQuality.md) · [ClipBehavior](./ClipBehavior.md) · [BoxShape](./BoxShape.md) · [StrokeCap](./StrokeCap.md) · [VisualDensity](./VisualDensity.md) · [TextSelection](./TextSelection.md) · [TextAffinity](./TextAffinity.md) · [InputFilter](./InputFilter.md) · [TextCapitalization](./TextCapitalization.md) · [SliderInteraction](./SliderInteraction.md) · [LinearGradient](./LinearGradient.md)
 
 ## Relationship to the Flet knowledge base
 

@@ -4,7 +4,7 @@ Floating action button with an icon and text.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 169).
+Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 222).
 
 ## Preview
 

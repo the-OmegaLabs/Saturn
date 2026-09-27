@@ -19,6 +19,11 @@ Saturn is a lightweight UI framework for Python desktop applications. These docs
 | [Page](./page.md) | Fonts, events, themes, list attachment, and services |
 | [Native desktop windows](./window.md) | Window properties, native events, close interception, and HWND access |
 | [Page compatibility and remaining differences](./page-properties-comparison.md) | Completed desktop repairs, event migration, and meaningful remaining limits |
+| [Control parameter comparison](./control-parameters-comparison.md) | Per-control implemented, missing and explicitly unsupported Flet constructor names |
+| [Subpages](./subpages.md) | Owned native child windows, placement, lifecycle and shared application routes |
+| [Shaders](./shaders.md) | Built-in effects and custom GLSL, includes, uniforms, animation and fallback |
+| [Subpage and Shader demos](./effects-demos.md) | Four runnable examples, including an Orb Aurora GLSL adaptation |
+| [Desktop feature feasibility](./feature-feasibility.md) | Assessment and practical priorities for all 30 ideas in the pasted Qt comparison |
 | [Renderer settings](./rendering.md) | Backend selection, antialiasing, vertical sync, and active renderer access |
 | [Expressive controls](./expressive.md) | Expressive implementation notes and examples |
 | [Compose namespace and Flet verification](./compose.md) | Separate Expressive API and tested Flet compatibility limits |

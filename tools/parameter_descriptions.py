@@ -247,6 +247,140 @@ OVERRIDES = {
 }
 
 
+DESCRIPTIONS.update({
+    "unsupported": "Unknown keyword arguments raise TypeError.",
+    "key": "Application key identifying the control or option.",
+    "ref": "Ref whose current property receives this control.",
+    "rtl": "Right-to-left direction; None inherits the parent's direction.",
+    "aspect_ratio": "Positive width-to-height ratio fitted within parent constraints.",
+    "can_request_focus": "Allow programmatic and keyboard focus when True.",
+    "mouse_cursor": "Cursor displayed while hovering over the control.",
+    "semantics_label": "Accessibility description metadata; native accessibility is not implemented.",
+    "semantics_value": "Accessibility value metadata.",
+    "size_change_interval": "Minimum interval in milliseconds between size events; the final size is delivered.",
+    "route": "Application route string shared by its native windows.",
+    "view": "Subpage removed from the navigation stack.",
+    "appbar": "Optional custom Subpage header control.",
+    "scroll": "Scroll mode: auto, always, hidden, or none.",
+    "scroll_interval": "Minimum interval in milliseconds between scroll events.",
+    "effect": "GPU effect: gradient, noise, ripple, or plasma.",
+    "uniforms": "Built-in effect parameters or custom GLSL scalar/vector uniform values.",
+    "shader": "ShaderEffect, GLSL source string, or pathlib.Path to a fragment source file.",
+    "includes": "Mapping from include names to GLSL snippets.",
+    "include_dirs": "Explicit folders searched for GLSL include files.",
+    "parent": "Page owning this native child window.",
+    "anchor": "Placement relative to the owner: center, sides, corners, or Alignment.",
+    "follow_parent": "Keep the child at its relative attachment position when windows move or resize.",
+    "expand_loose": "Treat the flex share as a maximum instead of forcing the child to fill it.",
+    "speed": "Multiplier for elapsed Shader animation time.",
+    "time": "Shader time offset in seconds.",
+    "fallback_color": "Static fill used by the software backend.",
+    "begin": "Gradient start Alignment.", "end": "Gradient end Alignment.",
+    "colors": "Ordered colors along the gradient.",
+    "stops": "Optional ascending normalized positions of gradient colors.",
+    "clip_behavior": "Clip mode; GPU rotated clips use conservative axis-aligned bounds.",
+    "wrap": "Wrap children into more runs when available space is insufficient.",
+    "run_alignment": "Distribution of wrapped runs across the cross axis.",
+    "run_spacing": "Gap between wrapped runs.",
+    "intrinsic_width": "Fit Stack width to its content.",
+    "intrinsic_height": "Fit Stack height to its content.",
+    "repeat": "Image tiling direction: none, both axes, horizontal, or vertical.",
+    "cache_width": "Requested image cache target width.",
+    "cache_height": "Requested image cache target height.",
+    "cache_extent": "ListView preload distance in logical pixels.",
+    "build_controls_on_demand": "Place known-height list children lazily while retaining control objects.",
+    "first_item_prototype": "Use the first child's measured extent for all rows.",
+    "prototype_item": "Control providing the measured extent of every row.",
+    "reverse": "Reverse list layout direction.",
+    "divider_thickness": "Thickness of list separators.",
+    "semantic_child_count": "Declared accessibility child count metadata.",
+    "semantic_container": "Accessibility container metadata.",
+    "selection": "TextSelection holding the selected character endpoints.",
+    "base_offset": "Starting character offset of a selection.",
+    "extent_offset": "Ending character offset of a selection.",
+    "affinity": "Selection affinity at a line boundary.",
+    "directional": "Whether selection direction is significant.",
+    "capitalization": "Capitalization applied to inserted text.",
+    "input_filter": "Regex InputFilter applied to inserted text.",
+    "regex_string": "Pattern matching text to accept or reject.",
+    "allow": "Accept matching text when True; reject it when False.",
+    "replacement_string": "Replacement for rejected filter matches.",
+    "enable_interactive_selection": "Allow pointer/keyboard selection and copy.",
+    "show_selection_cursor": "Draw a caret for focused selectable Text.",
+    "text_vertical_align": "Vertical placement of TextField content.",
+    "min_lines": "Minimum visible lines of multiline input.",
+    "font_family_fallback": "Ordered additional families for missing glyphs.",
+    "helper": "Control below the input providing helper content.",
+    "counter": "Control beside input helper/error content.",
+    "prefix": "Control before the editable input text.",
+    "suffix": "Control after the editable input text.",
+    "selected_suffix": "Control displayed after the selected dropdown option.",
+    "editable": "Allow typing in the dropdown's selection field.",
+    "enable_filter": "Filter dropdown options by entered text.",
+    "enable_search": "Search options while editing the dropdown.",
+    "menu_height": "Maximum height of the bounded dropdown menu.",
+    "menu_width": "Width of the dropdown menu.",
+    "interaction": "Slider tap/drag interaction mode.",
+    "secondary_track_value": "Value reached by the Slider secondary track.",
+    "tristate": "Allow Checkbox values True, False, and None.",
+    "toggleable": "Allow a selected Radio to become unselected.",
+    "animation_duration": "Supported style transition duration in milliseconds.",
+    "visual_density": "Compact, comfortable, or standard control sizing where supported.",
+    "ignore_pointers": "Exclude the Container subtree from pointer hit testing.",
+    "ignore_interactions": "Disable Slider interaction without changing appearance.",
+    "allowed_devices": "Pointer device restrictions; non-default requests are unsupported.",
+    "behavior": "Gesture hit-test behavior.",
+    "persist": "Keep the SnackBar open until explicitly dismissed.",
+    "show_close_icon": "Show a clickable SnackBar close icon.",
+    "action_overflow_threshold": "Width fraction at which the SnackBar action wraps.",
+    "track_gap": "Gap between a progress stroke and its track.",
+    "stop_indicator_radius": "Radius of the progress end marker.",
+    "stroke_align": "Alignment of the progress stroke relative to its bounds.",
+    "stroke_cap": "Shape of stroke endpoints.",
+    "gapless_playback": "Keep the previous image while a replacement is unavailable.",
+    "apply_text_scaling": "Apply supported text/icon scaling.",
+    "anti_alias": "Request smooth image edges on the active backend.",
+    "dense": "Use compact input decoration.",
+    "collapsed": "Remove ordinary input decoration spacing.",
+    "theme": "Light theme configuration.", "dark_theme": "Dark theme configuration.",
+    "theme_mode": "Light, dark, or detected system preference.",
+    "placeholder_src": "Image shown while the requested source is unavailable.",
+    "placeholder_fit": "BoxFit used for placeholder content.",
+    "error_content": "Control shown when an image cannot be decoded.",
+    "radius": "Corner radius of a shape border.",
+    "min_width": "Minimum width.", "max_width": "Maximum width.",
+    "min_height": "Minimum height.", "max_height": "Maximum height.",
+    "scrollable": "Scroll overflowing dialog content inside the dialog.",
+    "border_width": "Input outline thickness.",
+    "focused_border_width": "Input outline thickness while focused.",
+    "cursor_width": "Input caret width.", "cursor_height": "Input caret height.",
+    "cursor_radius": "Input caret corner radius.",
+    "selection_cursor_width": "Selectable Text caret width.",
+    "selection_cursor_height": "Selectable Text caret height.",
+    "track_outline_width": "Switch track outline thickness.",
+    "splash_radius": "Pointer feedback radius limit.",
+    "border_side": "Outline color and thickness as a BorderSide.",
+    "actions_alignment": "Main-axis arrangement of dialog action controls.",
+    "actions_overflow_button_spacing": "Spacing between wrapped dialog actions.",
+    "ignore_up_down_keys": "Allow Up/Down keys to reach the application rather than moving the caret.",
+    "word_spacing": "Extra spacing between words; nonzero requests are unsupported.",
+    "decoration_thickness": "Text decoration thickness; non-default requests are unsupported.",
+})
+
+OVERRIDES.update({
+    ("Subpage", "modal"): "Block the owning native window's input until this child closes.",
+    ("Shader", "animate"): "Request frames to advance time while visible on a GPU backend.",
+    ("Shader", "effect"): "Compatibility alias for shader; pass only one of them.",
+})
+for _name in ("autocorrect autofill_hints enable_suggestions enable_ime_personalized_learning "
+              "enable_stylus_handwriting keyboard_brightness keyboard_type smart_dashes_type smart_quotes_type "
+              "spans theme_style fill grade optical_size color_filter blend_mode color_blend_mode blur "
+              "foreground_decoration image shadows show_border_on_foreground year_2023 menu_style expanded_insets "
+              "auto_scroll_animation fade_in_animation placeholder_fade_out_animation multi_tap_touches "
+              "trackpad_scroll_causes_scale dismiss_direction").split():
+    DESCRIPTIONS.setdefault(_name, f"Requested {_name.replace('_', ' ')} option; see the control comparison for supported values and restrictions.")
+
+
 def describe(owner: str, parameter: str) -> str:
     if (owner, parameter) in OVERRIDES:
         return OVERRIDES[owner, parameter]
@@ -255,4 +389,13 @@ def describe(owner: str, parameter: str) -> str:
     if parameter.startswith("animate_"):
         property_name = parameter.removeprefix("animate_")
         return f"Animation settings applied when {property_name} changes."
+    if parameter in DESCRIPTIONS:
+        return DESCRIPTIONS[parameter]
+    if parameter.startswith("on_"):
+        return f"Callback for {parameter[3:].replace('_', ' ')}; accepts zero arguments or an event."
+    for suffix, text in (("_bgcolor", "Background color for"), ("_color", "Color for"), ("_padding", "Insets around"),
+                         ("_style", "Style applied to"), ("_icon", "Icon used for"),
+                         ("_elevation", "Shadow elevation during"), ("_text", "Text displayed as")):
+        if parameter.endswith(suffix):
+            return f"{text} {parameter[:-len(suffix)].replace('_', ' ')}."
     return DESCRIPTIONS[parameter]

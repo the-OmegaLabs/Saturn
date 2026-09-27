@@ -4,7 +4,7 @@ Adds spacing, background, borders, and other decoration to a child.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 189).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 326).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, border_radius=None, alignment=None, gradient=None, shadow=None, ink=False, animate=None, on_click=None, on_hover=None, on_long_press=None, **base)
+saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, border_radius=None, alignment=None, gradient=None, shadow=None, ink=False, animate=None, on_click=None, on_hover=None, on_long_press=None, on_tap_down=None, ink_color=None, clip_behavior=None, shape='rectangle', url=None, ignore_interactions=False, blend_mode=None, image=None, blur=None, theme=None, dark_theme=None, theme_mode=None, color_filter=None, foreground_decoration=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -54,6 +54,20 @@ saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, borde
 | `on_click` | `—` | `None` | Callback called when the control is clicked. |
 | `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
 | `on_long_press` | `—` | `None` | Callback called when the control is long pressed. |
+| `on_tap_down` | `—` | `None` | Callback called when a press begins. |
+| `ink_color` | `—` | `None` | Color for ink. |
+| `clip_behavior` | `—` | `None` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
+| `shape` | `—` | `'rectangle'` | Base shape of the button. |
+| `url` | `—` | `None` | Destination opened when the button is clicked. |
+| `ignore_interactions` | `—` | `False` | Disable Slider interaction without changing appearance. |
+| `blend_mode` | `—` | `None` | Unsupported for non-default requests. Requested blend mode option; see the control comparison for supported values and restrictions. |
+| `image` | `—` | `None` | Unsupported for non-default requests. Requested image option; see the control comparison for supported values and restrictions. |
+| `blur` | `—` | `None` | Unsupported for non-default requests. Requested blur option; see the control comparison for supported values and restrictions. |
+| `theme` | `—` | `None` | Unsupported for non-default requests. Light theme configuration. |
+| `dark_theme` | `—` | `None` | Unsupported for non-default requests. Dark theme configuration. |
+| `theme_mode` | `—` | `None` | Unsupported for non-default requests. Light, dark, or detected system preference. |
+| `color_filter` | `—` | `None` | Unsupported for non-default requests. Requested color filter option; see the control comparison for supported values and restrictions. |
+| `foreground_decoration` | `—` | `None` | Unsupported for non-default requests. Requested foreground decoration option; see the control comparison for supported values and restrictions. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -4,7 +4,7 @@ Draws a dividing line between adjacent content.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 399).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 646).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Divider(*, height: 'float' = 16, thickness: 'float' = 1, color=None, leading_indent: 'float' = 0, trailing_indent: 'float' = 0, **base)
+saturn.Divider(*, height: 'float' = 16, thickness: 'float' = 1, color=None, leading_indent: 'float' = 0, trailing_indent: 'float' = 0, radius=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -46,6 +46,7 @@ saturn.Divider(*, height: 'float' = 16, thickness: 'float' = 1, color=None, lead
 | `color` | `—` | `None` | Color of foreground content, text, or drawing. |
 | `leading_indent` | `float` | `0` | Inset at the start of a divider. |
 | `trailing_indent` | `float` | `0` | Inset at the end of a divider. |
+| `radius` | `—` | `None` | Corner radius of a shape border. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

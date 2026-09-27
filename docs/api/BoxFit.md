@@ -17,5 +17,7 @@ Source: [`saturn/types.py`](../../saturn/types.py) (line 179).
 | `COVER` | `cover` |
 | `NONE` | `none` |
 | `SCALE_DOWN` | `scaleDown` |
+| `FIT_WIDTH` | `fitWidth` |
+| `FIT_HEIGHT` | `fitHeight` |
 
 Use members by name, for example `saturn.BoxFit.FILL`.

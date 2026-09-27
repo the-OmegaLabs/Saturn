@@ -4,7 +4,7 @@ Arranges child controls horizontally.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 163).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 300).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Row(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, vertical_alignment=None, horizontal_alignment=None, spacing: 'float' = 10, tight: 'bool' = False, **base)
+saturn.Row(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, vertical_alignment=None, horizontal_alignment=None, spacing: 'float' = 10, tight: 'bool' = False, wrap=False, run_spacing=10, run_alignment=<MainAxisAlignment.START: 'start'>, intrinsic_height=False, intrinsic_width=False, scroll=None, auto_scroll=False, auto_scroll_animation=None, scroll_interval=10, on_scroll=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -48,6 +48,16 @@ saturn.Row(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, 
 | `horizontal_alignment` | `—` | `None` | Alignment on the horizontal or cross axis. |
 | `spacing` | `float` | `10` | Space between adjacent child controls. |
 | `tight` | `bool` | `False` | Size the layout closely to its children when True. |
+| `wrap` | `—` | `False` | Wrap children into more runs when available space is insufficient. |
+| `run_spacing` | `—` | `10` | Gap between wrapped runs. |
+| `run_alignment` | `—` | `<MainAxisAlignment.START: 'start'>` | Distribution of wrapped runs across the cross axis. |
+| `intrinsic_height` | `—` | `False` | Fit Stack height to its content. |
+| `intrinsic_width` | `—` | `False` | Fit Stack width to its content. |
+| `scroll` | `—` | `None` | Scroll mode: auto, always, hidden, or none. |
+| `auto_scroll` | `—` | `False` | Scroll to the end automatically as content is added. |
+| `auto_scroll_animation` | `—` | `None` | Unsupported for non-default requests. Requested auto scroll animation option; see the control comparison for supported values and restrictions. |
+| `scroll_interval` | `—` | `10` | Minimum interval in milliseconds between scroll events. |
+| `on_scroll` | `—` | `None` | Callback called when the list scrolls. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -4,7 +4,7 @@ Displays text with configurable size, weight, and color.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/text.py`](../../saturn/widgets/text.py) (line 15).
+Source: [`saturn/widgets/text.py`](../../saturn/widgets/text.py) (line 16).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weight=None, italic: 'bool' = False, text_align=None, max_lines: 'int | None' = None, no_wrap: 'bool' = False, selectable: 'bool | None' = None, font_family: 'str | None' = None, **base)
+saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weight=None, italic: 'bool' = False, text_align=None, max_lines: 'int | None' = None, no_wrap: 'bool' = False, selectable: 'bool | None' = None, font_family: 'str | None' = None, style=None, bgcolor=None, overflow=<TextOverflow.CLIP: 'clip'>, font_family_fallback=None, on_tap=None, on_selection_change=None, show_selection_cursor=False, enable_interactive_selection=True, selection_cursor_width=2.0, selection_cursor_height=None, selection_cursor_color=None, spans=None, theme_style=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -51,6 +51,19 @@ saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weigh
 | `no_wrap` | `bool` | `False` | Prevent automatic line wrapping when True. |
 | `selectable` | `bool | None` | `None` | Whether text can be selected with the pointer. |
 | `font_family` | `str | None` | `None` | Font family name registered on the page. |
+| `style` | `—` | `None` | Additional button style settings. |
+| `bgcolor` | `—` | `None` | Background color of the control or container. |
+| `overflow` | `—` | `<TextOverflow.CLIP: 'clip'>` | How to handle text beyond the available space. |
+| `font_family_fallback` | `—` | `None` | Ordered additional families for missing glyphs. |
+| `on_tap` | `—` | `None` | Callback called when a tap completes. |
+| `on_selection_change` | `—` | `None` | Callback for selection change; accepts zero arguments or an event. |
+| `show_selection_cursor` | `—` | `False` | Draw a caret for focused selectable Text. |
+| `enable_interactive_selection` | `—` | `True` | Allow pointer/keyboard selection and copy. |
+| `selection_cursor_width` | `—` | `2.0` | Selectable Text caret width. |
+| `selection_cursor_height` | `—` | `None` | Selectable Text caret height. |
+| `selection_cursor_color` | `—` | `None` | Color for selection cursor. |
+| `spans` | `—` | `None` | Unsupported for non-default requests. Requested spans option; see the control comparison for supported values and restrictions. |
+| `theme_style` | `—` | `None` | Unsupported for non-default requests. Requested theme style option; see the control comparison for supported values and restrictions. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

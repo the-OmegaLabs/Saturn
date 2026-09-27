@@ -87,7 +87,7 @@ Assigning a theme/mode or mutating a theme then calling `page.update()` applies 
 
 ## Controls, overlays, and services
 
-Direct changes to top-level lists are reconciled on `update()`:
+Direct changes to top-level and nested control lists are reconciled on `update()`:
 
 ```python
 button = saturn.Button("Save", on_click=lambda event: print(event.page.title))
@@ -102,7 +102,7 @@ page.services.append(picker)
 page.update()
 ```
 
-Additions are attached to Page without reattaching unchanged trees. Removed subtrees lose their Page/parent and obsolete focus, press, hover, and animation references. Overlays use the same top-level reconciliation; use `page.show_dialog(dialog)` and `page.pop_dialog()` for dialog lifecycle handling. Changes deep inside an already attached container are outside this top-level reconciliation contract; use the owning control's supported update behavior.
+Additions are attached to Page without reattaching unchanged trees. Removed subtrees lose their Page/parent and obsolete focus, press, hover, and animation references. Overlays use the same reconciliation; use `page.show_dialog(dialog)` and `page.pop_dialog()` for dialog lifecycle handling. Call `page.update()` after nested mutations, or call the owning control's `update()` to reconcile only its subtree. Leaf updates do not scan unrelated list rows.
 
 Services are explicitly registered through `page.services`, including FilePicker. Adding/removing a service and calling `update()` sets/clears its Page ownership. This does not provide every Flet service or Flet's contextual automatic service registry.
 
@@ -110,7 +110,15 @@ Services are explicitly registered through `page.services`, including FilePicker
 
 `page.disabled = True` followed by `page.update()` clears focus, press, and hover and blocks control/overlay pointer, keyboard, IME, and wheel input. Resize, platform-brightness, and native window events still operate. Re-enable input with `page.disabled = False` and `page.update()`.
 
-Root `visible` and `opacity` affect the main control tree; background clearing and overlays are separate. The background uses `page.bgcolor`, then `page.window.bgcolor`, then the active theme surface. Use `page.window.visible` or `.opacity` for native whole-window behavior. Root positioning, rotation, scale, and `animate_*` are not Page geometry APIs. Use supported child offsets, opacity, size, and position animations on a Container/Stack; general rotation/scale raster transforms are also incomplete on child controls. Put scrollable content in `ListView`.
+Root `visible` and `opacity` affect the main control tree; background clearing and overlays are separate. The background uses `page.bgcolor`, then `page.window.bgcolor`, then the active theme surface. Use `page.window.visible` or `.opacity` for native whole-window behavior. Root positioning, rotation, scale, and `animate_*` are not Page geometry APIs. Child rotation, per-axis scale, offset, opacity, size and position animations are implemented. GPU rotated clips remain conservative axis-aligned rectangles. Put scrollable content in the existing `ListView`.
+
+## Local navigation and effects
+
+Use `child = page.open_subpage(main, title="Settings")` for an independent owned native window. It inherits Page controls/events and has its own `.window`, `.renderer`, focus and HWND. Operate it with `add()`, `update()`, `show()`, `hide()`, `close()` and `attach()`. Closing an owner closes its descendants; closing a child leaves the main window running. `page.route = value` and `page.go(value)` update one shared application route and dispatch `RouteChangeEvent` to every open Page with `on_route_change`. The handler chooses which windows or controls to show. Browser history and the earlier in-window View stack are not implemented.
+
+Tab/Shift+Tab traverse enabled focusable controls. Nonblocking SnackBars do not trap focus; a visible AlertDialog restricts traversal to its own controls. `control.focus()` and `can_request_focus` support explicit focus choices.
+
+See [Subpages](./subpages.md), [Shaders](./shaders.md) and the [runnable demos](./effects-demos.md).
 
 ## Verification
 

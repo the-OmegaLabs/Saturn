@@ -4,7 +4,7 @@ Scrollable list of controls.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 129).
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 124).
 
 ## Preview
 
@@ -37,12 +37,12 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 
 | Method | Description |
 | --- | --- |
-| `scroll_to(self, offset: 'float' = 0, delta: 'float | None' = None)` | Scrolls to a position or by a specified distance. |
+| `scroll_to(self, offset: 'float' = 0, delta: 'float | None' = None, scroll_key=None, duration=None, curve=None)` | Scrolls to a position or by a specified distance. |
 
 ## Constructor parameters
 
 ```python
-saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'float' = 0, item_extent: 'float | None' = None, padding=None, auto_scroll: 'bool' = False, on_scroll=None, **base)
+saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'float' = 0, item_extent: 'float | None' = None, padding=None, auto_scroll: 'bool' = False, on_scroll=None, reverse=False, first_item_prototype=False, prototype_item=None, divider_thickness=0, clip_behavior='hardEdge', semantic_child_count=None, cache_extent=None, build_controls_on_demand=True, scroll=None, auto_scroll_animation=None, scroll_interval=10, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -55,6 +55,17 @@ saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'flo
 | `padding` | `—` | `None` | Space around the control's content. |
 | `auto_scroll` | `bool` | `False` | Scroll to the end automatically as content is added. |
 | `on_scroll` | `—` | `None` | Callback called when the list scrolls. |
+| `reverse` | `—` | `False` | Reverse list layout direction. |
+| `first_item_prototype` | `—` | `False` | Use the first child's measured extent for all rows. |
+| `prototype_item` | `—` | `None` | Control providing the measured extent of every row. |
+| `divider_thickness` | `—` | `0` | Thickness of list separators. |
+| `clip_behavior` | `—` | `'hardEdge'` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
+| `semantic_child_count` | `—` | `None` | Declared accessibility child count metadata. |
+| `cache_extent` | `—` | `None` | ListView preload distance in logical pixels. |
+| `build_controls_on_demand` | `—` | `True` | Place known-height list children lazily while retaining control objects. |
+| `scroll` | `—` | `None` | Scroll mode: auto, always, hidden, or none. |
+| `auto_scroll_animation` | `—` | `None` | Unsupported for non-default requests. Requested auto scroll animation option; see the control comparison for supported values and restrictions. |
+| `scroll_interval` | `—` | `10` | Minimum interval in milliseconds between scroll events. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

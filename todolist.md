@@ -36,12 +36,24 @@ Updated: 2026-09-27. Optimizations stay in the existing controls; no `VirtualStu
 
 ### Practical constraints
 
+The current [control comparison](docs/control-parameters-comparison.md) records implemented, missing and explicitly unsupported Flet constructor parameters. [Desktop feature feasibility](docs/feature-feasibility.md) assesses the thirty planning ideas below against the actual implementation and recommends priorities.
+
+- [x] **Align existing controls and document concrete gaps.** Useful input, button, layout, image, dialog and gesture parameters have working behavior and focused checks. Unsupported options reject non-default requests. Matching parameter names does not claim full Flet/Flutter equivalence.
+- [x] **Implement native Subpage and global route events.** Subpage is an owned native child window with its own HWND and renderer, matching the intended Toplevel behavior. Parent/child lifecycle, modal ownership, attachment, Software/OpenGL/Vulkan rendering and shared route events are checked. The earlier in-window navigation experiment is removed.
+- [x] **Expose built-in and user-written Shader programs.** `Shader(shader=ShaderEffect.PLASMA)` and `Shader(shader=glsl)` share the API. GLSL includes, scalar/vector uniforms, cached programs, errors and recovery are checked on OpenGL/Vulkan. The Orb Aurora GLSL demo retains MIT attribution; other presets and its particle multipass pipeline remain outside this adaptation.
+
 - Unknown variable row heights still require an O(N) initial exact measurement. The measured cost is reduced, not eliminated. Known-height data can use child `height` or `ListView.item_extent` to avoid intrinsic measurement.
 - Culling can account for declared built-in geometry. Custom drawing that extends beyond a control without declaring bounds needs a corresponding overflow rule and a pixel regression.
 - Initial image decoding, font/SVG rasterization, and high-quality bitmap reduction still use CPU source processing and cached textures. The full OpenGL/Vulkan frame and the dynamic effects above are rasterized on the GPU.
 - GPU elevation shadows approximate the original blur. Windows background transparency is color-keyed, not per-pixel desktop alpha. Other platform limits are documented in the Window guide.
 
 ### Follow-up measurements
+
+After the control/native-window/GLSL work, a sequential 5,000-row, 40-frame
+variable-height resize sweep measured Software/OpenGL/Vulkan draw-and-present
+p95 **13.328 / 12.612 / 14.876 ms**, with at most 22 painted rows. Initial exact
+layout was **184.445 / 84.175 / 91.409 ms**; the later backends reuse warm text
+caches, so these cold values are not an isolated backend comparison.
 
 A sequential 5,000-row, 40-frame variable-height resize sweep measured software /
 OpenGL / Vulkan draw-and-present p95 **10.487 / 11.910 / 13.136 ms**, with at most

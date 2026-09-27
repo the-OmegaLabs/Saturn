@@ -26,5 +26,5 @@ saturn.FilePicker(on_result=None, on_upload=None, *, data=None, key=None, ref=No
 | `on_result` | `—` | `None` | Callback called when a file selection or save returns a result. |
 | `on_upload` | `—` | `None` | Callback called when file upload status changes. |
 | `data` | `—` | `None` | Custom data attached to the control or event. |
-| `key` | `—` | `None` | Key used to locate a control or service. |
-| `ref` | `—` | `None` | Place to store a control or service reference. |
+| `key` | `—` | `None` | Application key identifying the control or option. |
+| `ref` | `—` | `None` | Ref whose current property receives this control. |

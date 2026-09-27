@@ -4,7 +4,7 @@ Small floating action button.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 154).
+Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 207).
 
 ## Preview
 

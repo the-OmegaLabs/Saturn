@@ -4,7 +4,7 @@ Selects a value in a range by dragging a thumb.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1264).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1800).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Slider(value=None, *, min: 'float' = 0.0, max: 'float' = 1.0, divisions: 'int | None' = None, label=None, round: 'int' = 0, active_color=None, inactive_color=None, thumb_color=None, on_change=None, on_change_start=None, on_change_end=None, **base)
+saturn.Slider(value=None, *, min: 'float' = 0.0, max: 'float' = 1.0, divisions: 'int | None' = None, label=None, round: 'int' = 0, active_color=None, inactive_color=None, thumb_color=None, autofocus=False, interaction=None, secondary_active_color=None, secondary_track_value=None, overlay_color=None, padding=None, year_2023=None, on_change=None, on_change_start=None, on_change_end=None, on_focus=None, on_blur=None, **base)
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -50,9 +50,18 @@ saturn.Slider(value=None, *, min: 'float' = 0.0, max: 'float' = 1.0, divisions: 
 | `active_color` | `—` | `None` | Color used in the selected or on state. |
 | `inactive_color` | `—` | `None` | Color used in the unselected state. |
 | `thumb_color` | `—` | `None` | Color of the slider thumb. |
+| `autofocus` | `—` | `False` | Try to focus this control when the page opens. |
+| `interaction` | `—` | `None` | Slider tap/drag interaction mode. |
+| `secondary_active_color` | `—` | `None` | Color for secondary active. |
+| `secondary_track_value` | `—` | `None` | Value reached by the Slider secondary track. |
+| `overlay_color` | `—` | `None` | Color for overlay. |
+| `padding` | `—` | `None` | Space around the control's content. |
+| `year_2023` | `—` | `None` | Unsupported for non-default requests. Requested year 2023 option; see the control comparison for supported values and restrictions. |
 | `on_change` | `—` | `None` | Callback called when the value changes. |
 | `on_change_start` | `—` | `None` | Callback called when dragging or value editing begins. |
 | `on_change_end` | `—` | `None` | Callback called when dragging or value editing ends. |
+| `on_focus` | `—` | `None` | Callback called when the control gains focus. |
+| `on_blur` | `—` | `None` | Callback called when the control loses focus. |
 | `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

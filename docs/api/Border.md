@@ -4,7 +4,7 @@ Border settings for each of the four sides.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 288).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 404).
 
 ## Public methods
 

@@ -4,7 +4,7 @@ Outline appearance of a form input field.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 280).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 384).
 
 ## Constructor parameters
 

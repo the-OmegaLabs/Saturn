@@ -4,7 +4,7 @@ Configures a hint shown on hover or long press.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 363).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 584).
 
 ## Constructor parameters
 
@@ -30,5 +30,5 @@ saturn.Tooltip(message: 'str', decoration: 'object' = None, enable_feedback: 'bo
 | `tap_to_dismiss` | `bool` | `True` | Dismiss the tooltip when its area is tapped. |
 | `exclude_from_semantics` | `bool | None` | `False` | Exclude this control from accessibility semantics. |
 | `trigger_mode` | `TooltipTriggerMode | None` | `None` | Interaction that triggers the tooltip. |
-| `mouse_cursor` | `object` | `None` | Pointer style shown on hover. |
+| `mouse_cursor` | `object` | `None` | Cursor displayed while hovering over the control. |
 | `size_constraints` | `object` | `None` | Allowed minimum and maximum dimensions. |
