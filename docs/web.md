@@ -15,6 +15,18 @@ Open `http://127.0.0.1:8000/` for an independent Page. Open
 contains a shared counter, Chinese text input, checkbox, named messages,
 routes, local opacity animation and a 500-row list with independent scrolling.
 
+The full control gallery also runs in the browser:
+
+```shell
+uv run examples/demo.py
+uv run examples/demo.py --backend vulkan  # Native desktop instead.
+```
+
+The repository's default `examples` dependency group installs the Web example
+dependencies for `uv run`. The library's Web dependencies remain optional.
+The full demo prefers port 12342, prints its URL and chooses an available port
+if that port is occupied. Use `--port` to change the preferred port.
+
 ## Select shared state
 
 ```python
@@ -57,8 +69,12 @@ changing shared controls; ordinary state needs no manual notification.
 
 `page.width`, `page.height`, `page.media.device_pixel_ratio` and `page.focus()` use
 the originating view. `page.on_resize` receives `e.width`, `e.height` and
-`e.client_id`. `page.renderer.name` is `"canvas"`. Web `page.window` and native
-Subpages are unavailable; desktop `page.web` reports the required runtime.
+`e.client_id`. `page.renderer.name` is `"canvas"`. On Web Pages, known
+`page.window` settings and methods are ignored so desktop initialization can
+be reused. Size getters return the originating view's dimensions, native
+handles return zero, and other native settings return their defaults. Typos
+still raise `AttributeError`. Native Subpages remain unsupported; desktop
+`page.web` reports the required runtime.
 
 ## Named messages
 
@@ -142,10 +158,16 @@ messages. Server restart loses sessions and tokens.
 ## Rendering and current coverage
 
 Basic controls: Text, Button and filled/tonal/outlined/text/elevated variants,
-TextField, Checkbox, Switch, Container, Row, Column, Stack, Divider, local Image
-and ListView. Switch currently uses a checkbox presentation. Button icons,
-shadows, transforms, advanced field decoration, dialogs and WebGL effects are
-not implemented. Shader draws its fallback color. Unsupported control types
+Icon, IconButton, TextField, Checkbox, Switch, Slider, non-editable Dropdown,
+ProgressRing, ProgressBar, Container, Row, Column, Stack, Divider, local Image,
+ListView, AlertDialog and SnackBar. Material icons use a cached font resource;
+images support fit, tint and rounded clipping. Scrollbars have proportional
+thumbs, keyboard control and dragging in both directions. Dialogs use a Canvas
+overlay above native inputs, and SnackBar timers run on the session event loop.
+Native input focus cannot scroll the fixed application surface.
+
+Shadows, transforms, advanced field decoration, editable Dropdown and WebGL
+effects are not implemented. Shader draws its fallback color. Unsupported types
 fail explicitly; this is not a complete desktop-control port.
 Control `on_size_change` is explicitly unsupported; use `page.on_resize`.
 
@@ -174,6 +196,7 @@ Page scrolling have no Web adapter yet.
 
 ```shell
 uv run --extra web --with httpx python tests/web_session_checks.py
+uv run python tests/web_demo_checks.py
 ```
 
 Checks cover simultaneous joins, isolation, shared updates, edit conflicts,

@@ -114,8 +114,8 @@ one mutable field on a shared Page. Use an event's `client_id` when scheduling
 work that outlives that callback.
 
 Desktop Web-specific operations report that a Web runtime is required. Web
-native-window operations such as `window.hwnd`, native positioning and owned
-native Subpages are unsupported. Shared Page/Control APIs keep their ordinary
+Pages ignore known native-window settings/methods; `window.hwnd` is zero.
+Native Subpages remain unsupported. Shared Page/Control APIs keep their ordinary
 meanings; backend-specific capabilities are documented explicitly.
 
 ## Named messages
