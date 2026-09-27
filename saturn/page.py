@@ -107,7 +107,7 @@ class Page(Control):
         super().__init__()
         self._app = app
         self._renderer_settings = _RendererSettings(app)
-        self.window = Window(app)
+        self.window = Window(app) if getattr(self, '_native_window', True) else None
         self.controls: list[Control] = []
         self.on_route_change = None
         self.on_render_failed = None
@@ -153,6 +153,11 @@ class Page(Control):
         self._apply_theme()
 
     # -- public API ---------------------------------------------------------
+    @property
+    def web(self):
+        """Web session services, available on Pages hosted by saturn.web."""
+        raise NotImplementedError("page.web requires the saturn.web runtime")
+
     @property
     def renderer(self):
         """Rendering settings and the active backend context."""

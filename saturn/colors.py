@@ -8,6 +8,9 @@ Colors members, and named values ("red", "red500") or M3 role names
 from __future__ import annotations
 
 import sys
+from contextvars import ContextVar
+
+_render_colors = ContextVar("saturn_render_colors", default=None)
 
 from ._gen.colors import MATERIAL, Colors  # noqa: F401  (re-exported)
 
@@ -173,10 +176,13 @@ def parse_color(value) -> tuple[int, int, int, int]:
         return (0, 0, 0, 0)
     if low in MATERIAL:
         return _hex_to_rgba(MATERIAL[low])
-    if low in BASELINE_LIGHT or low in role_overrides:
-        if low in role_overrides:
-            return _hex_to_rgba(role_overrides[low])
-        table = BASELINE_DARK if theme_dark else BASELINE_LIGHT
+    context = _render_colors.get()
+    overrides = context[1] if context is not None else role_overrides
+    dark = context[0] if context is not None else theme_dark
+    if low in BASELINE_LIGHT or low in overrides:
+        if low in overrides:
+            return _hex_to_rgba(overrides[low])
+        table = BASELINE_DARK if dark else BASELINE_LIGHT
         return _hex_to_rgba(table[low])
     if len(s) == 3:
         s = "".join(c * 2 for c in s)

@@ -21,6 +21,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 
+[project.optional-dependencies]
+web = ["fastapi>=0.115", "uvicorn>=0.30", "websockets>=13"]
+
 [[project.authors]]
 name = "Stevesuk"
 email = "stevesukawa@outlook.com"
