@@ -371,6 +371,10 @@ OVERRIDES.update({
     ("Subpage", "modal"): "Block the owning native window's input until this child closes.",
     ("Shader", "animate"): "Request frames to advance time while visible on a GPU backend.",
     ("Shader", "effect"): "Compatibility alias for shader; pass only one of them.",
+    ("Shader", "buffer"): "Optional ShaderBuffer rendered on the GPU before the final fragment; sample with saturnSampleBuffer(uv).",
+    ("ShaderBuffer", "vertex_shader"): "GLSL vertex source string or pathlib.Path; defines void main() and portable SATURN vertex/instance identifiers.",
+    ("ShaderBuffer", "fragment_shader"): "GLSL fragment source string or pathlib.Path; defines void main() and returns premultiplied RGBA.",
+    ("ShaderBuffer", "instances"): "Number of six-vertex instances, from 1 to 1,000,000.",
 })
 for _name in ("autocorrect autofill_hints enable_suggestions enable_ime_personalized_learning "
               "enable_stylus_handwriting keyboard_brightness keyboard_type smart_dashes_type smart_quotes_type "

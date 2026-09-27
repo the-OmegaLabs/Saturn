@@ -25,7 +25,7 @@ API = OUT / "api"
 
 CATEGORIES = {
     "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
-    "Navigation and effects": "Subpage Shader ShaderEffect",
+    "Navigation and effects": "Subpage Shader ShaderEffect ShaderBuffer",
     "Input border styles": "NoInputBorder UnderlineInputBorder",
     "Expressive namespace": "Compose",
     "Layout and content": "Text Row Column Container Stack Divider Icon Image Card ListView GestureDetector ListItem",
@@ -39,6 +39,7 @@ DESCRIPTIONS = {
     "Subpage": "Owned native child window with Page controls, independent rendering and shared application routing; see the Subpage guide.",
     "Shader": "Built-in effects or custom GLSL fragment backgrounds on OpenGL and Vulkan; see the Shader guide.",
     "ShaderEffect": "Built-in procedural effects supported by OpenGL and Vulkan.",
+    "ShaderBuffer": "One additive instanced GPU pass sampled by a Shader's final fragment; see the Shader guide.",
     "Compose": "Namespace for Saturn's Material 3 Expressive controls and theme; see the Compose guide for migration details.",
     "App": "Application object that manages windows, events, and rendering.",
     "Renderer": "Selects the software, OpenGL, or Vulkan backend.",

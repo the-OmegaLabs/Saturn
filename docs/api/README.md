@@ -2,7 +2,7 @@
 
 [← Documentation home](../README.md) · [Screenshot gallery](../gallery.md)
 
-This index covers the 135 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
+This index covers the 136 public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.
 
 ## App and page
 
@@ -10,7 +10,7 @@ This index covers the 135 public symbols currently in `saturn.__all__`, with one
 
 ## Navigation and effects
 
-[Subpage](./Subpage.md) · [Shader](./Shader.md) · [ShaderEffect](./ShaderEffect.md)
+[Subpage](./Subpage.md) · [Shader](./Shader.md) · [ShaderEffect](./ShaderEffect.md) · [ShaderBuffer](./ShaderBuffer.md)
 
 ## Input border styles
 

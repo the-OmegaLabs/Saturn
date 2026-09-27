@@ -35,25 +35,29 @@ python examples/shader_playground.py --backend vulkan --screen editor
 The independent settings window changes the main preview's effect, speed,
 intensity and animation flag immediately.
 
-## Orb Aurora GLSL
+## All Orb presets
 
 ```sh
 python examples/orb_glsl.py --backend opengl --screen editor
 python examples/orb_glsl.py --backend vulkan --screen editor
+python examples/orb_gallery.py --backend vulkan
 ```
 
-This uses custom GLSL and a nested `#include` file. The native parameter window
-controls glass refraction, width, zoom, warp and exposure. Vulkan requires
+The editor switches between all 13 presets and remembers each preset's edits.
+The native parameter window exposes fluid, glass, color and effect-specific
+controls, including particle ribbons and chromatic metal. Reset restores the
+selected preset's upstream defaults. The gallery shows every effect together.
+These examples use custom GLSL and `#include` files. Vulkan requires
 glslangValidator on PATH or `SATURN_GLSLANG` set to the compiler executable;
 see [Shaders](./shaders.md). Software displays the static fallback color.
 
-![Orb GLSL on Vulkan](../.static/shots/orb_glsl-main-vulkan.png)
+![All 13 Orb effects on Vulkan](../.static/shots/orb_gallery-main-vulkan.png)
 
-The Aurora noise/fluid and glass shell are adapted from
+The fluid effects, glass shell and GPU particle ribbons are adapted from
 [LerSent001/orb](https://github.com/LerSent001/orb), Copyright (c) 2026 LerSent001,
 under the [MIT license](../.static/shaders/ORB-LICENSE.txt). The complete license
-and copyright notice are retained beside the GLSL sources. Other presets, the WebGPU
-editor and multipass particle ribbons are not part of this example.
+and copyright notice are retained beside the GLSL sources. The web editor is
+replaced by a Saturn native parameter window. See [Orb presets](./orb.md).
 
 Each example exposes `build(page)` returning its controls/state. Native
 examples also return `open_screen(name)` for launching their child windows.

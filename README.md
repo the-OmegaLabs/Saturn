@@ -34,7 +34,7 @@ The generated loading shapes in `saturn/_gen/loading_shapes.json` derive from An
 
 ### Orb GLSL demos
 
-The [Aurora GLSL demo](./examples/orb_glsl.py) adapts the Aurora fluid and glass shell from [LerSent001/orb](https://github.com/LerSent001/orb), Copyright (c) 2026 LerSent001. Orb is distributed under the [MIT license](https://github.com/LerSent001/orb/blob/main/LICENSE); the complete [license and copyright notice](./.static/shaders/ORB-LICENSE.txt) are retained beside the adapted GLSL sources. It is a single-pass example; the original particle-ribbon renderer and full preset editor are not included.
+The [Orb GLSL editor](./examples/orb_glsl.py) and [13-effect gallery](./examples/orb_gallery.py) adapt every curated preset from [LerSent001/orb](https://github.com/LerSent001/orb), including instanced Particle Ribbons with glass refraction on OpenGL and Vulkan. Copyright (c) 2026 LerSent001. Orb is distributed under the [MIT license](https://github.com/LerSent001/orb/blob/main/LICENSE); the complete [license and copyright notice](./.static/shaders/ORB-LICENSE.txt) are retained beside the adapted GLSL sources. See the [preset catalog and usage](./docs/orb.md).
 
 ## Preview
 

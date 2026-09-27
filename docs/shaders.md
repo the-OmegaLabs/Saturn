@@ -69,7 +69,8 @@ Do not redeclare supplied uniforms. Declare custom `float`, `int`, `bool` or
 entries generate declarations: numeric values become float, bool becomes
 bool, and tuples/lists of length 2–4 become vectors. Declared uniforms omitted
 from the dict default to zero/false. At most 252 custom uniforms are supported.
-Arrays, matrices, sampler uniforms and custom vertex programs are not exposed.
+Arrays, matrices and arbitrary sampler uniforms are not exposed. An optional
+`ShaderBuffer` supports instanced vertex/fragment programs and one sampled GPU buffer.
 
 ## Includes and source files
 
@@ -128,15 +129,49 @@ axis aligned. Each custom fragment needs its own draw; ordinary controls and
 built-in effects keep their existing batching. Vulkan custom uniform uploads
 are capped at 1 MiB per frame.
 
+## Optional GPU buffer
+
+```python
+particles = saturn.ShaderBuffer(
+    vertex_shader=Path("effects/particles.vert"),
+    fragment_shader=Path("effects/particles.frag"),
+    instances=384 * 96 * 6,
+)
+effect = saturn.Shader(shader=Path("effects/composite.glsl"),
+                       buffer=particles, uniforms=params)
+```
+
+Each buffer stage defines `void main()` and shares the final fragment's custom
+uniform layout and time/resolution uniforms. Use `SATURN_LOCATION(n)` on
+varyings, `SATURN_VERTEX_ID` and `SATURN_INSTANCE_ID` in the vertex stage.
+Each instance draws six triangle vertices. Output coordinates are native clip
+coordinates; `SATURN_VULKAN` is defined for Vulkan, whose viewport Y points down.
+The buffer uses RGBA8, additive RGB blending (`ONE, ONE`) and accumulated alpha
+(`ONE, ONE_MINUS_SRC_ALPHA`). Return premultiplied RGBA from the buffer fragment.
+Instances must be an integer from 1 to 1,000,000.
+
+The final `mainImage` samples it with `saturnSampleBuffer(uv)`, using top-left
+UV coordinates on both backends, and returns straight RGBA. This helper requires
+a buffer. Inherited opacity, clipping and transforms apply to the final composite.
+The offscreen target tracks local dimensions, pixel ratio and antialiasing scale;
+it is reused until dimensions change. Programs and inactive targets have bounded
+caches and are released with the renderer. Buffer images stay on the GPU.
+Software renders the same static fallback as a Shader without a buffer.
+This is one optional pass; it does not provide a general render graph or access
+to other controls' frame contents.
+
 ## Orb GLSL adaptation
 
-[orb_glsl.py](../examples/orb_glsl.py) uses a real GLSL port of Orb's Aurora
-noise, fluid layers and glass refraction, with an independent native settings
-window. Includes and source live in [.static/shaders](../.static/shaders).
-The fluid formulas are adapted from `effect.wgsl`; the palette and shell
-controls are simplified, output is converted to straight alpha, and the
-sphere edge uses derivative antialiasing. This is not a pixel-identical port
-of all presets or the particle-ribbon multipass renderer.
+[orb_glsl.py](../examples/orb_glsl.py) provides all 13 Orb presets with an
+independent native settings window. [orb_gallery.py](../examples/orb_gallery.py)
+shows the complete catalog together. Includes, preset defaults and stages live
+in [.static/shaders](../.static/shaders). The upstream typed Metal export of
+`effect.wgsl` is converted to GLSL by `tools/port_orb_shaders.py`.
+Particle Ribbons uses instanced GPU geometry, an additive offscreen target and
+the original glass/channel-refraction composite. Final output is converted
+from premultiplied to straight alpha for Saturn. See [Orb presets](./orb.md)
+for the catalog, settings and verification. Shader compiler and floating-point
+differences can change pixels across backends; bit-identical output is not guaranteed.
 
 Original project: [LerSent001/orb](https://github.com/LerSent001/orb).
 Copyright (c) 2026 LerSent001. The complete [MIT license](../.static/shaders/ORB-LICENSE.txt)
