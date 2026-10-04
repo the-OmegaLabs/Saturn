@@ -190,11 +190,11 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 # Explicit GPU renderer
 saturn.run(main, backend=saturn.Renderer.OPENGL)
 
-# Vulkan GPU renderer
+# Vulkan GPU renderer (experimental)
 saturn.run(main, backend=saturn.Renderer.VULKAN)
 ```
 
-The Vulkan backend draws geometry and composites textures on the GPU with batched draw calls and scissor clipping. Text and some effects are prepared as surfaces before texture upload; the full frame is not rasterized on the CPU. A Vulkan-capable driver is required, along with the optional `vulkan` package: `pip install saturn[vulkan]`. Without the package, apps requesting Vulkan fall back to software rendering and print the reason. The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:
+The experimental Vulkan backend draws geometry and composites textures on the GPU with batched draw calls and scissor clipping. OpenGL is the supported GPU backend; Vulkan may change or fall behind it while it matures. Text and some effects are prepared as surfaces before texture upload; the full frame is not rasterized on the CPU. A Vulkan-capable driver is required, along with the optional `vulkan` package: `pip install saturn[vulkan]`. Without the package, apps requesting Vulkan fall back to software rendering and print the reason. The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:
 
 ```powershell
 $env:SATURN_BACKEND = "opengl"
