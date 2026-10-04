@@ -74,7 +74,7 @@ the originating view. `page.on_resize` receives `e.width`, `e.height` and
 be reused. Size getters return the originating view's dimensions, native
 handles return zero, and other native settings return their defaults. Typos
 still raise `AttributeError`. Native Subpages remain unsupported; desktop
-`page.web` reports the required runtime.
+`page.web` is None.
 
 ## Named messages
 

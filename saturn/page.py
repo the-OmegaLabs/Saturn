@@ -155,8 +155,8 @@ class Page(Control):
     # -- public API ---------------------------------------------------------
     @property
     def web(self):
-        """Web session services, available on Pages hosted by saturn.web."""
-        raise NotImplementedError("page.web requires the saturn.web runtime")
+        """Web session services when hosted by saturn.web; None on desktop."""
+        return None
 
     @property
     def renderer(self):
