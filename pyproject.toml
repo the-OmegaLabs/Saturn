@@ -52,3 +52,7 @@ members = ["packages/*"]
 [tool.uv.build-backend]
 module-name = "saturn"
 module-root = ""
+# The GL backend embeds wave/effects GLSL in saturn/renderer/_glsl.py and the
+# Vulkan runtime loads only the committed .spv blobs; the .glsl files remain
+# in the checkout and sdist for live editing but never ship in wheels.
+wheel-exclude = ["**/*.glsl"]

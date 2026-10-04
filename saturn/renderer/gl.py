@@ -141,6 +141,15 @@ void main() {
 }
 """
 
+def _glsl_source(name: str) -> str:
+    """Read a GLSL source from the checkout, or the embedded copy in wheels."""
+    try:
+        return Path(__file__).with_name(name).read_text(encoding="utf-8")
+    except OSError:
+        from ._glsl import SOURCES
+        return SOURCES[name]
+
+
 STATE_FS = """
 #version 330
 in vec2 v_uv;
@@ -156,7 +165,7 @@ uniform vec4 u_wave;
 uniform vec4 u_info;
 uniform vec4 u_secondary_color;
 out vec4 frag;
-""" + Path(__file__).with_name('wave.glsl').read_text() + Path(__file__).with_name('effects.glsl').read_text() + """
+""" + _glsl_source('wave.glsl') + _glsl_source('effects.glsl') + """
 void main() {
     vec2 p = v_uv * u_rect_size;
     if (u_mode > 3.5) {
