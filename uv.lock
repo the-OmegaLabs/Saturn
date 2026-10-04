@@ -644,10 +644,12 @@ dependencies = [
     { name = "pyperclip" },
     { name = "saturn-fonts-cjk" },
     { name = "saturn-icons-material" },
-    { name = "vulkan" },
 ]
 
 [package.optional-dependencies]
+vulkan = [
+    { name = "vulkan" },
+]
 web = [
     { name = "fastapi" },
     { name = "uvicorn" },
@@ -674,10 +676,10 @@ requires-dist = [
     { name = "saturn-fonts-cjk", editable = "packages/saturn-fonts-cjk" },
     { name = "saturn-icons-material", editable = "packages/saturn-icons-material" },
     { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.30" },
-    { name = "vulkan", specifier = ">=1.3.275.1" },
+    { name = "vulkan", marker = "extra == 'vulkan'", specifier = ">=1.3.275.1" },
     { name = "websockets", marker = "extra == 'web'", specifier = ">=13" },
 ]
-provides-extras = ["web"]
+provides-extras = ["web", "vulkan"]
 
 [package.metadata.requires-dev]
 examples = [

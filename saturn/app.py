@@ -182,6 +182,7 @@ class App:
             self._renderer_failure = dict(backend=self._backend.value,
                                           gpu=self._gpu, error=str(error))
             print("Saturn can't use your current GPU, fallback to software renderer.")
+            print(f"  reason: {error}")
             position = self._window.position if self._window is not None else None
             if self.renderer is not None:
                 try:

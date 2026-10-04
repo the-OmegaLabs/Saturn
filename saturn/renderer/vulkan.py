@@ -18,7 +18,13 @@ from pathlib import Path
 import struct
 
 import pygame
-import vulkan as vk
+
+try:
+    import vulkan as vk
+except ImportError as error:  # optional extra: pip install saturn[vulkan]
+    raise ImportError(
+        "The Vulkan backend requires the optional 'vulkan' package; "
+        "install it with `pip install saturn[vulkan]`") from error
 
 from ..colors import parse_color
 from .base import Renderer

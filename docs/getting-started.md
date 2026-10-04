@@ -45,7 +45,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 saturn.run(main, backend=saturn.Renderer.VULKAN)
 ```
 
-You can also set `SATURN_BACKEND` when omitting the `backend` argument. `Renderer.VULKAN` uses a Vulkan graphics pipeline to draw shapes and composite text and image textures on the GPU, with batched draw calls and clipping. It requires a Vulkan-capable driver. `Render` remains a compatibility alias.
+You can also set `SATURN_BACKEND` when omitting the `backend` argument. `Renderer.VULKAN` uses a Vulkan graphics pipeline to draw shapes and composite text and image textures on the GPU, with batched draw calls and clipping. It requires a Vulkan-capable driver and the optional `vulkan` package (`pip install saturn[vulkan]`); without the package Saturn falls back to software rendering and prints the reason. `Render` remains a compatibility alias.
 
 ## Keep exploring
 
