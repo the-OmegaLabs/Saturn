@@ -90,6 +90,8 @@ class Shader(Control):
         self._error = None
         self._source_key = None
         self._source = None
+        self._prepared_key = None
+        self._prepared = None
         self._started = _time.perf_counter()
         self._elapsed = 0.0
         if self._builtin:
@@ -139,6 +141,7 @@ class Shader(Control):
         if key != self._source_key:
             self._source = resolve_source(self.shader, self.includes, self.include_dirs)
             self._source_key = key
+            self._prepared_key = None
         if 'saturnSampleBuffer' in self._source and self.buffer is None:
             raise ValueError("saturnSampleBuffer requires a ShaderBuffer")
         radius = _number(self.border_radius, "border_radius")
@@ -146,8 +149,14 @@ class Shader(Control):
             raise ValueError("border_radius must be nonnegative")
         if not isinstance(self.animate, bool):
             raise TypeError("animate must be a bool")
+        # GLSL parsing dominates the frame budget if redone per frame; the
+        # prepared program inputs only change when source or uniforms do.
+        prepared_key = (self._source_key, tuple(sorted(self.uniforms.items())))
+        if prepared_key != self._prepared_key:
+            self._prepared = prepare_source(self._source, self.uniforms)
+            self._prepared_key = prepared_key
         elapsed = _number(self.time, "time") + self._elapsed * _number(self.speed, "speed")
-        return (*prepare_source(self._source, self.uniforms), elapsed, radius)
+        return (*self._prepared, elapsed, radius)
 
     def _parameters(self):
         effect = self.effect.value if isinstance(self.effect, ShaderEffect) else self.effect

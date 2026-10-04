@@ -683,12 +683,14 @@ class GLRenderer(Renderer):
                 raise ShaderCompilationError(str(error)) from error
             vao = self.ctx.vertex_array(program,
                 [(self._state_vbo, '2f 2f', 'in_pos', 'in_uv')], skip_errors=True)
-            self._custom_programs[key] = (program, vao)
+            # `name in program` iterates every member; snapshot the uniform
+            # names once so the per-frame loop can use a hash lookup.
+            self._custom_programs[key] = (program, vao, frozenset(program))
             if len(self._custom_programs)>32:
-                _, (old_program, old_vao) = self._custom_programs.popitem(last=False)
+                _, (old_program, old_vao, _) = self._custom_programs.popitem(last=False)
                 old_vao.release()
                 old_program.release()
-        program, vao = self._custom_programs[key]
+        program, vao, names = self._custom_programs[key]
         self._custom_programs.move_to_end(key)
         self._flush_rects()
         if buffer_pass is not None:
@@ -704,7 +706,7 @@ class GLRenderer(Renderer):
                         u_color=tuple(v/255 for v in parse_color(color)),
                         u_secondary_color=tuple(v/255 for v in parse_color(secondary_color)))
         for name, value in (*builtins.items(), *zip((name for name,_ in layout), values)):
-            if name in program:
+            if name in names:
                 program[name].value = value
         vao.render(moderngl.TRIANGLES)
 
@@ -725,12 +727,12 @@ class GLRenderer(Renderer):
                 if len(self._custom_failures) > 32:
                     self._custom_failures.popitem(last=False)
                 raise ShaderCompilationError(str(error)) from error
-            self._buffer_programs[key] = (program, vao)
+            self._buffer_programs[key] = (program, vao, frozenset(program))
             if len(self._buffer_programs) > 16:
-                _, (old, old_vao) = self._buffer_programs.popitem(last=False)
+                _, (old, old_vao, _) = self._buffer_programs.popitem(last=False)
                 old_vao.release()
                 old.release()
-        program, vao = self._buffer_programs[key]
+        program, vao, names = self._buffer_programs[key]
         self._buffer_programs.move_to_end(key)
         size = (max(1, round(w*self.scale)), max(1, round(h*self.scale)))
         cached = self._shader_buffers.get(token)
@@ -762,7 +764,7 @@ class GLRenderer(Renderer):
                             u_color=tuple(v/255 for v in parse_color(color)),
                             u_secondary_color=tuple(v/255 for v in parse_color(secondary)))
             for name, value in (*builtins.items(), *zip((n for n,_ in layout), values)):
-                if name in program:
+                if name in names:
                     program[name].value = value
             vao.render(moderngl.TRIANGLES, vertices=6, instances=instances)
         finally:
@@ -871,12 +873,12 @@ class GLRenderer(Renderer):
             target.release()
             texture.release()
         self._shader_buffers.clear()
-        for program, vao in self._buffer_programs.values():
+        for program, vao, _ in self._buffer_programs.values():
             vao.release()
             program.release()
         self._buffer_programs.clear()
         self._flush_rects()
-        for program, vao in self._custom_programs.values():
+        for program, vao, _ in self._custom_programs.values():
             vao.release()
             program.release()
         self._custom_programs.clear()

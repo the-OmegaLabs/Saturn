@@ -24,6 +24,8 @@ class _WindowPos(ctypes.Structure):
 
 
 class NativeWindow:
+    _window_event_type = None  # cached on first message; import here is too slow
+
     def __init__(self, owner):
         self.owner = owner
         self.hwnd = owner.hwnd
@@ -74,7 +76,10 @@ class NativeWindow:
         @callback_type
         def callback(hwnd, message, wparam, lparam, _id, _data):
             try:
-                from .window import WindowEventType
+                event_type = NativeWindow._window_event_type
+                if event_type is None:
+                    from .window import WindowEventType
+                    event_type = NativeWindow._window_event_type = WindowEventType
                 if message == 0x0046 and self.owner.always_on_bottom:
                     position = ctypes.cast(lparam, ctypes.POINTER(_WindowPos)).contents
                     position.after = 1  # HWND_BOTTOM
@@ -83,13 +88,13 @@ class NativeWindow:
                     if not self.owner.movable:
                         return 0  # WM_SYSCOMMAND / SC_MOVE
                 if message == 0x0214:
-                    self.owner._emit(WindowEventType.RESIZE)
+                    self.owner._emit(event_type.RESIZE)
                     if self.owner.aspect_ratio:
                         rect = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
                         self.owner._constrain_sizing(rect, wparam)
                         return 1  # WM_SIZING
                 if message == 0x0216:
-                    self.owner._emit(WindowEventType.MOVE)
+                    self.owner._emit(event_type.MOVE)
                 result = self.comctl.DefSubclassProc(hwnd, message, wparam, lparam)
                 if message == 0x0084 and self.owner.ignore_mouse_events:
                     return -1  # WM_NCHITTEST / HTTRANSPARENT
