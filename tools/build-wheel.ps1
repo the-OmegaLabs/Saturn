@@ -14,11 +14,15 @@
 #   -WheelOnly  build only the wheel for saturn (skip the .tar.gz sdist)
 #   -NoClean    keep existing files in dist\ before building
 #   -SkipSmoke  skip the temporary-venv install test (offline builds)
+#   -Python     interpreter for the smoke-test venvs, e.g. -Python 3.10 or
+#               -Python "3.10,3.12,3.14" to verify each in turn (uv downloads
+#               managed interpreters on demand); default is uv's choice
 
 param(
     [switch]$WheelOnly,
     [switch]$NoClean,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    [string]$Python = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -94,13 +98,20 @@ Invoke-Step "verifying wheel contents" {
 }
 
 if (-not $SkipSmoke) {
-    Invoke-Step "smoke-testing the wheel in a temporary venv" {
-        $venv = Join-Path $env:TEMP ("saturn-wheel-smoke-" + $PID)
-        $python = Join-Path $venv "Scripts\python.exe"
-        try {
-            uv venv $venv
-            uv pip install --python $python --find-links $dist "saturn==0.1.0"
-            $check = @"
+    $versions = @($Python.Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if (-not $versions) { $versions = @("") }
+    foreach ($version in $versions) {
+        $label = if ($version) { "Python $version" } else { "the default interpreter" }
+        Invoke-Step "smoke-testing the wheel on $label" {
+            $tag = if ($version) { $version -replace "[^0-9.abrc]", "" } else { "default" }
+            $venv = Join-Path $env:TEMP ("saturn-wheel-smoke-" + $PID + "-" + $tag)
+            $python = Join-Path $venv "Scripts\python.exe"
+            try {
+                $venvArgs = @("venv", $venv)
+                if ($version) { $venvArgs += @("--python", $version) }
+                uv @venvArgs
+                uv pip install --python $python --find-links $dist "saturn==0.1.0"
+                $check = @"
 import importlib.metadata
 assert importlib.metadata.version('saturn') == '0.1.0'
 import saturn.renderer.gl   # installed wheel has no .glsl: exercises the embedded copy
@@ -113,10 +124,11 @@ else:
     print('vulkan package present')
 print('wheel smoke OK')
 "@
-            $check | & $python -
-            if ($LASTEXITCODE -ne 0) { throw "smoke test imports failed" }
-        } finally {
-            if (Test-Path $venv) { Remove-Item $venv -Recurse -Force -ErrorAction SilentlyContinue }
+                $check | & $python -
+                if ($LASTEXITCODE -ne 0) { throw "smoke test imports failed" }
+            } finally {
+                if (Test-Path $venv) { Remove-Item $venv -Recurse -Force -ErrorAction SilentlyContinue }
+            }
         }
     }
 }
