@@ -39,7 +39,7 @@ from .types import (
     RoundedRectangleBorder, StadiumBorder, CircleBorder,
     ImageRepeat, FilterQuality, ClipBehavior, BoxShape, StrokeCap, VisualDensity,
     TextSelection, TextAffinity, InputFilter, TextCapitalization,
-    SliderInteraction, LinearGradient,
+    SliderInteraction, LinearGradient, RadialGradient,
     NoInputBorder, UnderlineInputBorder,
     Alignment,
     Animation,
@@ -134,7 +134,7 @@ from .compose import Compose
 
 __all__ = [
     "NoInputBorder", "UnderlineInputBorder",
-    "Subpage", "Shader", "ShaderEffect", "ShaderBuffer", "SliderInteraction", "LinearGradient",
+    "Subpage", "Shader", "ShaderEffect", "ShaderBuffer", "SliderInteraction", "LinearGradient", "RadialGradient",
     "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
     "WindowEvent", "WindowEventType", "WindowResizeEdge",

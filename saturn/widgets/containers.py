@@ -523,12 +523,17 @@ class Container(Control):
     def _draw_gradient(self, r, x, y, w, h):
         # Static decoration cache: gradients are rasterized only when their
         # size or stops change, then share the ordinary GPU texture path.
+        import math
         import pygame
+        from bisect import bisect_right
         from ..painting import corners, shape_mask
         g = self.gradient
         begin, end = getattr(g, "begin", None), getattr(g, "end", None)
+        center, radius = getattr(g, "center", None), getattr(g, "radius", None)
         if begin is None or end is None:
-            raise NotImplementedError("only LinearGradient is supported")
+            if center is None or radius is None:
+                raise NotImplementedError(
+                    "only linear and radial gradients are supported")
         rgba = tuple(colors.parse_color(c) for c in g.colors)
         if len(rgba) < 2:
             raise ValueError("a gradient requires at least two colors")
@@ -536,20 +541,34 @@ class Container(Control):
         if len(stops) != len(rgba) or list(stops) != sorted(stops):
             raise ValueError("gradient stops must match colors and increase")
         pw, ph = max(1, round(w*r.scale)), max(1, round(h*r.scale))
-        key = (pw, ph, rgba, stops, begin.x, begin.y, end.x, end.y, self._radius())
-        if getattr(self, "_gradient_key", None) != key:
+        if radius is not None:  # radial
+            focal = getattr(g, "focal", None)
+            if focal is not None and (focal.x != center.x or focal.y != center.y):
+                raise NotImplementedError(
+                    "an off-center focal point is not supported for radial gradients")
+            cx, cy = (center.x+1)*pw/2, (center.y+1)*ph/2
+            span = math.hypot(pw, ph)/2
+            rp = max(1.0, radius*span)
+            fp = max(0.0, getattr(g, "focal_radius", 0.0)*span)
+            key = ("radial", pw, ph, rgba, stops, cx, cy, rp, fp, self._radius())
+            def t_at(px, py):
+                return (math.hypot(px-cx, py-cy)-fp)/(rp-fp)
+        else:
             sx, sy = (begin.x+1)*pw/2, (begin.y+1)*ph/2
             dx, dy = (end.x-begin.x)*pw/2, (end.y-begin.y)*ph/2
             denom = dx*dx+dy*dy or 1
+            key = (pw, ph, rgba, stops, begin.x, begin.y, end.x, end.y, self._radius())
+            def t_at(px, py):
+                return ((px-sx)*dx+(py-sy)*dy)/denom
+        if getattr(self, "_gradient_key", None) != key:
             surface = pygame.Surface((pw, ph), pygame.SRCALPHA)
             # A smooth gradient has no high-frequency detail. Rasterize its
             # small color field once and upscale, without an extra dependency.
             gw,gh = min(pw,128),min(ph,128)
             field = pygame.Surface((gw,gh),pygame.SRCALPHA)
-            from bisect import bisect_right
             for gy in range(gh):
                 for gx in range(gw):
-                    t = max(0,min(1,((gx*pw/gw-sx)*dx+(gy*ph/gh-sy)*dy)/denom))
+                    t = max(0,min(1,t_at(gx*pw/gw, gy*ph/gh)))
                     i = max(0,min(len(stops)-2,bisect_right(stops,t)-1))
                     fraction = max(0,min(1,(t-stops[i])/(stops[i+1]-stops[i] or 1)))
                     field.set_at((gx,gy),tuple(round(a+(b-a)*fraction) for a,b in zip(rgba[i],rgba[i+1])))

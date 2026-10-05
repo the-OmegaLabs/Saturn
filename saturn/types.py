@@ -480,6 +480,19 @@ class LinearGradient:
 
 
 @dataclass
+class RadialGradient:
+    """Flet-compatible radial sweep: ``radius`` spans half the box diagonal,
+    so 1.0 reaches the corners from ``center``. ``focal`` currently only
+    supports the shared-center two-point form via ``focal_radius``."""
+    colors: list
+    center: Alignment = field(default_factory=lambda: Alignment(0, 0))
+    radius: float = 0.5
+    focal: Alignment | None = None
+    focal_radius: float = 0.0
+    stops: list | None = None
+
+
+@dataclass
 class TextStyle:
     size: float | None = None
     weight: FontWeight | None = None
