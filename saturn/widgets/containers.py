@@ -114,11 +114,12 @@ class _Multi(Control):
             h = self._height if self._height is not None else cross
         return w, h
 
-    def _footprint(self, k, max_w, scale):
+    def _footprint(self, k, max_w, scale, max_h=None):
         """Child intrinsic size + its margin (margin sits outside the box)."""
         ml, mt, mr, mb = _margins(k)
         w, h = k._intrinsic(
-            (max_w - ml - mr) if max_w is not None else None, None, scale)
+            (max_w - ml - mr) if max_w is not None else None,
+            (max_h - mt - mb) if max_h is not None else None, scale)
         return w + ml + mr, h + mt + mb
 
     # -- placing -----------------------------------------------------------
@@ -150,7 +151,11 @@ class _Multi(Control):
         kids = self._visible()
         if not kids:
             return
-        sizes = [self._footprint(k, w, scale) for k in kids]
+        # For a Row the cross axis (height) is bounded by this box, matching
+        # Flutter's loose cross constraints so aligned children can fill it.
+        sizes = [self._footprint(k, w, scale,
+                                 h if not self.vertical else None)
+                 for k in kids]
         main_sizes = [s[0] if not self.vertical else s[1] for s in sizes]
         box_main = w if not self.vertical else h
         flex = [self._expand_of(k) for k in kids]
@@ -445,6 +450,13 @@ class Container(Control):
             cw = ch = 0.0
         w = state["_width"] if state["_width"] is not None else cw + pad_w
         h = state["_height"] if state["_height"] is not None else ch + pad_h
+        # Flutter Container rule: with an alignment and no explicit size the
+        # box fills the bounded constraints instead of wrapping its content.
+        if state["alignment"] is not None:
+            if state["_width"] is None and max_w is not None:
+                w = max_w
+            if state["_height"] is None and max_h is not None:
+                h = max_h
         # Parent constraints limit the child's requested size. A 460px card
         # placed in a 330px page shrinks to the available width.
         if max_w is not None:
@@ -602,11 +614,26 @@ class Stack(Control):
 
     def _intrinsic(self, max_w, max_h, scale):
         ws, hs = 0.0, 0.0
+        positioned = 0
+        visible = 0
         for k in self.controls:
             if not k.visible:
                 continue
+            visible += 1
+            if k.left is not None or k.top is not None \
+                    or k.right is not None or k.bottom is not None:
+                positioned += 1
             w, h = k._intrinsic(max_w, max_h, scale)
             ws, hs = max(ws, w), max(hs, h)
+        if positioned and positioned == visible:
+            # Flutter: a Stack with only positioned children sizes itself to
+            # the biggest size the constraints allow; unbounded axes fall
+            # back to the largest child.
+            w = self._width if self._width is not None else (
+                max_w if max_w is not None else ws)
+            h = self._height if self._height is not None else (
+                max_h if max_h is not None else hs)
+            return w, h
         w = self._width if self._width is not None else ws
         h = self._height if self._height is not None else hs
         # Layout rule: the Stack itself fits its constraints; oversized
