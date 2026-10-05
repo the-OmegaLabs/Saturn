@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-000000?style=flat-square&logo=python&logoColor=white">
   <img alt="Status: Alpha" src="https://img.shields.io/badge/status-alpha-000000?style=flat-square">
-  <img alt="Software, OpenGL, and Vulkan renderers" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan-000000?style=flat-square">
+  <img alt="Software, OpenGL, and Vulkan renderers" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan%20(Experimental)-000000?style=flat-square">
 </p>
 
 > **Saturn** is currently in **alpha** stages. Everything may change, some controls are still being completed, and production use should be evaluated carefully.
