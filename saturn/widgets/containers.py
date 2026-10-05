@@ -793,12 +793,20 @@ class WindowDragArea(Control):
         x, y = self._hit_point(x, y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
-        return self
+        if self.content is not None:
+            hit = self.content._hit_test(x, y)
+            if hit is not None:
+                return hit  # interactive children (window buttons) win taps
+        return self  # everything else drags the window
 
     def _hit_test_hover(self, x, y):
         x, y = self._hit_point(x, y)
         if not self.visible or self.disabled or not self._contains(x, y):
             return None
+        if self.content is not None:
+            hit = self.content._hit_test_hover(x, y)
+            if hit is not None:
+                return hit
         return self
 
     def _pressed_hook(self, x, y):

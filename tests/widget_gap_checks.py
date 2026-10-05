@@ -76,10 +76,14 @@ def check_vertical_divider():
 
 
 def check_window_drag_area():
-    events, calls, maximized = [], [], []
+    events, calls, maximized, clicks = [], [], [], []
     def main(page):
         area = st.WindowDragArea(
-            st.Container(st.Text("title"), bgcolor="#243B42", padding=8),
+            st.Row([
+                st.Container(st.Text("btn"), bgcolor="#243B42", width=40, height=25,
+                             on_click=lambda e: clicks.append("btn")),
+                st.Text("title", expand=True),
+            ], spacing=0),
             on_drag_start=lambda e=None: events.append("start"),
             on_drag_end=lambda e=None: events.append("end"))
         page.add(area)
@@ -92,24 +96,35 @@ def check_window_drag_area():
         area = page._area
         window = page.window
         window._native.start_interaction = lambda hit: calls.append(hit)
-        x, y = area._rect[0] + 10, area._rect[1] + 5
-        page.pointer_down(x, y)
+        row = area.content
+        button, title = row.controls
+        # press on the plain title text starts the native drag
+        tx, ty = title._rect[0] + 8, title._rect[1] + 5
+        page.pointer_down(tx, ty)
         pump(app, lambda: len(calls) == 1 and "end" in events)
         assert calls == [2], calls
         assert "start" in events and "end" in events, events
-        page.pointer_up(x, y)
+        page.pointer_up(tx, ty)
         pump(app)
+        # a press on the interactive child clicks it instead of dragging
+        bx, by = button._rect[0] + 20, button._rect[1] + 12
+        page.pointer_down(bx, by)
+        assert page._pressed is button, page._pressed
+        page.pointer_up(bx, by)
+        pump(app)
+        assert clicks == ["btn"], (clicks, calls)
+        assert len(calls) == 1, calls  # button press must not start a drag
         # double press toggles maximize instead of dragging
         with mock.patch.object(type(window), "maximized",
                                property(lambda self: False,
                                         lambda self, v: maximized.append(v))):
             area._last_press = None
-            area._pressed_hook(x, y)
-            area._pressed_hook(x, y)
+            area._pressed_hook(tx, ty)
+            area._pressed_hook(tx, ty)
         pump(app)
         assert maximized == [True], (maximized, calls)
         assert len(calls) == 2, calls  # each first-of-pair press starts a drag
-        print("WindowDragArea drag/double-tap OK")
+        print("WindowDragArea drag/click-through/double-tap OK")
     finally:
         app.close()
         app.run_until_closed()
