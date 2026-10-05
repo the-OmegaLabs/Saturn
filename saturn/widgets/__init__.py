@@ -3,7 +3,8 @@ from .basic import Card, Icon, Image, ProgressBar, ProgressRing  # noqa: F401
 from .buttons import (Button, ElevatedButton, ExpressiveButton, FilledButton,  # noqa: F401
                       FilledTonalButton, IconButton, ExpressiveIconButton,
                       OutlinedButton, TextButton)
-from .containers import (Column, Container, Divider, VerticalDivider, Row, Stack,
+from .containers import (AnimatedSwitcher, AnimatedSwitcherTransition,  # noqa: F401
+                         Column, Container, Divider, VerticalDivider, Row, Stack,
                          WindowDragArea)  # noqa: F401
 from .dialogs import AlertDialog, DialogControl, SnackBar  # noqa: F401
 from .fab import (ExtendedFloatingActionButton, FloatingActionButton,  # noqa: F401
@@ -16,6 +17,9 @@ from .expressive_progress import (LoadingIndicator, WavyProgressIndicator,
                                  LinearWavyProgressIndicator, CircularWavyProgressIndicator)
 from .floating import (FloatingToolbar, HorizontalFloatingToolbar, VerticalFloatingToolbar,
                        FloatingActionButtonMenu, FloatingActionButtonMenuItem)
+from .navigation_rail import (NavigationRail, NavigationRailDestination,  # noqa: F401
+                              NavigationRailLabelType)
+from .popup_menu import PopupMenuButton, PopupMenuItem  # noqa: F401
 from .split_button import SplitButton  # noqa: F401
 from .button_group import ButtonGroup  # noqa: F401
 from .toggle_button import (ToggleButton, ElevatedToggleButton,  # noqa: F401

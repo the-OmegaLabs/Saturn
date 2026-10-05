@@ -100,6 +100,19 @@ class _RendererSettings:
         return self._app.renderer
 
 
+def _require_saturn_control(control):
+    """Reject controls built by other frameworks before they poison the tree."""
+    if isinstance(control, Control):
+        return
+    cls = type(control)
+    hint = (" Replace `import flet` with `import saturn` in the module"
+            " that created it."
+            if cls.__module__.split(".", 1)[0] == "flet" else "")
+    raise TypeError(
+        f"{cls.__module__}.{cls.__qualname__} is not a Saturn control"
+        f" and cannot enter a Saturn page.{hint}")
+
+
 class Page(Control):
     """Root control container. Handlers (on_resize etc.) run off the UI thread."""
 
@@ -302,10 +315,13 @@ class Page(Control):
         self.window.title = v or "saturn"
 
     def add(self, *ctrls: Control):
+        for control in ctrls:
+            _require_saturn_control(control)
         self.controls.extend(ctrls)
         self.update()
 
     def insert(self, index, ctrl):
+        _require_saturn_control(ctrl)
         self.controls.insert(index, ctrl)
         self.update()
 
@@ -377,6 +393,7 @@ class Page(Control):
         for control, _ in previous_roots:
             collect_old(control)
         def reconcile(control, parent):
+            _require_saturn_control(control)
             if control in current:
                 raise ValueError("A control cannot occur twice in the same control tree")
             current.add(control)

@@ -536,6 +536,21 @@ class InputFilter:
     replacement_string: str = ""
 
 
+class NumbersOnlyInputFilter(InputFilter):
+    """Allows only digits; every other character is stripped from the value."""
+
+    def __init__(self):
+        super().__init__(allow=True, regex_string=r"[0-9]*", replacement_string="")
+
+
+class InputBorder(enum.Enum):
+    """TextField border shape, mirroring flet's InputBorder."""
+    NONE = "none"
+    OUTLINE = "outline"
+    UNDERLINE = "underline"
+    FILLED = "filled"
+
+
 @dataclass
 class BoxConstraints:
     min_width: float = 0

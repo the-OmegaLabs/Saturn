@@ -12,13 +12,16 @@ Stack children position via their own left/top/right/bottom.
 """
 from __future__ import annotations
 
+import enum
+import math
 import sys
 import time
 
 from .. import colors
+from ..animation import ease
 from ..control import Control
-from ..types import (CrossAxisAlignment, MainAxisAlignment,
-                     as_border_radius, as_padding)
+from ..types import (Alignment, AnimationCurve, CrossAxisAlignment,
+                     MainAxisAlignment, as_border_radius, as_padding)
 from ._material import (draw_state_layer, init_state_layer, press,
                         release, set_hover, tick_state_layer)
 from ._compat import axis_distribution, value, reject_options
@@ -704,7 +707,7 @@ class Stack(Control):
 
 
 class Divider(Control):
-    def __init__(self, *, height: float = 16, thickness: float = 1,
+    def __init__(self, height: float = 16, *, thickness: float = 1,
                  color=None, leading_indent: float = 0, trailing_indent: float = 0,
                  radius=None, **base):
         super().__init__(**base)
@@ -845,3 +848,155 @@ class WindowDragArea(Control):
         page._app.post(lambda: native.start_interaction(2))
         if self.on_drag_end:
             page._app.post(lambda: page._dispatch(self.on_drag_end))
+
+
+class AnimatedSwitcherTransition(enum.Enum):
+    """Visual strategy used while AnimatedSwitcher swaps its content."""
+    FADE = "fade"
+    ROTATION = "rotation"
+    SCALE = "scale"
+
+
+def _switch_ms(value):
+    """Accept flet's DurationValue: a number of milliseconds or a Duration."""
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    ms = getattr(value, "in_milliseconds", None)
+    if ms is None:
+        ms = getattr(value, "in_microseconds", 0) / 1000.0
+    return float(ms)
+
+
+class AnimatedSwitcher(Stack):
+    """Animates between old and new content, mirroring Flutter's switcher.
+
+    The outgoing child stays in the tree below the incoming one (a centered
+    Stack) until its reverse_duration elapses, so layout, attachment and hit
+    testing all see a consistent tree; only the draw pass adds the fade or
+    transform envelope.
+    """
+
+    def __init__(self, content=None, *, duration=1000, reverse_duration=None,
+                 switch_in_curve=AnimationCurve.LINEAR,
+                 switch_out_curve=AnimationCurve.LINEAR,
+                 transition=AnimatedSwitcherTransition.FADE, **base):
+        super().__init__(alignment=Alignment.CENTER, clip_behavior="none", **base)
+        self.duration = duration
+        self.reverse_duration = (reverse_duration if reverse_duration is not None
+                                 else duration)
+        self.switch_in_curve = switch_in_curve
+        self.switch_out_curve = switch_out_curve
+        self.transition = transition
+        self._content = content
+        self._outgoing = []      # [{control, started, duration, curve, transition}]
+        self._in_started = None  # None: current content appeared without animation
+        self._sync_children()
+
+    @property
+    def content(self):
+        return self._content
+
+    @content.setter
+    def content(self, value):
+        old = self._content
+        if old is value:
+            return
+        self._content = value
+        if self.page is not None:
+            now = time.perf_counter()
+            # Toggling back to a still-fading control restores it instantly.
+            self._outgoing = [entry for entry in self._outgoing
+                              if entry["control"] is not value]
+            if old is not None:
+                self._outgoing.append({
+                    "control": old, "started": now,
+                    "duration": _switch_ms(self.reverse_duration) / 1000.0,
+                    "curve": self.switch_out_curve,
+                    "transition": self.transition})
+            self._in_started = now
+        self._sync_children()
+        self.update()
+
+    def _sync_children(self):
+        self.controls = ([entry["control"] for entry in self._outgoing]
+                         + ([self._content] if self._content is not None else []))
+
+    def _progress(self, started, ms, now):
+        duration = ms / 1000.0
+        if duration <= 0:
+            return 1.0
+        return min(1.0, (now - started) / duration)
+
+    def _in_fade(self, now):
+        if self._in_started is None:
+            return 1.0
+        progress = self._progress(self._in_started, _switch_ms(self.duration), now)
+        return ease(self.switch_in_curve, progress)
+
+    def _tick_animations(self, now: float) -> bool:
+        remaining = [entry for entry in self._outgoing
+                     if now - entry["started"] < entry["duration"]]
+        if len(remaining) != len(self._outgoing):
+            self._outgoing = remaining
+            self._sync_children()
+            self.update()
+        active = super()._tick_animations(now) or bool(self._outgoing)
+        return active or self._in_fade(now) < 1.0
+
+    def _draw_all(self, r, ox=0.0, oy=0.0):
+        if not self.visible:
+            return
+        self._effects_begin(r, ox, oy)
+        try:
+            now = time.perf_counter()
+            for entry in self._outgoing:
+                progress = self._progress(entry["started"],
+                                          entry["duration"] * 1000.0, now)
+                fade = 1.0 - ease(entry["curve"], progress)
+                if fade > 0.0:
+                    self._draw_entry(r, entry["control"], ox, oy, fade,
+                                     entry["transition"], 1.0 - progress)
+            if self._content is not None:
+                self._draw_entry(r, self._content, ox, oy, self._in_fade(now),
+                                 self.transition,
+                                 1.0 if self._in_started is None else
+                                 self._progress(self._in_started,
+                                                _switch_ms(self.duration), now))
+        finally:
+            self._effects_end(r)
+
+    def _draw_entry(self, r, child, ox, oy, opacity, transition, progress):
+        mode = getattr(transition, "value", transition)
+        pushed_opacity = pushed_transform = False
+        try:
+            if opacity < 1.0:
+                r.opacity_push(max(0.0, min(1.0, opacity)))
+                pushed_opacity = True
+            if mode == "rotation" and progress < 1.0:
+                x, y, w, h = child._rect
+                cx, cy = x + w / 2.0, y + h / 2.0
+                angle = progress * 2.0 * math.pi
+                cosine, sine = math.cos(angle), math.sin(angle)
+                r.transform_push((cosine, sine, -sine, cosine,
+                                  cx - cosine * cx + sine * cy,
+                                  cy - sine * cx - cosine * cy),
+                                 bounds=child._paint_bounds(ox, oy))
+                pushed_transform = True
+            elif mode == "scale" and progress < 1.0:
+                if progress <= 0.0:
+                    return
+                x, y, w, h = child._rect
+                cx, cy = x + w / 2.0, y + h / 2.0
+                factor = ease(self.switch_in_curve, progress)
+                r.transform_push((factor, 0.0, 0.0, factor,
+                                  cx * (1.0 - factor), cy * (1.0 - factor)),
+                                 bounds=child._paint_bounds(ox, oy))
+                pushed_transform = True
+            child._draw_all(r, ox, oy)
+        finally:
+            if pushed_transform:
+                r.transform_pop()
+            if pushed_opacity:
+                r.opacity_pop()

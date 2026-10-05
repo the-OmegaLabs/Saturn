@@ -224,7 +224,7 @@ class TextField(Control):
         self.value = str(value)
         self.text_size = text_size or 16.0
         self._password_revealed = False
-        self._caret = len(value)
+        self._caret = len(self.value)
         self._selection_anchor = None
         self._selection_dragging = False
         self._selection_drag_mode = "character"
@@ -2020,7 +2020,7 @@ class Slider(Control):
 class DropdownOption(Control):
     """Options hold key/text data; the Dropdown renders them as a menu."""
 
-    def __init__(self, key=None, *, text=None, content=None,
+    def __init__(self, key=None, text=None, *, content=None,
                  leading_icon=None, trailing_icon=None, style=None, **base):
         super().__init__(**base)
         self.key = key if key is not None else (text if text is not None else

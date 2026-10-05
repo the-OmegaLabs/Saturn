@@ -15,6 +15,10 @@ from .event import (
     TextSelectionChangeEvent, LayoutSizeChangeEvent, RouteChangeEvent,
     RenderFailedEvent, RenderReadyEvent, FontOptimizeEvent,
 )
+
+# Handler-annotation names mirroring flet: `def on_hover(e: HoverEvent[Container])`.
+Event = ControlEvent
+HoverEvent = ControlEvent
 from .app import App, Renderer, run
 
 Render = Renderer
@@ -38,7 +42,8 @@ from .types import (
     ButtonStyle, ControlState, BoxConstraints, MouseCursor, Ref,
     RoundedRectangleBorder, StadiumBorder, CircleBorder,
     ImageRepeat, FilterQuality, ClipBehavior, BoxShape, StrokeCap, VisualDensity,
-    TextSelection, TextAffinity, InputFilter, TextCapitalization,
+    TextSelection, TextAffinity, InputFilter, NumbersOnlyInputFilter,
+    InputBorder, TextCapitalization,
     SliderInteraction, LinearGradient, RadialGradient,
     NoInputBorder, UnderlineInputBorder,
     Alignment,
@@ -73,6 +78,8 @@ from .types import (
 )
 from .widgets import (
     AlertDialog,
+    AnimatedSwitcher,
+    AnimatedSwitcherTransition,
     DialogControl,
     Button,
     Card,
@@ -106,6 +113,11 @@ from .widgets import (
     Image,
     ListView,
     ListItem,
+    NavigationRail,
+    NavigationRailDestination,
+    NavigationRailLabelType,
+    PopupMenuButton,
+    PopupMenuItem,
     LoadingIndicator,
     WavyProgressIndicator,
     LinearWavyProgressIndicator,
@@ -136,6 +148,8 @@ __all__ = [
     "NoInputBorder", "UnderlineInputBorder",
     "Subpage", "Shader", "ShaderEffect", "ShaderBuffer", "SliderInteraction", "LinearGradient", "RadialGradient",
     "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
+    "Event", "HoverEvent",
+    "AnimatedSwitcher", "AnimatedSwitcherTransition",
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",
     "WindowEvent", "WindowEventType", "WindowResizeEdge",
     "TextSelectionChangeEvent", "LayoutSizeChangeEvent", "RouteChangeEvent",
@@ -143,7 +157,8 @@ __all__ = [
     "ButtonStyle", "ControlState", "BoxConstraints", "MouseCursor", "Ref",
     "RoundedRectangleBorder", "StadiumBorder", "CircleBorder",
     "ImageRepeat", "FilterQuality", "ClipBehavior", "BoxShape", "StrokeCap", "VisualDensity",
-    "TextSelection", "TextAffinity", "InputFilter", "TextCapitalization",
+    "TextSelection", "TextAffinity", "InputFilter", "NumbersOnlyInputFilter",
+    "InputBorder", "TextCapitalization",
     "Colors", "Icons", "parse_color",
     "Control", "Page", "Window", "Text", "Row", "Column", "Container",
     "Stack", "Divider", "VerticalDivider", "WindowDragArea", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",
@@ -161,6 +176,8 @@ __all__ = [
     "DropdownOption", "Option", "Slider", "AlertDialog", "SnackBar",
     "ListView", "GestureDetector",
     "ListItem",
+    "NavigationRail", "NavigationRailDestination", "NavigationRailLabelType",
+    "PopupMenuButton", "PopupMenuItem",
     "LoadingIndicator", "WavyProgressIndicator", "LinearWavyProgressIndicator",
     "CircularWavyProgressIndicator",
     "FloatingToolbar", "HorizontalFloatingToolbar", "VerticalFloatingToolbar",

@@ -20,6 +20,13 @@ class ControlEvent:
     def page(self):
         return self.control.page
 
+    @classmethod
+    def __class_getitem__(cls, item):
+        # Handler annotations like `def on_hover(e: HoverEvent[Container])`
+        # evaluate at definition time; the payload type carries no runtime
+        # information, so subscripting is a no-op.
+        return cls
+
 
 @dataclass
 class PageResizeEvent(ControlEvent):
