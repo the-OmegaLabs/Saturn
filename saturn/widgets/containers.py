@@ -151,9 +151,12 @@ class _Multi(Control):
         kids = self._visible()
         if not kids:
             return
-        # For a Row the cross axis (height) is bounded by this box, matching
-        # Flutter's loose cross constraints so aligned children can fill it.
-        sizes = [self._footprint(k, w, scale,
+        # Flutter Flex measures children with an UNBOUNDED main axis (a nested
+        # Row sizes to content, so SPACE_BETWEEN keeps its free space) and a
+        # bounded cross axis (aligned children may fill it).
+        sizes = [self._footprint(k,
+                                 None if not self.vertical else w,
+                                 scale,
                                  h if not self.vertical else None)
                  for k in kids]
         main_sizes = [s[0] if not self.vertical else s[1] for s in sizes]
