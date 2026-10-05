@@ -3,7 +3,8 @@ from .basic import Card, Icon, Image, ProgressBar, ProgressRing  # noqa: F401
 from .buttons import (Button, ElevatedButton, ExpressiveButton, FilledButton,  # noqa: F401
                       FilledTonalButton, IconButton, ExpressiveIconButton,
                       OutlinedButton, TextButton)
-from .containers import Column, Container, Divider, Row, Stack  # noqa: F401
+from .containers import (Column, Container, Divider, VerticalDivider, Row, Stack,
+                         WindowDragArea)  # noqa: F401
 from .dialogs import AlertDialog, DialogControl, SnackBar  # noqa: F401
 from .fab import (ExtendedFloatingActionButton, FloatingActionButton,  # noqa: F401
                   LargeFloatingActionButton, MediumFloatingActionButton,

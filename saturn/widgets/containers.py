@@ -12,6 +12,9 @@ Stack children position via their own left/top/right/bottom.
 """
 from __future__ import annotations
 
+import sys
+import time
+
 from .. import colors
 from ..control import Control
 from ..types import (CrossAxisAlignment, MainAxisAlignment,
@@ -669,3 +672,111 @@ class Divider(Control):
                     max(0, w - self.leading_indent - self.trailing_indent),
                     self.thickness,
                     colors.parse_color(self.color or colors.Colors.OUTLINE_VARIANT), radius=self.radius or 0)
+
+
+class VerticalDivider(Control):
+    """A thin vertical line, flet-compatible with Divider's axis flipped."""
+
+    def __init__(self, width: float | None = None, *, thickness: float | None = 1,
+                 color=None, leading_indent: float = 0, trailing_indent: float = 0,
+                 radius=None, **base):
+        super().__init__(**base)
+        self.width = 16 if width is None else width
+        self.thickness = 1 if thickness is None else thickness
+        self.color = color
+        self.leading_indent = leading_indent or 0
+        self.trailing_indent = trailing_indent or 0
+        self.radius = radius
+
+    def _intrinsic(self, max_w, max_h, scale):
+        return (self._width if self._width is not None else self.width,
+                self._height if self._height is not None else (max_h or 0))
+
+    def _place(self, x, y, w, h, scale):
+        self._rect = (x, y, w, h)
+
+    def _draw(self, r, x, y):
+        _, _, w, h = self._rect
+        cx = x + (w - self.thickness) / 2
+        r.fill_rect(cx, y + self.leading_indent, self.thickness,
+                    max(0, h - self.leading_indent - self.trailing_indent),
+                    colors.parse_color(self.color or colors.Colors.OUTLINE_VARIANT), radius=self.radius or 0)
+
+
+class WindowDragArea(Control):
+    """Turn its content into a draggable title-bar region (flet-compatible).
+
+    A press inside the area enters the native move loop; a double press
+    toggles maximize unless ``maximizable=False``. The native loop blocks
+    the UI queue until the button is released, so ``on_drag_end`` is
+    dispatched by the command queued behind the drag.
+    """
+
+    def __init__(self, content=None, *, maximizable: bool = True,
+                 on_double_tap=None, on_drag_start=None, on_drag_end=None, **base):
+        super().__init__(**base)
+        self.content = content
+        self.maximizable = maximizable
+        self.on_double_tap = on_double_tap
+        self.on_drag_start = on_drag_start
+        self.on_drag_end = on_drag_end
+        self._last_press = None
+        self._last_press_pos = None
+
+    def _children(self):
+        return [self.content] if self.content is not None else []
+
+    def _intrinsic(self, max_w, max_h, scale):
+        if self.content is None:
+            return (self._width or max_w or 0, self._height or max_h or 0)
+        w, h = self.content._intrinsic(max_w, max_h, scale)
+        return (self._width or w, self._height or h)
+
+    def _place(self, x, y, w, h, scale):
+        self._rect = (x, y, w, h)
+        if self.content is not None:
+            self.content._place(x, y, w, h, scale)
+
+    def _draw(self, r, x, y):
+        pass
+
+    def _hit_test(self, x, y):
+        x, y = self._hit_point(x, y)
+        if not self.visible or self.disabled or not self._contains(x, y):
+            return None
+        return self
+
+    def _hit_test_hover(self, x, y):
+        x, y = self._hit_point(x, y)
+        if not self.visible or self.disabled or not self._contains(x, y):
+            return None
+        return self
+
+    def _pressed_hook(self, x, y):
+        page = self.page
+        if page is None:
+            return
+        window = page.window
+        now = time.perf_counter()
+        last, last_pos = self._last_press, self._last_press_pos
+        self._last_press, self._last_press_pos = now, (x, y)
+        if window is None:
+            return
+        if (last is not None and now - last <= 0.5 and last_pos is not None
+                and abs(x - last_pos[0]) <= 8 and abs(y - last_pos[1]) <= 8):
+            self._last_press = None
+            if self.maximizable:
+                window.maximized = not window.maximized
+            if self.on_double_tap:
+                page._dispatch(self.on_double_tap)
+            return
+        native = getattr(window, "_native", None)
+        if sys.platform != "win32" or native is None or not window.movable:
+            return
+        if self.on_drag_start:
+            page._dispatch(self.on_drag_start)
+        # FIFO on the UI queue: the drag blocks inside the native move loop
+        # and the completion hook queued behind it runs on release.
+        page._app.post(lambda: native.start_interaction(2))
+        if self.on_drag_end:
+            page._app.post(lambda: page._dispatch(self.on_drag_end))

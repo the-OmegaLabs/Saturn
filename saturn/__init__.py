@@ -26,6 +26,7 @@ from .subpage import Subpage
 from .widgets.shader import Shader, ShaderEffect, ShaderBuffer
 from .window import WindowEvent, WindowEventType, WindowResizeEdge
 from .services import (
+    Clipboard,
     FilePicker,
     FilePickerFile,
     FilePickerFileType,
@@ -72,12 +73,15 @@ from .types import (
 )
 from .widgets import (
     AlertDialog,
+    DialogControl,
     Button,
     Card,
     Checkbox,
     Column,
     Container,
     Divider,
+    VerticalDivider,
+    WindowDragArea,
     Dropdown,
     DropdownOption,
     ElevatedButton,
@@ -142,7 +146,7 @@ __all__ = [
     "TextSelection", "TextAffinity", "InputFilter", "TextCapitalization",
     "Colors", "Icons", "parse_color",
     "Control", "Page", "Window", "Text", "Row", "Column", "Container",
-    "Stack", "Divider", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",
+    "Stack", "Divider", "VerticalDivider", "WindowDragArea", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",
     "Button", "ElevatedButton", "FilledButton", "FilledTonalButton", "OutlinedButton",
     "ExpressiveButton",
     "ExpressiveIconButton",
@@ -163,6 +167,7 @@ __all__ = [
     "FloatingActionButtonMenu", "FloatingActionButtonMenuItem",
     "FilePicker", "FilePickerFile", "FilePickerFileType",
     "FilePickerResultEvent", "FilePickerUploadEvent", "FilePickerUploadFile",
+    "Clipboard", "DialogControl",
     "Alignment", "Animation", "AnimationCurve", "Border", "BorderRadius",
     "BorderSide", "BoxFit", "BoxShadow", "CrossAxisAlignment", "Duration",
     "FontWeight", "KeyboardType", "LabelPosition",

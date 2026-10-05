@@ -183,3 +183,19 @@ async def _emit(handler, event):
     result = handler(*args)
     if inspect.isawaitable(result):
         await result
+
+
+class Clipboard:
+    """System clipboard, flet-compatible: ``await Clipboard().set(text)``.
+
+    Reads and writes go through the shared pyperclip/scrap helpers in
+    ``widgets.inputs`` (the same path TextField copy/paste uses).
+    """
+
+    async def set(self, value: str) -> None:
+        from .widgets.inputs import _clipboard_copy
+        _clipboard_copy(str(value))
+
+    async def get(self) -> str | None:
+        from .widgets.inputs import _clipboard_paste
+        return _clipboard_paste()
