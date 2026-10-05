@@ -685,14 +685,35 @@ def _segment(text: str, px: int, wnum: int, italic: bool,
 def render_line(text: str, size: float, *, scale: float = 1.0,
                 weight: int | None = None, bold: bool = False,
                 italic: bool = False, family: str | None = None,
-                color=(0, 0, 0, 255)) -> pygame.Surface:
+                color=(0, 0, 0, 255), letter_spacing: float = 0.0) -> pygame.Surface:
     """Render one line with per-glyph fallback, concatenated into a surface.
-    Runs are aligned by BASELINE (ascent difference), not top edge."""
+    Runs are aligned by BASELINE (ascent difference), not top edge.
+    ``letter_spacing`` is logical px added between characters; it disables
+    kerning by falling back to per-character rasters."""
     wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
     px = max(1, round(size * scale))
     runs = _segment(text, px, wnum, italic, family)
     if not runs:
         return pygame.Surface((0, 0), pygame.SRCALPHA)
+    spacing_px = letter_spacing * scale
+    if spacing_px:
+        chars = [(f, ch) for f, part in runs for ch in part]
+        surfs = [f.render(ch, True, color) for f, ch in chars]
+        ascents = [f.get_ascent() for f, _ in chars]
+        base = max(ascents)
+        ys = [base - a for a in ascents]
+        # Float advance matches line_width exactly; only blit positions round.
+        x = 0.0
+        height = 0
+        positions = []
+        for s, y in zip(surfs, ys):
+            positions.append((round(x), y, s))
+            x += s.get_width() + spacing_px
+            height = max(height, y + s.get_height())
+        out = pygame.Surface((max(0, round(x - spacing_px)), height), pygame.SRCALPHA)
+        for px_, py_, s in positions:
+            out.blit(s, (px_, py_))
+        return out
     surfs = [f.render(part, True, color) for f, part in runs]
     if len(surfs) == 1:
         return surfs[0]
@@ -712,11 +733,11 @@ def render_line(text: str, size: float, *, scale: float = 1.0,
 def render_line_cached(text: str, size: float, *, scale: float = 1.0,
                        weight: int | None = None, bold: bool = False,
                        italic: bool = False, family: str | None = None,
-                       color=(0, 0, 0, 255)) -> pygame.Surface:
+                       color=(0, 0, 0, 255), letter_spacing: float = 0.0) -> pygame.Surface:
     """Return an immutable line raster from a bounded animation-safe cache."""
     frozen_color = tuple(color) if isinstance(color, (tuple, list)) else color
     key = (text, float(size), float(scale), weight, bool(bold), bool(italic),
-           family, default_family, frozen_color)
+           family, default_family, frozen_color, float(letter_spacing))
     with _line_surface_lock:
         surface = _line_surface_cache.get(key)
         if surface is not None:
@@ -724,7 +745,7 @@ def render_line_cached(text: str, size: float, *, scale: float = 1.0,
             return surface
     surface = render_line(
         text, size, scale=scale, weight=weight, bold=bold, italic=italic,
-        family=family, color=color)
+        family=family, color=color, letter_spacing=letter_spacing)
     with _line_surface_lock:
         _line_surface_cache[key] = surface
         _line_surface_cache.move_to_end(key)
@@ -735,19 +756,22 @@ def render_line_cached(text: str, size: float, *, scale: float = 1.0,
 
 def line_width(text: str, size: float, *, scale: float = 1.0,
                weight: int | None = None, bold: bool = False,
-               italic: bool = False, family: str | None = None) -> float:
+               italic: bool = False, family: str | None = None,
+               letter_spacing: float = 0.0) -> float:
     """Width of a line in logical px under per-glyph fallback."""
     wnum = weight_num(weight) if weight is not None else weight_num(700 if bold else None)
     return _line_width_cached(text, float(size), float(scale), wnum,
                               bool(italic), family, default_family,
-                              font_revision)
+                              font_revision, float(letter_spacing))
 
 
 @lru_cache(maxsize=32768)
 def _line_width_cached(text, size, scale, wnum, italic, family,
-                       _default, _revision):
+                       _default, _revision, letter_spacing=0.0):
     px = max(1, round(size * scale))
     total = sum(f.size(part)[0] for f, part in _segment(text, px, wnum, italic, family))
+    if letter_spacing and len(text) > 1:
+        total += letter_spacing * scale * (len(text) - 1)
     return total / scale
 
 
@@ -771,7 +795,8 @@ def line_height(size: float, *, scale: float = 1.0, bold: bool = False,
 
 def wrap(text: str, max_width: float, size: float, *, scale: float = 1.0,
          bold: bool = False, italic: bool = False, family: str | None = None,
-         max_lines: int | None = None, weight: int | None = None) -> list[str]:
+         max_lines: int | None = None, weight: int | None = None,
+         letter_spacing: float = 0.0) -> list[str]:
     """Word-wrap into lines fitting max_width (logical px). Honors \n breaks;
     char-splits words longer than a line; adds an ellipsis when truncated."""
     if not text:
@@ -780,7 +805,7 @@ def wrap(text: str, max_width: float, size: float, *, scale: float = 1.0,
 
     def width(s: str) -> float:
         return line_width(s, size, scale=scale, weight=wnum, italic=italic,
-                          family=family)
+                          family=family, letter_spacing=letter_spacing)
 
     if "\n" not in text and (max_lines is None or max_lines >= 1) and \
             width(text) <= max_width:

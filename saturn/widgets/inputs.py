@@ -298,7 +298,7 @@ class TextField(Control):
     def _style(self):
         """(family, value size, value color) from text_style."""
         ts = self.text_style
-        for name in ("letter_spacing", "word_spacing", "height", "decoration", "decoration_color", "decoration_thickness"):
+        for name in ("word_spacing", "height", "decoration", "decoration_color", "decoration_thickness"):
             value = getattr(ts, name, None)
             if value not in (None, 0, 0.0) and not (name == "decoration" and _enum_value(value) == "none"):
                 raise NotImplementedError(f"TextStyle.{name} is not supported by desktop input shaping")
@@ -308,23 +308,29 @@ class TextField(Control):
                 ts.size or self.text_size,
                 (self.focused_color if self._focused and self.focused_color is not None else self.color) or ts.color or colors.Colors.ON_SURFACE)
 
+    def _spacing(self) -> float:
+        return float(getattr(self.text_style, "letter_spacing", 0) or 0)
+
     def _line_width(self, value, size, *, scale=1.0, family=None):
         style = self.text_style
         return txt.line_width(value, size, scale=scale, family=family,
                               weight=txt.weight_num(getattr(style, "weight", None)),
-                              italic=getattr(style, "italic", False))
+                              italic=getattr(style, "italic", False),
+                              letter_spacing=self._spacing())
 
     def _render_cached(self, slot, text, size, scale, family, color):
         """Reuse immutable text rasters across short state animations."""
         color = tuple(_parse(color))
         style = (self.hint_style if slot == "hint" else self.label_style if slot.startswith("label") else self.text_style)
         weight, italic = txt.weight_num(getattr(style, "weight", None)), getattr(style, "italic", False)
+        spacing = self._spacing()
         key = (slot, text, float(size), float(scale), family, color, weight, italic,
-               txt.default_family, txt.font_revision)
+               spacing, txt.default_family, txt.font_revision)
         surface = self._line_cache.get(key)
         if surface is None:
             surface = txt.render_line(
-                text, size, scale=scale, family=family, color=color, weight=weight, italic=italic)
+                text, size, scale=scale, family=family, color=color, weight=weight,
+                italic=italic, letter_spacing=spacing)
             self._line_cache[key] = surface
             if len(self._line_cache) > 32:
                 self._line_cache.pop(next(iter(self._line_cache)))

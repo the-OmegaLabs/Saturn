@@ -73,7 +73,8 @@ class Text(Control):
         self._sync_style()
         return dict(scale=scale, weight=weight_num(self.weight),
                     italic=self.italic,
-                    family=self._family())
+                    family=self._family(),
+                    letter_spacing=float(getattr(self.style, "letter_spacing", 0) or 0))
 
     def _sync_style(self, initial=False):
         style = self.style
@@ -81,7 +82,7 @@ class Text(Control):
             return
         if getattr(getattr(style, "overflow", None), "value", getattr(style, "overflow", None)) == "fade":
             raise NotImplementedError("TextStyle overflow FADE needs a renderer mask")
-        for name in ("letter_spacing", "word_spacing", "height", "decoration", "decoration_color", "decoration_thickness"):
+        for name in ("word_spacing", "height", "decoration", "decoration_color", "decoration_thickness"):
             value = getattr(style, name, None)
             if value not in (None, 0, 0.0) and not (name == "decoration" and getattr(value, "value", value) == "none"):
                 raise NotImplementedError(f"TextStyle.{name} is not supported by desktop text shaping")
@@ -244,20 +245,23 @@ class Text(Control):
             no_wrap, max_lines = state["no_wrap"], state["max_lines"]
             fixed_w, fixed_h = state["_width"], state["_height"]
             cache = state["_measure_cache"]
+            spacing = float(getattr(state["style"], "letter_spacing", 0) or 0)
         else:
             value, size = self.value, self.size
             weight, italic, family = self.weight, self.italic, self._family()
             no_wrap, max_lines = self.no_wrap, self.max_lines
             fixed_w, fixed_h, cache = self._width, self._height, self._measure_cache
+            spacing = float(getattr(self.style, "letter_spacing", 0) or 0)
         key = (value, size, weight, italic, family,
                font_state.default_family, font_state.font_revision,
-               no_wrap, max_lines, max_w, scale, fixed_w, fixed_h)
+               no_wrap, max_lines, max_w, scale, fixed_w, fixed_h, spacing)
         cached = cache.get(key)
         if cached is not None:
             cache.move_to_end(key)
             return cached
         kw = dict(scale=scale, weight=weight_num(weight), italic=italic,
-                  family=family if isinstance(family, tuple) else family_for(value, family))
+                  family=family if isinstance(family, tuple) else family_for(value, family),
+                  letter_spacing=spacing)
         available = max_w if max_w is not None else 10_000
         single_width = None
         if "\n" not in value and (max_lines is None or max_lines >= 1):
@@ -301,7 +305,8 @@ class Text(Control):
             weight, italic, family = self.weight, self.italic, self._family()
             cache = self._wrap_cache
         key = (value, size, weight, italic, family, font_state.default_family,
-               font_state.font_revision, max_lines, width, scale)
+               font_state.font_revision, max_lines, width, scale,
+               kw.get("letter_spacing", 0))
         cached = cache.get(key)
         if cached is None:
             cached = wrap(
