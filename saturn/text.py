@@ -41,6 +41,7 @@ from saturn_fonts_cjk import BOLD_FONT as NOTO_BOLD
 from saturn_fonts_cjk import REGULAR_FONT as NOTO_REGULAR
 from saturn_fonts_cjk import VARIABLE_FONT as NOTO
 from saturn_icons_material import FILLED_FONT as ICON_FONT_PATH
+from saturn_icons_material import OUTLINED_FONT as ICON_OUTLINED_PATH
 
 # bundled UI fonts (SIL OFL 1.1; each distribution ships its own license)
 # DEFAULT = Inter (variable; real weights via runtime instancing). CJK
@@ -539,10 +540,14 @@ def _chain_cached(family, wnum, italic, _default, _revision):
     Inter-Italic / Noto), then the CJK system chain. Deduped by priority."""
     links = ([_primary_link(item, wnum, italic) for item in family if item is not None]
              if isinstance(family, tuple) else [_primary_link(family, wnum, italic)])
-    links.append(("file", str(NOTO_REGULAR), wnum, False))
     links.append(_default_link(wnum, False))
+    # System CJK fonts first: this is what Flet renders through Flutter's
+    # platform fallback (Microsoft YaHei on Windows, PingFang on macOS), so
+    # migrated apps keep the same typeface flavor. The bundled Noto is the
+    # fallback for systems without a covering system font.
     links += [("sys", n.strip(), wnum, False)
               for n in CJK_FAMILY.split(",") if n.strip()]
+    links.append(("file", str(NOTO_REGULAR), wnum, False))
     out, seen = [], set()
     for link in links:
         key = (link[0], link[1], link[3])
@@ -619,24 +624,30 @@ def get_font(size: float, scale: float = 1.0, bold: bool = False,
                         max(1, round(size * scale)))
 
 
-def get_icon_font(px_size: int) -> pygame.font.Font:
-    """Material Symbols font (default instance: outlined, wght 400)."""
+def get_icon_font(px_size: int, outlined: bool = False) -> pygame.font.Font:
+    """Material Symbols font; the variant font follows the icon name."""
     if not pygame.font.get_init():
         pygame.font.init()
-    f = _icon_cache.get(px_size)
+    key = (px_size, outlined)
+    f = _icon_cache.get(key)
     if f is None:
-        f = pygame.font.Font(str(ICON_FONT_PATH), px_size)
-        _icon_cache[px_size] = f
+        f = pygame.font.Font(str(ICON_OUTLINED_PATH if outlined else ICON_FONT_PATH), px_size)
+        _icon_cache[key] = f
     return f
 
 
 def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
-    """Render an immutable Material icon once and reuse it across frames."""
+    """Render an immutable Material icon once and reuse it across frames.
+
+    Icon names ending in ``_OUTLINED`` render with the outlined font; the
+    filled font would draw e.g. crop_square as a solid block."""
+    name = getattr(icon, "name", "") or ""
+    outlined = name.endswith("_OUTLINED")
     rgba = tuple(color)
-    key = (int(icon), int(px_size), rgba)
+    key = (int(icon), int(px_size), rgba, outlined)
     surface = _icon_surface_cache.get(key)
     if surface is None:
-        surface = get_icon_font(px_size).render(chr(int(icon)), True, rgba)
+        surface = get_icon_font(px_size, outlined).render(chr(int(icon)), True, rgba)
         _icon_surface_cache[key] = surface
         if len(_icon_surface_cache) > 256:
             _icon_surface_cache.popitem(last=False)
