@@ -78,6 +78,12 @@ class Icon(Control):
         surf = render_icon_cached(
             self.icon, round(self.size * r.scale),
             (255, 255, 255, 255) if gpu_tint else color)
+        # The glyph surface is cropped tight; center it in whatever rect the
+        # parent placed us in (a fixed Container hands over its full inner
+        # box, mirroring Flutter's Icon which wraps the glyph in a Center).
+        _, _, rw, rh = self._rect
+        ox = (rw - surf.get_width() / r.scale) / 2
+        oy = (rh - surf.get_height() / r.scale) / 2
         if self.shadows:
             for shadow in self.shadows if isinstance(self.shadows,list) else [self.shadows]:
                 key = (self.icon,self.size,r.scale,shadow.color,shadow.blur_radius,shadow.offset.x,shadow.offset.y)
@@ -94,13 +100,13 @@ class Icon(Control):
                         self._icon_shadow_cache.pop(next(iter(self._icon_shadow_cache)))
                     cached = self._icon_shadow_cache[key] = (layer,pad)
                 layer,pad = cached
-                r.blit_cached(layer,x+shadow.offset.x-pad/r.scale,y+shadow.offset.y-pad/r.scale)
+                r.blit_cached(layer,x+ox+shadow.offset.x-pad/r.scale,y+oy+shadow.offset.y-pad/r.scale)
         if gpu_tint:
-            r.blit_tinted_scaled(surf, x, y,
+            r.blit_tinted_scaled(surf, x + ox, y + oy,
                                  surf.get_width() / r.scale,
                                  surf.get_height() / r.scale, color)
         else:
-            r.blit_cached(surf, x, y)
+            r.blit_cached(surf, x + ox, y + oy)
 
     __unsupported_parameters__ = {"fill", "grade", "weight", "optical_size", "blend_mode", "apply_text_scaling"}
 

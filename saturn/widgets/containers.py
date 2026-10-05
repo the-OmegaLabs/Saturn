@@ -195,6 +195,14 @@ class _Multi(Control):
                     fh = main_sizes[i]
                 else:
                     fw = main_sizes[i]
+            # Flutter's constrained cross axis: a fixed child larger than the
+            # flex box is clamped to it (Container height=35 inside a 25px
+            # Row renders 25px tall), so children never overflow the line.
+            if not self.vertical:
+                if h is not None and fh > h:
+                    fh = h
+            elif w is not None and fw > w:
+                fw = w
             # margin sits outside the child's box
             cw, ch = fw - ml - mr, fh - mt - mb
             # cross-axis STRETCH fills the inner cross size (unless fixed)

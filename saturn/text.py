@@ -640,14 +640,19 @@ def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
     """Render an immutable Material icon once and reuse it across frames.
 
     Icon names ending in ``_OUTLINED`` render with the outlined font; the
-    filled font would draw e.g. crop_square as a solid block."""
+    filled font would draw e.g. crop_square as a solid block. The surface is
+    cropped to the visible glyph: symbol fonts carry large ascent margins,
+    and only a tight bitmap lets widgets center the glyph optically."""
     name = getattr(icon, "name", "") or ""
     outlined = name.endswith("_OUTLINED")
     rgba = tuple(color)
     key = (int(icon), int(px_size), rgba, outlined)
     surface = _icon_surface_cache.get(key)
     if surface is None:
-        surface = get_icon_font(px_size, outlined).render(chr(int(icon)), True, rgba)
+        rendered = get_icon_font(px_size, outlined).render(chr(int(icon)), True, rgba)
+        bbox = rendered.get_bounding_rect()
+        surface = (rendered.subsurface(bbox).copy()
+                   if bbox.w > 0 and bbox.h > 0 else rendered)
         _icon_surface_cache[key] = surface
         if len(_icon_surface_cache) > 256:
             _icon_surface_cache.popitem(last=False)

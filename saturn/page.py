@@ -565,6 +565,12 @@ class Page(Control):
         if e.type == pygame.WINDOWRESIZED:
             self._notify_resize()
             return
+        if e.type == pygame.WINDOWLEAVE:
+            # The cursor left the window; a frameless title bar sits against
+            # the screen edge, so without this the last hovered control
+            # keeps its ink forever.
+            self._clear_hover()
+            return
         if self.disabled or not self.visible:
             self._cancel_input()
             return
@@ -814,6 +820,20 @@ class Page(Control):
         self._hovered = target
         if prev is not None or target is not None:
             self.repaint()
+
+    def _clear_hover(self):
+        """Drop the current hover state (mouse left the window)."""
+        prev = self._hovered
+        if prev is None:
+            return
+        from .event import fire
+        if hasattr(prev, "_set_hover"):
+            prev._set_hover(False)
+        else:
+            prev._hovered = False
+            fire(prev, "hover", "false")
+        self._hovered = None
+        self.repaint()
 
     def _sync_mouse_cursor(self, target):
         cursor = getattr(target, "mouse_cursor", None)
