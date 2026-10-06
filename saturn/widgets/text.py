@@ -32,7 +32,7 @@ class Text(Control):
         if getattr(overflow, "value", overflow) == "fade":
             raise NotImplementedError("Text overflow FADE needs a renderer mask; use CLIP or ELLIPSIS")
         super().__init__(**base)
-        self.value = str(value)
+        self.value = value
         self.size = size if size is not None else getattr(style, "size", None) or 14
         self.color = color if color is not None else getattr(style, "color", None)
         self.weight = weight if weight is not None else getattr(style, "weight", None)
@@ -69,6 +69,17 @@ class Text(Control):
         self._wrap_cache = OrderedDict()
 
     # -- style helpers -----------------------------------------------------
+    @property
+    def value(self) -> str:
+        return self.__dict__["value"]
+
+    @value.setter
+    def value(self, value):
+        # flet parity: numbers and other non-strings are accepted and shown
+        # as text instead of crashing the layout pass. Stored under the raw
+        # __dict__ key the animation/measurement paths read.
+        self.__dict__["value"] = "" if value is None else str(value)
+
     def _style(self, scale: float):
         self._sync_style()
         return dict(scale=scale, weight=weight_num(self.weight),

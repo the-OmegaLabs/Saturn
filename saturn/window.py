@@ -125,7 +125,7 @@ def _coordinate(value):
 class Window:
     """Desktop window configuration. All sizes and positions are logical pixels."""
     __slots__ = ("_app", "_values", "_native", "_size_pending", "_pending_size",
-                 "_last_resize_event", "on_event", "data", "key")
+                 "_applied_limits", "_last_resize_event", "on_event", "data", "key")
 
     def __init__(self, app):
         self._app = app
@@ -367,11 +367,19 @@ class Window:
 
     def _apply_styles(self):
         if self._native:
-            outer = self._app.outer_size
             self._native.apply_styles()
             self._app._frame_size = self._app._measure_frame_size()
-            self._apply_limits()
-            self._set_size(*outer)
+            # A style change alters the client/outer split without an SDL
+            # resize, so take the new split from the actual rects before
+            # anything re-derives sizes from the tracked (stale) values.
+            outer = self._app._actual_outer_size()
+            self._app._outer_size[:] = outer
+            self._app._size[:] = self._app.client_size_for_outer(*outer)
+            if not self._size_pending:
+                # A queued resize target was clamped and frame-adjusted at
+                # queue time and re-derives the client at apply time; don't
+                # overwrite it with the pre-change size.
+                self._apply_limits()
 
     def _apply_resizable(self):
         self._app._window.resizable = self.resizable
@@ -452,29 +460,68 @@ class Window:
         if self._size_pending:
             return
         self._size_pending = True
-        def apply():
-            target = self._pending_size
-            self._size_pending = False
-            client = self._app.client_size_for_outer(*target)
-            pixels = self._app.physical_size_for_logical(*client)
+        self._post(self._apply_pending_size)
+
+    def _apply_pending_size(self):
+        if not self._size_pending:
+            return
+        if self._native is not None and self._native.user32.IsZoomed(self.hwnd):
+            # Resizing a maximized window rewrites its saved restore bounds
+            # instead of the visible size; keep the target queued until the
+            # window is restored.
+            return
+        target = self._pending_size
+        self._size_pending = False
+        client = self._app.client_size_for_outer(*target)
+        pixels = self._app.physical_size_for_logical(*client)
+        if self._native is None or not self._set_native_client(pixels):
             self._app._window.size = pixels
-            self._app._resize_frame(*pixels, present=False, dispatch=True)
-            self._emit(WindowEventType.RESIZED)
-        self._post(apply)
+        self._app._resize_frame(*pixels, present=False, dispatch=True)
+        self._emit(WindowEventType.RESIZED)
+
+    def _set_native_client(self, pixels):
+        """Size the window so its client area lands exactly on `pixels`.
+
+        SDL's SetWindowSize adds the frame AdjustWindowRectEx reports, which
+        overshoots once WM_NCCALCSIZE hands that frame to the client area.
+        Setting the Win32 outer rect from the frame measured at this instant
+        stays exact across style changes.
+        """
+        rects = self._app._window_rects()
+        if rects is None:
+            return False
+        outer, client = rects
+        frame_w = (outer.right - outer.left) - (client.right - client.left)
+        frame_h = (outer.bottom - outer.top) - (client.bottom - client.top)
+        self._native.user32.SetWindowPos(
+            self.hwnd, None, 0, 0,
+            max(1, pixels[0] + frame_w), max(1, pixels[1] + frame_h),
+            0x2 | 0x4 | 0x10)  # SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE
+        return True
 
     def _apply_limits(self):
         frame = self._app._frame_size
         ratio = self._app.pixel_ratio
         def client(value, border, default):
             return default if value is None else max(1, round((value - border) * ratio))
-        self._app._window.minimum_size = (
-            client(self.min_width, frame[0], 1), client(self.min_height, frame[1], 1))
+        minimum = (client(self.min_width, frame[0], 1), client(self.min_height, frame[1], 1))
         maximum = (client(self.max_width, frame[0], 0),
                    client(self.max_height, frame[1], 0))
-        if self._native:
-            self._native.set_maximum_size(*maximum)
-        else:
-            self._app._window.maximum_size = tuple(value or 2147483647 for value in maximum)
+        # SDL's SetWindowMinimumSize/MaximumSize always force a SetWindowSize
+        # call, which re-applies the style frame and overshoots once
+        # WM_NCCALCSIZE hands that frame to the client area. Skip SDL when
+        # the limits are the defaults and re-apply only on change.
+        applied = getattr(self, "_applied_limits", None)
+        if applied != (minimum, maximum):
+            if (self.min_width, self.min_height) != (None, None):
+                self._app._window.minimum_size = minimum
+            if (self.max_width, self.max_height) != (None, None):
+                if self._native:
+                    self._native.set_maximum_size(*maximum)
+                else:
+                    self._app._window.maximum_size = tuple(
+                        value or 2147483647 for value in maximum)
+            self._applied_limits = (minimum, maximum)
         self._set_size(*self._normalize_size(self.width, self.height))
 
     def _constrain_sizing(self, rect, edge):
@@ -566,6 +613,7 @@ class Window:
             self._values.update(maximized=False, minimized=False)
             if was_maximized:
                 self._emit(WindowEventType.UNMAXIMIZE)
+            self._post(self._apply_pending_size)
         self._emit(kind)
 
     def _request_close(self):

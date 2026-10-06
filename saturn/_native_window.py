@@ -80,6 +80,28 @@ class NativeWindow:
                 if event_type is None:
                     from .window import WindowEventType
                     event_type = NativeWindow._window_event_type = WindowEventType
+                if message == 0x0083 and wparam and self.owner.title_bar_hidden:
+                    # WM_NCCALCSIZE: keeping WS_THICKFRAME for resize borders
+                    # otherwise reserves a frame strip the page cannot draw
+                    # into (visible as a band at the top of the window).
+                    if self.user32.IsZoomed(hwnd):
+                        # A maximized thickframe window extends past the
+                        # monitor by the border width; inset the client so
+                        # the content stays on-screen.
+                        added = self.user32.GetSystemMetrics(92)  # SM_CXPADDEDBORDER
+                        rect = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
+                        rect.left += self.user32.GetSystemMetrics(32) + added
+                        rect.top += self.user32.GetSystemMetrics(33) + added
+                        rect.right -= self.user32.GetSystemMetrics(32) + added
+                        rect.bottom -= self.user32.GetSystemMetrics(33) + added
+                    return 0
+                if (message in (0x0086, 0x0085)  # WM_NCACTIVATE, WM_NCPAINT
+                        and (self.owner.title_bar_hidden or self.owner.frameless)):
+                    # DefWindowProc repaints the cached caption on activation
+                    # changes, flashing a ghost title bar even though
+                    # WM_NCCALCSIZE removed it. The window owns every pixel,
+                    # so the non-client area is never painted.
+                    return 0
                 if message == 0x0046 and self.owner.always_on_bottom:
                     position = ctypes.cast(lparam, ctypes.POINTER(_WindowPos)).contents
                     position.after = 1  # HWND_BOTTOM
@@ -95,6 +117,40 @@ class NativeWindow:
                         return 1  # WM_SIZING
                 if message == 0x0216:
                     self.owner._emit(event_type.MOVE)
+                if (message == 0x0084 and self.owner.title_bar_hidden
+                        and not self.owner.frameless
+                        and not self.user32.IsZoomed(hwnd)
+                        and not self.owner.full_screen):
+                    # WM_NCHITTEST: with WM_NCCALCSIZE handing the whole
+                    # window to the client area, DefWindowProc reports
+                    # HTCLIENT everywhere and the resize borders die. Point
+                    # at the border zones by hand, like a captioned window.
+                    x = ctypes.c_short(lparam & 0xFFFF).value
+                    y = ctypes.c_short((lparam >> 16) & 0xFFFF).value
+                    rect = wintypes.RECT()
+                    if self.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                        border = (self.user32.GetSystemMetrics(32)
+                                  + self.user32.GetSystemMetrics(92))
+                        left = x - rect.left < border
+                        top = y - rect.top < border
+                        right = rect.right - x <= border
+                        bottom = rect.bottom - y <= border
+                        if top and left:
+                            return 13  # HTTOPLEFT
+                        if top and right:
+                            return 14  # HTTOPRIGHT
+                        if bottom and left:
+                            return 16  # HTBOTTOMLEFT
+                        if bottom and right:
+                            return 17  # HTBOTTOMRIGHT
+                        if left:
+                            return 10  # HTLEFT
+                        if top:
+                            return 12  # HTTOP
+                        if right:
+                            return 11  # HTRIGHT
+                        if bottom:
+                            return 15  # HTBOTTOM
                 result = self.comctl.DefSubclassProc(hwnd, message, wparam, lparam)
                 if message == 0x0084 and self.owner.ignore_mouse_events:
                     return -1  # WM_NCHITTEST / HTTRANSPARENT
@@ -121,7 +177,11 @@ class NativeWindow:
                              (0x10000, owner.maximizable),
                              (0x40000, owner.resizable and not owner.frameless),
                              (0xC00000, not (owner.frameless or owner.title_bar_hidden)),
-                             (0x80000, not owner.title_bar_buttons_hidden)):
+                             # The buttons live on the title bar; keeping
+                             # WS_SYSMENU on a caption-less window makes DWM
+                             # paint a ghost title bar on focus changes.
+                             (0x80000, not (owner.title_bar_buttons_hidden
+                                            or owner.title_bar_hidden))):
             style = (style | bit) if enabled else (style & ~bit)
         self.set_style(self.hwnd, -16, style)
         extended = self.get_style(self.hwnd, -20)
@@ -133,6 +193,13 @@ class NativeWindow:
                     else (extended & ~0x20))
         self.set_style(self.hwnd, -20, extended)
         self.user32.SetWindowPos(self.hwnd, None, 0, 0, 0, 0, 0x37)
+        if owner.title_bar_hidden:
+            # A window without WS_CAPTION loses DWM's rounded corners; opt
+            # back in (attribute 33 is Win11+; errors on Win10 are fine).
+            preference = ctypes.c_int(2)  # DWMWCP_ROUND
+            self.dwm.DwmSetWindowAttribute(self.hwnd, 33,
+                                           ctypes.byref(preference),
+                                           ctypes.sizeof(preference))
         if owner.always_on_bottom:
             self.user32.SetWindowPos(self.hwnd, ctypes.c_void_p(1),
                                      0, 0, 0, 0, 0x13)

@@ -464,9 +464,10 @@ class Container(Control):
             cw = ch = 0.0
         w = state["_width"] if state["_width"] is not None else cw + pad_w
         h = state["_height"] if state["_height"] is not None else ch + pad_h
-        # Flutter Container rule: with an alignment and no explicit size the
-        # box fills the bounded constraints instead of wrapping its content.
-        if state["alignment"] is not None:
+        # Flutter Container rules: with an alignment and no explicit size the
+        # box fills the bounded constraints instead of wrapping its content,
+        # and a childless Container fills the bounded constraints as well.
+        if state["alignment"] is not None or content is None:
             if state["_width"] is None and max_w is not None:
                 w = max_w
             if state["_height"] is None and max_h is not None:

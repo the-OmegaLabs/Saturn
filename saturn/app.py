@@ -157,6 +157,7 @@ class App:
         self._refresh_rate = 60
         self._window_icon = None
         self._pixel_ratio = 1.0
+        self._show_on_first_frame = _parent_app is None
         self._last_brightness_check = 0.0
 
     # -- lifecycle ------------------------------------------------------
@@ -222,7 +223,10 @@ class App:
             title=self._title, size=self.physical_size_for_logical(*self._outer_size),
             resizable=True, opengl=self._backend is Renderer.OPENGL,
             vulkan=self._backend is Renderer.VULKAN, allow_high_dpi=True,
-            hidden=self._parent_app is not None)
+            hidden=True)
+        # The window is shown after its first styled frame; creating it
+        # visible would flash the default caption before main() applies
+        # settings like title_bar_hidden.
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
@@ -289,6 +293,14 @@ class App:
                 self.post(lambda: page._sync_attachment(force=True))
             if not self._closed.is_set():
                 self._notify_render_ready()
+            # Safety for mains that draw nothing: never keep the window hidden.
+            def show_pending():
+                if getattr(self, "_show_on_first_frame", False):
+                    self._show_on_first_frame = False
+                    if page.window._values.get("visible", True):
+                        self._window.show()
+                        page.window._emit(WindowEventType.SHOW)
+            self.post(show_pending)
         if inspect.isawaitable(result):
             async def finish():
                 try:
@@ -401,6 +413,11 @@ class App:
                 app._dirty.clear()
                 app.page.draw()
                 app.renderer.flip()
+                if getattr(app, "_show_on_first_frame", False):
+                    app._show_on_first_frame = False
+                    if app.page.window._values.get("visible", True):
+                        app._window.show()
+                        app.page.window._emit(WindowEventType.SHOW)
         for app in reversed(tuple(self._apps())):
             if app._closed.is_set() and app is not self:
                 app._dispose()
@@ -534,9 +551,25 @@ class App:
         self._refresh_pixel_ratio()
         width = max(1, round(pixel_width / self._pixel_ratio))
         height = max(1, round(pixel_height / self._pixel_ratio))
+        rects = self._window_rects()
+        if rects is not None:
+            # One consistent snapshot: the tracked frame, client and outer
+            # sizes all come from the same instant. A cached frame here can
+            # be stale (a style change re-splits client/outer without an SDL
+            # resize) and would inflate the tracked sizes every event.
+            outer, client = rects
+            ratio = self._pixel_ratio or 1.0
+            client_w = client.right - client.left
+            client_h = client.bottom - client.top
+            if client_w > 0 and client_h > 0:  # minimized windows report none
+                width = max(1, round(client_w / ratio))
+                height = max(1, round(client_h / ratio))
+                self._frame_size = (
+                    round(((outer.right - outer.left) - client_w) / ratio),
+                    round(((outer.bottom - outer.top) - client_h) / ratio))
+                self._outer_size[0] = max(1, round((outer.right - outer.left) / ratio))
+                self._outer_size[1] = max(1, round((outer.bottom - outer.top) / ratio))
         self._size[:] = [width, height]
-        self._outer_size[0] = width + self._frame_size[0]
-        self._outer_size[1] = height + self._frame_size[1]
         if self.renderer is not None:
             self.renderer.on_resize(
                 width, height, pixel_size=(pixel_width, pixel_height),
@@ -698,8 +731,35 @@ class App:
         Win32 reports the real metrics for the current DPI/theme, avoiding
         hard-coded 16x39 assumptions. Other platforms retain SDL semantics.
         """
-        if sys.platform != "win32":
+        rects = self._window_rects()
+        if rects is None:
             return (0, 0)
+        outer, client = rects
+        frame_w = ((outer.right - outer.left)
+                   - (client.right - client.left))
+        frame_h = ((outer.bottom - outer.top)
+                   - (client.bottom - client.top))
+        return (round(frame_w / self._pixel_ratio),
+                round(frame_h / self._pixel_ratio))
+
+    def _actual_outer_size(self):
+        """The window's real outer size in logical pixels.
+
+        Style changes (hiding the title bar) alter the client/outer split
+        without an SDL resize, leaving the tracked `_outer_size` stale.
+        """
+        rects = self._window_rects()
+        if rects is None:
+            return tuple(self._outer_size)
+        outer, _ = rects
+        ratio = self._pixel_ratio or 1.0
+        return (max(1, round((outer.right - outer.left) / ratio)),
+                max(1, round((outer.bottom - outer.top) / ratio)))
+
+    def _window_rects(self):
+        """Outer and client rects in physical pixels, or None off-Windows."""
+        if sys.platform != "win32" or self._window is None:
+            return None
         try:
             import ctypes
             from ctypes import wintypes
@@ -713,17 +773,12 @@ class App:
             user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
             user32.GetClientRect.restype = wintypes.BOOL
             if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
-                return (0, 0)
+                return None
             if not user32.GetClientRect(hwnd, ctypes.byref(client)):
-                return (0, 0)
-            frame_w = ((outer.right - outer.left)
-                       - (client.right - client.left))
-            frame_h = ((outer.bottom - outer.top)
-                       - (client.bottom - client.top))
-            return (round(frame_w / self._pixel_ratio),
-                    round(frame_h / self._pixel_ratio))
+                return None
+            return outer, client
         except (KeyError, OSError):
-            return (0, 0)
+            return None
 
 
 def _swallow(fn, *args):
