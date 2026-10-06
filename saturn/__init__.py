@@ -19,7 +19,7 @@ from .event import (
 # Handler-annotation names mirroring flet: `def on_hover(e: HoverEvent[Container])`.
 Event = ControlEvent
 HoverEvent = ControlEvent
-from .app import App, Renderer, run
+from .app import App, Renderer, run, run_thread
 
 Render = Renderer
 from ._gen.icons import Icons
@@ -147,7 +147,7 @@ from .compose import Compose
 __all__ = [
     "NoInputBorder", "UnderlineInputBorder",
     "Subpage", "Shader", "ShaderEffect", "ShaderBuffer", "SliderInteraction", "LinearGradient", "RadialGradient",
-    "App", "Renderer", "Render", "run", "ControlEvent", "Compose",
+    "App", "Renderer", "Render", "run", "run_thread", "ControlEvent", "Compose",
     "Event", "HoverEvent",
     "AnimatedSwitcher", "AnimatedSwitcherTransition",
     "KeyboardEvent", "PageResizeEvent", "PlatformBrightnessChangeEvent",

@@ -821,3 +821,30 @@ def run(main, *, backend: Renderer | None = None, title: str = "saturn", gpu: st
         raise
     app.run_until_closed()
     return app
+
+
+def run_thread(main, *, backend: Renderer | None = None, title: str = "saturn",
+               gpu: str | int | None = None):
+    """Like `run`, but the window runs on a daemon thread and this returns
+    the App handle immediately. Window creation and the event loop share
+    that thread (SDL affinity); UI mutations from the caller's thread must
+    go through `page.run_task` / `page._app.post`. The app dies with the
+    process (daemon thread)."""
+    if backend is None:
+        backend = Renderer(os.environ.get("SATURN_BACKEND", "opengl").lower())
+
+    app = App(main, backend, title=title, gpu=gpu)
+
+    def serve():
+        try:
+            app.start()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            app.close()
+            app.run_until_closed()
+            return
+        app.run_until_closed()
+
+    threading.Thread(target=serve, daemon=True, name="saturn-window").start()
+    return app
