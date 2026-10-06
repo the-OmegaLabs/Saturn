@@ -459,9 +459,22 @@ class Page(Control):
         """Redraw when geometry has not changed (scroll, hover, ripple)."""
         self._app.mark_dirty()
 
-    def run_task(self, handler, *args):
-        """Schedule a coroutine handler on the application event loop."""
-        return self._app.call(handler, *args)
+    def run_task(self, handler, *args, **kwargs):
+        """Schedule a handler off the UI thread; coroutine handlers run on
+        the application event loop."""
+        return self._app.call(handler, *args, **kwargs)
+
+    def run_thread(self, handler, *args, **kwargs):
+        """Run `handler` off the UI thread and return a Future with its
+        result (`ret.result()`). Coroutine handlers run on the application
+        event loop, other callables on a worker thread; exceptions surface
+        through the future."""
+        app = self._app
+        import asyncio
+        import inspect
+        if inspect.iscoroutinefunction(handler):
+            return asyncio.run_coroutine_threadsafe(handler(*args, **kwargs), app._loop)
+        return app._executor.submit(handler, *args, **kwargs)
 
     async def take_screenshot(self, path: str | None = None):
         """Return the captured frame surface (and save

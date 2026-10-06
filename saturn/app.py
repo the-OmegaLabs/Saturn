@@ -501,15 +501,15 @@ class App:
         self.post(apply)
         self.mark_dirty()
 
-    def call(self, fn, *args):
+    def call(self, fn, *args, **kwargs):
         """Run a callable off the UI thread and await returned awaitables."""
         if inspect.iscoroutinefunction(fn):
-            future = asyncio.run_coroutine_threadsafe(fn(*args), self._loop)
+            future = asyncio.run_coroutine_threadsafe(fn(*args, **kwargs), self._loop)
             future.add_done_callback(_report_async_error)
             return future
         else:
             def invoke():
-                result = fn(*args)
+                result = fn(*args, **kwargs)
                 if inspect.isawaitable(result):
                     async def await_result():
                         return await result
