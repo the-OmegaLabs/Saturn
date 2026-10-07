@@ -133,6 +133,7 @@ class App:
         self._title = title
         self._dirty = threading.Event()
         self._closed = threading.Event()
+        self._mod_watch_stop = threading.Event()
         self._ui_q: queue.SimpleQueue = queue.SimpleQueue()
         # background loop for async handlers / main coroutines
         if _parent_app:
@@ -203,6 +204,9 @@ class App:
             self.page = Page(self)
         from . import text as _text
         _text._font_event_apps.add(self._root)
+        if self._parent_app is None:
+            from . import _modwatch
+            _modwatch.start(self.page, self._mod_watch_stop)
         autoclose = os.environ.get("SATURN_AUTOCLOSE")  # test hook
         if autoclose and self._parent_app is None:
             threading.Timer(float(autoclose), self.close).start()
@@ -468,6 +472,8 @@ class App:
                 # animations remain uncapped when synchronization is off.
                 self._dirty.wait(0.004)
         self._running = False
+        if self._root is self:
+            self._mod_watch_stop.set()
         self._dispose()
         pygame.display.quit()
         self._executor.shutdown(wait=False, cancel_futures=True)

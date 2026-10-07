@@ -94,6 +94,14 @@ class FontOptimizeEvent(ControlEvent):
 
 
 @dataclass
+class ForeignModuleEvent(ControlEvent):
+    """A DLL loaded at runtime from outside the interpreter, venv and
+    Windows directories — usually injected by an overlay tool."""
+    path: str = ""
+    tool: str = ""  # product name when the DLL matches a known injector
+
+
+@dataclass
 class TapEvent:
     kind: str
     local_position: tuple

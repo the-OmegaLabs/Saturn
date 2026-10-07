@@ -142,6 +142,7 @@ class Page(Control):
         self.overlay: list[Control] = []  # drawn + hit-tested above the tree
         self.services: list = []          # Registered application services
         self.on_resize: list = []  # Resize event handlers
+        self.on_foreign_module: list = []  # A foreign DLL was injected (Windows/Linux)
         self.on_keyboard_event: list = []
         self.on_platform_brightness_change = None
         self._pressed = None
