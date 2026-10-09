@@ -33,5 +33,9 @@ inline constexpr Color kOutlineVariant = from_hex6(0x49454F);
 inline constexpr Color kError = from_hex6(0xF2B8B5);
 inline constexpr Color kSecondaryContainer = from_hex6(0x4A4458);
 inline constexpr Color kOnSecondaryContainer = from_hex6(0xE8DEF8);
+inline constexpr Color kInverseSurface = from_hex6(0xE6E0E9);
+inline constexpr Color kOnInverseSurface = from_hex6(0x313033);
+// AlertDialog barrier scrim (Python dialogs._SCRIM).
+inline constexpr Color kScrim = Color{0, 0, 0, 82};
 } // namespace colors
 } // namespace saturn

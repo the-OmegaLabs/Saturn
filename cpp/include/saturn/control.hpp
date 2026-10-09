@@ -1,6 +1,7 @@
 #pragma once
 #include "types.hpp"
 #include "events.hpp"
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -157,6 +158,16 @@ protected:
 class OutlinedButton final : public ButtonBase {
 public:
   OutlinedButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
+protected:
+  void paint_background(Renderer& r) override;
+  Color content_color() const override;
+};
+
+
+// M3 TextButton: no fill (pressed SURFACE_CONTAINER), PRIMARY label. Dialog Cancel.
+class TextButton final : public ButtonBase {
+public:
+  TextButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
 protected:
   void paint_background(Renderer& r) override;
   Color content_color() const override;
@@ -324,6 +335,80 @@ private:
   bool open_ = false;
   bool pressed_ = false;
   int press_option_ = -1; // -2 = field, -1 = none, >=0 = option index
+};
+
+
+// Overlay base for Page::show_dialog / pop_dialog. Barrier dialogs swallow
+// outside clicks; non-barrier (SnackBar) let the page stay live.
+class DialogControl : public Control {
+public:
+  bool barrier() const { return barrier_; }
+  bool modal() const { return modal_; }
+  // Called once when pushed onto the page overlay stack.
+  virtual void on_shown();
+  // Per-frame; SnackBar uses this for duration auto-dismiss.
+  virtual void tick();
+protected:
+  DialogControl(bool barrier, bool modal = false);
+  void dismiss();
+private:
+  bool barrier_ = true;
+  bool modal_ = false;
+};
+
+// M3 AlertDialog: scrim + centered card (pad 24, inset 40, radius 28).
+// title/content strings; actions are owned buttons (≤ kMaxDialogActions).
+// Text over kMaxTextBytes / actions oversize → throw (no truncate).
+class AlertDialog final : public DialogControl {
+public:
+  static constexpr float kPad = 24.f;
+  static constexpr float kInset = 40.f;
+  static constexpr float kRadius = 28.f;
+  static constexpr float kTitlePx = 24.f;
+  static constexpr float kContentPx = 14.f;
+  static constexpr float kMinCardW = 280.f;
+  static constexpr float kActionGap = 8.f;
+  AlertDialog(std::string title, std::string content,
+              std::vector<std::unique_ptr<Control>> actions,
+              bool modal = false);
+  void layout() override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  bool point_in_card(float x, float y) const;
+  std::string title_;
+  std::string content_;
+  Rect card_rect_{};
+};
+
+// M3 SnackBar: bottom bar (INVERSE_SURFACE), optional action TextButton.
+// Non-barrier. duration_ms in (0, kMaxSnackBarDurationMs]; with a non-empty
+// action label the bar persists until action/dismiss (Python persist default).
+// Message / action label over kMaxTextBytes → throw.
+class SnackBar final : public DialogControl {
+public:
+  static constexpr float kPad = 24.f;
+  static constexpr float kMargin = 16.f;
+  static constexpr float kMinH = 48.f;
+  static constexpr float kTextPx = 14.f;
+  static constexpr float kRadius = 4.f;
+  SnackBar(std::string message, std::string action_label = "",
+           std::function<void()> on_action = {},
+           int duration_ms = 4000);
+  void on_shown() override;
+  void tick() override;
+  void layout() override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+private:
+  std::string message_;
+  std::string action_label_;
+  std::function<void()> on_action_;
+  int duration_ms_ = 4000;
+  bool has_deadline_ = false;
+  std::chrono::steady_clock::time_point deadline_{};
+  Rect bar_rect_{};
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.

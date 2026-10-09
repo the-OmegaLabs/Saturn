@@ -30,6 +30,10 @@ inline constexpr int kMaxImageDecodeDim = 4096;
 inline constexpr int kMaxSliderDivisions = 1024;
 // Dropdown menu rows; paint/hit loop options — reject unbounded.
 inline constexpr std::size_t kMaxDropdownOptions = 256;
+// AlertDialog modal stack + action row; SnackBar duration.
+inline constexpr std::size_t kMaxDialogDepth = 8;
+inline constexpr std::size_t kMaxDialogActions = 8;
+inline constexpr int kMaxSnackBarDurationMs = 60000; // 60s
 static_assert(kMaxImageDecodeDim > 0);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) <= kMaxLayoutDim);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) *
