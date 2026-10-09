@@ -600,7 +600,8 @@ void OpenGLRenderer::ensure_arc_pipeline() {
   if (impl_->arc_pipeline) return;
   auto& g = impl_->gl;
   g.load_all();
-  if (!g.loaded || !g.uniform1f || !g.uniform2f) return;
+  if (!g.loaded || !g.uniform1f || !g.uniform2f)
+    throw std::runtime_error("stroke_arc: GL entry points unavailable for arc pipeline");
 
   unsigned vs = 0, fs = 0;
   auto cleanup_shaders = [&]() {
@@ -911,7 +912,8 @@ void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
   if (!(sweep > 1e-6f)) return;
 
   float outer = outer_radius;
-  if (outer > float(kMaxLayoutDim)) return;
+  if (outer > float(kMaxLayoutDim))
+    throw std::invalid_argument("stroke_arc outer radius exceeds kMaxLayoutDim");
   float sw = width;
   if (sw > kMaxStrokeWidth) sw = kMaxStrokeWidth;
   if (sw > outer) sw = outer;
@@ -919,7 +921,8 @@ void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
 
   SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
   ensure_arc_pipeline();
-  if (!impl_->arc_pipeline) return;
+  if (!impl_->arc_pipeline)
+    throw std::runtime_error("stroke_arc: arc pipeline unavailable");
   // Fail loud if required uniforms missing (no silent empty arc).
   if (impl_->u_arc_center < 0 || impl_->u_arc_outer < 0 || impl_->u_arc_stroke < 0 ||
       impl_->u_arc_start < 0 || impl_->u_arc_sweep < 0 || impl_->u_arc_color < 0 ||

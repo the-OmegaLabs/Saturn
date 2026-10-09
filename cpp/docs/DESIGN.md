@@ -94,6 +94,8 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - ProgressRing: value ∈ [0,1] (non-finite throw); track + progress via
   `Renderer::stroke_arc` (angular SDF annulus sector, round caps; OpenGL).
   Track uses Material-style gap vs progress. Default 40×40 / stroke 4 / PRIMARY.
+  `stroke_arc`: outer > `kMaxLayoutDim` / arc pipeline unavailable / missing
+  uniforms → throw (no silent empty arc). Stroke soft-capped by `kMaxStrokeWidth`.
 - Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
 - Dropdown: hint + options (≤ `kMaxDropdownOptions`); width default 180; field
   height 56 / text 16; inline popup (no overlay animation). `on_select(key)`.
