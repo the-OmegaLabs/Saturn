@@ -48,7 +48,10 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Demo `ColorBox` added via `Page::add` (no hard-coded rect in `App::run`)
 
 ## Layout note
-- `Page::layout` remains a top-level vertical column (padding/gap) for hello zero churn; after `set_rect` it calls `child->layout()` so nested `Row`/`Column` can position kids.
+- `Page::layout(w,h)` uses `set_padding` / `set_spacing` (defaults 40/16; demo uses 24/16). `set_bgcolor` feeds `App` clear. After `set_rect` it calls `child->layout()` so nested `Row`/`Column` can position kids.
+- `Container` width-only / height-only: unset axis still measured from children (+ padding).
+- `Text::set_size` / ctor `size` (clamped `kMinFontPx`..`kMaxFontPx`); default 16.
+- Screenshot: `SATURN_SHOT=path.png` (+ optional `SATURN_SHOT_FRAMES`, default 3) via `Renderer::read_pixels_rgba` + stb_image_write; capped by `kMaxScreenshotPixels` / `kMaxPathBytes`. Target `saturn_demo`.
 - `Row` / `Column`: own children via `unique_ptr` + `add()`; explicit `spacing` / `set_spacing` (no kwargs); `kMaxChildren` cap; intrinsic = sum main-axis + gaps, max cross-axis.
 - Cross-axis: `CrossAxisAlignment` {Start, Center, End, Stretch} via `set_cross_axis_alignment`. Row default Center (Python `vertical_alignment`); Column default Start (Python `horizontal_alignment`). Stretch fills cross size unless child has explicit width/height.
 - Expand: `Control::set_expand(bool)` / `ControlOptions::expand` — leftover main-axis space shared equally among expand siblings (bool only; no flex weights yet). Intrinsic size still sums natural footprints.

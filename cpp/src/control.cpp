@@ -94,9 +94,10 @@ void ColorBox::paint(Renderer& r) {
   Control::paint(r);
 }
 
-Text::Text(std::string value, Color color, ControlOptions opt)
+Text::Text(std::string value, Color color, float size, ControlOptions opt)
   : Control(std::move(opt)), value_(std::move(value)), color_(color) {
   if (value_.size() > kMaxTextBytes) value_.resize(kMaxTextBytes);
+  set_size(size);
 }
 void Text::set_value(std::string value) {
   if (value.size() > kMaxTextBytes) value.resize(kMaxTextBytes);
@@ -104,15 +105,23 @@ void Text::set_value(std::string value) {
   if (page_) page_->update();
 }
 const std::string& Text::value() const { return value_; }
+void Text::set_size(float px) {
+  if (!std::isfinite(px)) px = kUiFontPx;
+  if (px < kMinFontPx) px = kMinFontPx;
+  if (px > kMaxFontPx) px = kMaxFontPx;
+  size_ = px;
+  if (page_) page_->update();
+}
+float Text::size() const { return size_; }
 Size Text::intrinsic(OptionalSize max_w, OptionalSize) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  Size s = default_font().measure(value_, kUiFontPx);
+  Size s = default_font().measure(value_, size_);
   if (max_w && s.w > *max_w) s.w = *max_w;
   return s;
 }
 void Text::paint(Renderer& r) {
   if (!opt_.visible) return;
-  default_font().draw(r, rect_.x, rect_.y, value_, color_, kUiFontPx);
+  default_font().draw(r, rect_.x, rect_.y, value_, color_, size_);
 }
 
 FilledButton::FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt)
@@ -353,10 +362,16 @@ void Container::set_corner_radius(float radius) {
 }
 void Container::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
 Size Container::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
-  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
   float pad2 = padding_ * 2.f;
-  OptionalSize child_max_w = max_w ? OptionalSize(*max_w - pad2) : OptionalSize{};
-  OptionalSize child_max_h = max_h ? OptionalSize(*max_h - pad2) : OptionalSize{};
+  // Width-only / height-only: still measure the unset axis from children.
+  float fixed_w = opt_.width ? *opt_.width : -1.f;
+  float fixed_h = opt_.height ? *opt_.height : -1.f;
+  float avail_w = fixed_w >= 0.f ? fixed_w - pad2
+                : (max_w ? (*max_w - pad2) : -1.f);
+  float avail_h = fixed_h >= 0.f ? fixed_h - pad2
+                : (max_h ? (*max_h - pad2) : -1.f);
+  OptionalSize child_max_w = avail_w >= 0.f ? OptionalSize(avail_w) : OptionalSize{};
+  OptionalSize child_max_h = avail_h >= 0.f ? OptionalSize(avail_h) : OptionalSize{};
   float w = 0.f, h = 0.f;
   for (auto& child : children_) {
     if (!child || !child->options().visible) continue;
@@ -365,6 +380,8 @@ Size Container::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
     if (s.h > h) h = s.h;
   }
   w += pad2; h += pad2;
+  if (fixed_w >= 0.f) w = fixed_w;
+  if (fixed_h >= 0.f) h = fixed_h;
   if (w < 0) w = 0; if (h < 0) h = 0;
   if (w > float(kMaxLayoutDim)) w = float(kMaxLayoutDim);
   if (h > float(kMaxLayoutDim)) h = float(kMaxLayoutDim);

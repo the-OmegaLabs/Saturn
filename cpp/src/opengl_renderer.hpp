@@ -17,6 +17,7 @@ public:
   void* create_texture_rgba8(int w, int h, const std::uint8_t* rgba) override;
   void destroy_texture(void* tex) override;
   void draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count, Color tint) override;
+  bool read_pixels_rgba(std::vector<std::uint8_t>* out, int* out_w, int* out_h) override;
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;

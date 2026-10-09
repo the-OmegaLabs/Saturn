@@ -99,6 +99,9 @@ std::vector<PointerEvent> Window::take_pointer_events() {
   return out;
 }
 
+void Window::set_title(const std::string& title) {
+  if (impl_->win) SDL_SetWindowTitle(impl_->win, title.c_str());
+}
 int Window::width() const { return impl_->w; }
 int Window::height() const { return impl_->h; }
 Renderer& Window::renderer() { return *impl_->renderer; }

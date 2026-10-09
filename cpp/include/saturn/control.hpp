@@ -51,14 +51,18 @@ private:
 
 class Text final : public Control {
 public:
-  explicit Text(std::string value, Color color = Color{0xff,0xff,0xff,0xff}, ControlOptions opt = {});
+  explicit Text(std::string value, Color color = Color{0xff,0xff,0xff,0xff},
+                 float size = 16.f, ControlOptions opt = {});
   void set_value(std::string value);
   const std::string& value() const;
+  void set_size(float px);
+  float size() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
 private:
   std::string value_;
   Color color_;
+  float size_ = 16.f;
 };
 
 class FilledButton final : public Control {

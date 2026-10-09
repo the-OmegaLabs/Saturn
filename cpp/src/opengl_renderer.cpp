@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -786,5 +787,32 @@ void OpenGLRenderer::on_resize(int w, int h) {
     glViewport(0, 0, w, h);
     apply_scissor();
   }
+}
+
+bool OpenGLRenderer::read_pixels_rgba(std::vector<std::uint8_t>* out, int* out_w, int* out_h) {
+  if (!out || !out_w || !out_h) return false;
+  if (!impl_ || !impl_->ctx) return false;
+  int w = impl_->w, h = impl_->h;
+  if (w <= 0 || h <= 0) return false;
+  std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+  if (n > kMaxScreenshotPixels)
+    throw std::runtime_error("screenshot exceeds kMaxScreenshotPixels");
+  SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+  if (impl_->gl.disable) impl_->gl.disable(kScissorTest);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  std::vector<std::uint8_t> raw(n * 4u);
+  glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, raw.data());
+  out->resize(n * 4u);
+  // GL origin is bottom-left; flip to top-left for PNG / compare_shots.
+  const std::size_t row = static_cast<std::size_t>(w) * 4u;
+  for (int y = 0; y < h; ++y) {
+    std::memcpy(out->data() + static_cast<std::size_t>(y) * row,
+                raw.data() + static_cast<std::size_t>(h - 1 - y) * row,
+                row);
+  }
+  *out_w = w;
+  *out_h = h;
+  apply_scissor();
+  return true;
 }
 }
