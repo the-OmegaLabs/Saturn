@@ -2,6 +2,7 @@
 #include "types.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 namespace saturn {
 class Renderer {
 public:
@@ -22,5 +23,9 @@ public:
   virtual void destroy_texture(void* tex);
   // uv in TexturedQuad is pixel-space of the texture. Throws if count > kMaxFillRects.
   virtual void draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count, Color tint);
+
+  // Read back RGBA8 framebuffer (origin top-left). out sized w*h*4.
+  // Returns false if unsupported. Throws if w*h > kMaxScreenshotPixels.
+  virtual bool read_pixels_rgba(std::vector<std::uint8_t>* out, int* out_w, int* out_h);
 };
 }

@@ -1,14 +1,34 @@
 #include "saturn/page.hpp"
 #include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
+#include <cmath>
 #include <stdexcept>
 namespace saturn {
+namespace {
+float clamp_pad(float v) {
+  if (!std::isfinite(v) || v < 0.f) return 0.f;
+  if (v > float(kMaxLayoutDim)) return float(kMaxLayoutDim);
+  return v;
+}
+} // namespace
 Page::Page() : Control({}) {}
 void Page::set_title(std::string title) {
   if (title.size() > kMaxTextBytes) title.resize(kMaxTextBytes);
   title_ = std::move(title);
 }
 const std::string& Page::title() const { return title_; }
+void Page::set_bgcolor(Color c) { bgcolor_ = c; }
+Color Page::bgcolor() const { return bgcolor_; }
+void Page::set_padding(float pad) {
+  padding_ = clamp_pad(pad);
+  layout_dirty_ = true;
+}
+float Page::padding() const { return padding_; }
+void Page::set_spacing(float gap) {
+  spacing_ = clamp_pad(gap);
+  layout_dirty_ = true;
+}
+float Page::spacing() const { return spacing_; }
 void Page::add(std::unique_ptr<Control> child) {
   if (!child) return;
   if (children_.size() >= kMaxChildren) throw std::runtime_error("too many children");
@@ -18,15 +38,15 @@ void Page::add(std::unique_ptr<Control> child) {
 }
 void Page::update() { layout_dirty_ = true; }
 bool Page::layout_dirty() const { return layout_dirty_; }
-void Page::layout(float width, float height, float padding, float gap) {
+void Page::layout(float width, float height) {
   if (!(width > 0) || !(height > 0)) {
     layout_dirty_ = false;
     return;
   }
   if (width > kMaxLayoutDim) width = float(kMaxLayoutDim);
   if (height > kMaxLayoutDim) height = float(kMaxLayoutDim);
-  if (padding < 0) padding = 0;
-  if (gap < 0) gap = 0;
+  float padding = padding_;
+  float gap = spacing_;
   set_rect(Rect{0, 0, width, height});
   float inner_w = width - padding * 2.f;
   if (inner_w < 0) inner_w = 0;

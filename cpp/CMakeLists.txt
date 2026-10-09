@@ -18,19 +18,26 @@ endif()
 add_executable(saturn_hello src/main.cpp)
 target_link_libraries(saturn_hello PRIVATE saturn)
 
-# Copy SDL3.dll next to the exe on Windows when known.
+add_executable(saturn_demo src/demo_main.cpp)
+target_link_libraries(saturn_demo PRIVATE saturn)
+
+# Copy SDL3.dll next to the exes on Windows when known.
 if (WIN32 AND DEFINED SDL3_DIR)
   get_filename_component(_sdl3_root "${SDL3_DIR}/../.." ABSOLUTE)
   if (EXISTS "${_sdl3_root}/lib/x64/SDL3.dll")
-    add_custom_command(TARGET saturn_hello POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${_sdl3_root}/lib/x64/SDL3.dll" $<TARGET_FILE_DIR:saturn_hello>)
+    foreach(_tgt saturn_hello saturn_demo)
+      add_custom_command(TARGET ${_tgt} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${_sdl3_root}/lib/x64/SDL3.dll" $<TARGET_FILE_DIR:${_tgt}>)
+    endforeach()
   endif()
 endif()
 
-# Bundled Inter Regular (OFL) for hello / metrics — same family Python ships (instanced wght=400).
-add_custom_command(TARGET saturn_hello POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:saturn_hello>/assets"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${CMAKE_SOURCE_DIR}/assets/Inter-Regular.ttf"
-    "$<TARGET_FILE_DIR:saturn_hello>/assets/Inter-Regular.ttf")
+# Bundled Inter Regular (OFL) next to both exes.
+foreach(_tgt saturn_hello saturn_demo)
+  add_custom_command(TARGET ${_tgt} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${_tgt}>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/assets/Inter-Regular.ttf"
+      "$<TARGET_FILE_DIR:${_tgt}>/assets/Inter-Regular.ttf")
+endforeach()

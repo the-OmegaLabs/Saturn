@@ -14,6 +14,7 @@ public:
   bool poll_quit();
   bool consume_resized(int* out_w, int* out_h);
   std::vector<PointerEvent> take_pointer_events();
+  void set_title(const std::string& title);
   int width() const;
   int height() const;
   Renderer& renderer();

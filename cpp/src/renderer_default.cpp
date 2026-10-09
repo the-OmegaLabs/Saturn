@@ -15,4 +15,5 @@ void Renderer::draw_textured_quads(void*, const TexturedQuad*, std::size_t count
   if (count > kMaxFillRects)
     throw std::runtime_error("draw_textured_quads exceeds kMaxFillRects");
 }
+bool Renderer::read_pixels_rgba(std::vector<std::uint8_t>*, int*, int*) { return false; }
 }
