@@ -73,6 +73,11 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - `STBI_MAX_DIMENSIONS` == `kMaxImageDecodeDim` (4096), set before stb include;
   file bytes capped by `kMaxImageFileBytes`. No silent `catch (...)`.
 
+## Slider
+- `divisions` must be in `[0, kMaxSliderDivisions]` (1024); ctor throws otherwise
+  (no clamp) — paint ticks loop `divisions-1` times.
+- `set_value` / `apply_value`: non-finite → throw (same as min/max).
+
 ## Font (TTF metrics)
 - `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
   (OFL; instanced from Python `saturn/assets` Inter variable @ wght=400/opsz=14).

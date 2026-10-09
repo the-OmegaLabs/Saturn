@@ -485,7 +485,8 @@ Slider::Slider(float min_v, float max_v, int divisions,
     on_change_(std::move(on_change)) {
   if (!(std::isfinite(min_) && std::isfinite(max_)) || max_ < min_)
     throw std::invalid_argument("Slider min/max invalid");
-  if (divisions_ < 0) divisions_ = 0;
+  if (divisions_ < 0 || divisions_ > kMaxSliderDivisions)
+    throw std::invalid_argument("Slider divisions out of range");
   value_ = min_;
   if (!opt_.width) opt_.width = kDefaultWidth;
   if (!opt_.height) opt_.height = kDefaultHeight;
@@ -509,7 +510,8 @@ float Slider::value_from_x(float x) const {
   return v;
 }
 void Slider::apply_value(float v) {
-  if (!(std::isfinite(v))) return;
+  if (!(std::isfinite(v)))
+    throw std::invalid_argument("Slider value must be finite");
   if (v < min_) v = min_;
   if (v > max_) v = max_;
   if (v == value_) return;

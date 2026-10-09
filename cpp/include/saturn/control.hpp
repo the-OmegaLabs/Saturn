@@ -214,7 +214,8 @@ private:
 };
 
 // M3 Slider: intrinsic ~300×48, active PRIMARY. Click + drag (pointer move
-// while captured). divisions>0 snaps to steps.
+// while captured). divisions>0 snaps to steps; ctor rejects divisions outside
+// [0, kMaxSliderDivisions]. set_value / apply_value reject non-finite.
 class Slider final : public Control {
 public:
   static constexpr float kDefaultWidth = 300.f;

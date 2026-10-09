@@ -102,7 +102,8 @@ python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png pat
 ## Caps (security)
 See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
 `kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`,
-`kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`).
+`kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`),
+`kMaxSliderDivisions` (ctor throw if out of range; `set_value` rejects non-finite).
 Screenshot / image / icon path length capped by `kMaxPathBytes` — oversize paths
 **throw**, never truncate. `Image` / `IconButton` fail loud on bad/oversize
 decode (no silent empty paint). ListView scroll caches must honor these —

@@ -26,6 +26,8 @@ inline constexpr int kFontAtlasDim = 1024; // square atlas edge (<= kMaxLayoutDi
 // buffer cannot exceed kMaxScreenshotPixels (wired to STBI_MAX_DIMENSIONS).
 inline constexpr std::size_t kMaxImageFileBytes = 32u << 20; // 32 MiB
 inline constexpr int kMaxImageDecodeDim = 4096;
+// Slider tick count: paint loops `divisions-1` times; reject unbounded.
+inline constexpr int kMaxSliderDivisions = 1024;
 static_assert(kMaxImageDecodeDim > 0);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) <= kMaxLayoutDim);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) *
