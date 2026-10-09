@@ -67,8 +67,8 @@ private:
 
 class FilledButton final : public Control {
 public:
-  // Default corner radius 8px; renderer also clamps to kMaxCornerRadius / half min(w,h).
-  static constexpr float kDefaultCornerRadius = 8.f;
+  // M3 filled uses pill (height/2 ≈ 20). Renderer also clamps to kMaxCornerRadius / half min(w,h).
+  static constexpr float kDefaultCornerRadius = 20.f;
   FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
   void set_corner_radius(float radius);
   float corner_radius() const;

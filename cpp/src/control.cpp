@@ -1,4 +1,5 @@
 #include "saturn/control.hpp"
+#include "saturn/colors.hpp"
 #include "saturn/page.hpp"
 #include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
@@ -10,6 +11,10 @@
 namespace saturn {
 namespace {
 constexpr float kUiFontPx = 16.f;
+// M3 FilledButton metrics (saturn/widgets/buttons.py non-expressive).
+constexpr float kLabelFontPx = 14.f;
+constexpr float kPadH = 24.f;
+constexpr float kHeight = 40.f;
 float clamp_spacing(float spacing) {
   if (!std::isfinite(spacing) || spacing < 0.f) return 0.f;
   if (spacing > float(kMaxLayoutDim)) return float(kMaxLayoutDim);
@@ -137,23 +142,21 @@ void FilledButton::set_corner_radius(float radius) {
 float FilledButton::corner_radius() const { return corner_radius_; }
 Size FilledButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  Size text = default_font().measure(label_, kUiFontPx);
-  Size s{text.w + 32.f, text.h + 24.f};
+  Size text = default_font().measure(label_, kLabelFontPx);
+  Size s{text.w + 2.f * kPadH, kHeight};
   if (max_w && s.w > *max_w) s.w = *max_w;
   if (max_h && s.h > *max_h) s.h = *max_h;
   return s;
 }
 void FilledButton::paint(Renderer& r) {
   if (!opt_.visible) return;
-  Color bg = pressed_ ? Color{0x37, 0x30, 0xa3, 0xff} : Color{0x4f, 0x46, 0xe5, 0xff};
+  // M3 dark: Colors.PRIMARY fill, Colors.ON_PRIMARY label; no outline.
+  Color bg = pressed_ ? Color{0xb8, 0xa0, 0xe8, 0xff} : colors::kPrimary;
   r.fill_rect(rect_, bg, corner_radius_);
-  // Subtle inside stroke; same radius so SDF fill/stroke share corners.
-  Color border = pressed_ ? Color{0x2e, 0x28, 0x8a, 0xff} : Color{0x63, 0x5b, 0xff, 0xff};
-  r.stroke_rect(rect_, border, 1.f, corner_radius_);
-  Size text = default_font().measure(label_, kUiFontPx);
+  Size text = default_font().measure(label_, kLabelFontPx);
   float tx = rect_.x + (rect_.w - text.w) * 0.5f;
   float ty = rect_.y + (rect_.h - text.h) * 0.5f;
-  default_font().draw(r, tx, ty, label_, Color{0xff, 0xff, 0xff, 0xff}, kUiFontPx);
+  default_font().draw(r, tx, ty, label_, colors::kOnPrimary, kLabelFontPx);
 }
 bool FilledButton::hit_test(float x, float y) const {
   return hit_round_rect(x, y, rect_, corner_radius_);

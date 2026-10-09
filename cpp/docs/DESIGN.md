@@ -62,7 +62,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Invalid layout size clears `layout_dirty_` (no per-frame no-op spin).
 
 ## Phase 4 status
-- `Text` + `FilledButton` hello (pointer capture, SDF round fill/stroke)
+- `Text` + `FilledButton` hello (pointer capture, SDF round fill)
 - Caps: `kMaxTextLen` / `kMaxFillRects` throw, no silent truncate
 - Hello track closed; layout widgets (`Row`/`Column`/`Container`) landed
 
@@ -71,7 +71,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
   (OFL; instanced from Python `saturn/assets` Inter variable @ wght=400/opsz=14).
 - Real advances / ascent / descent; on-demand atlas (ASCII preload) → `create_texture_rgba8` +
   `draw_textured_quads`. Caps: `kMaxFontPx`, `kMaxFontFileBytes`, `kMaxPathBytes`, `kFontAtlasDim`.
-- `Text` / `FilledButton` use `default_font()` at 16px. `run()` calls `Font::load_default()` and
+- `Text` defaults to 16px; `FilledButton` uses M3 label 14px / PRIMARY / ON_PRIMARY. `run()` calls `Font::load_default()` and
   **fails loud** if missing (`SATURN_FONT_PATH` or `assets/Inter-Regular.ttf` next to exe).
 - 5x7 `bitmap_font.hpp` is **not** for pixel parity (kept as emergency reference only).
 

@@ -45,7 +45,13 @@ Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
   at wght=400). Override with `SATURN_FONT_PATH`. Hello/demo fail loud if missing.
 
 ## Skeleton (`saturn_demo`)
-Layout-only first cut — **not** pixel parity yet (no ListView / inputs / icons).
+Layout register cut toward `examples/demo.py` — **not** pixel parity.
+Has: SURFACE page, brand header slot (52×40 spacer + title 28 + `v0.1.0` 12),
+status 13, two 440px panels (pad 20 / radius 16), M3 `FilledButton` (PRIMARY /
+ON_PRIMARY, 40× pad24 / label14 / radius20), static fake list items.
+**Missing** (expect `compare_shots` FAIL): real logo Image+PRIMARY tint, Elevated /
+Outlined / IconButton, TextField, Checkbox, Slider, Switch, ProgressRing, Dropdown,
+Image, Dialog/SnackBar, ListView scroll, variable Inter weight / Noto SC.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
