@@ -8,7 +8,7 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 ## Locked constraints (do not reopen without user + review)
 1. Stack: SDL3 window/events → `Renderer` abstract → **OpenGL only** this phase. No Software/Vulkan/web in tree yet.
 2. Ownership: every owning pointer documents who frees; containers own children; no raw shared ownership without `std::shared_ptr` and a comment why.
-3. Bounds: text/input buffers, event queues, layout allocations have explicit caps (see `saturn/limits.hpp`). Unconstrained layout sizes (`nullopt`) must not allocate unbounded memory.
+3. Bounds: text/input buffers, event queues, layout allocations have explicit caps (see `saturn/limits.hpp`, including `kMaxTextLen` / `kMaxFillRects`). Unconstrained layout sizes (`nullopt`) must not allocate unbounded memory.
 4. Untrusted inputs: fonts, images, FilePicker paths, GLSL - validate format + path escape before pipeline. Custom shaders = untrusted.
 5. `ControlOptions`: explicit struct. Open fields (`data`, urls) typed or opaque - never `any`/`void*` dump without tag.
 6. Phases 1-4: **hello runs only**. Do not expand Flet-wide widget surface before hello works.

@@ -1,8 +1,10 @@
 #pragma once
+#include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
 #include "saturn/types.hpp"
-#include <string_view>
 #include <cstdint>
+#include <stdexcept>
+#include <string_view>
 #include <vector>
 namespace saturn {
 namespace bitmap_font {
@@ -11,6 +13,9 @@ inline constexpr int kGlyphH = 7;
 inline constexpr int kCellW = 6;
 inline constexpr int kCellH = 8;
 inline constexpr int kScale = 2;
+inline constexpr int kAtlasCell = 8;   // 5x7 glyph + 1px pad
+inline constexpr int kAtlasCols = 16;
+inline constexpr int kAtlasRows = 8;   // ASCII 0..127
 
 inline const std::uint8_t* glyph(char c) {
   static const std::uint8_t box[7] = {0x1f,0x11,0x11,0x11,0x11,0x1f,0};
@@ -45,23 +50,91 @@ inline Size measure(std::string_view text, float scale = float(kScale)) {
   return {float(text.size()) * kCellW * scale, kCellH * scale};
 }
 
-inline void draw(Renderer& r, float x, float y, std::string_view text, Color color, float scale = float(kScale)) {
-  std::vector<Rect> rects;
-  rects.reserve(text.size() * kGlyphW * kGlyphH / 2);
-  float cx = x;
-  for (char ch : text) {
-    const std::uint8_t* rows = glyph(ch);
+inline void build_atlas_rgba(std::vector<std::uint8_t>& rgba, int& tw, int& th) {
+  tw = kAtlasCols * kAtlasCell;
+  th = kAtlasRows * kAtlasCell;
+  rgba.assign(std::size_t(tw * th * 4), 0);
+  for (int ci = 0; ci < 128; ++ci) {
+    const std::uint8_t* rows = glyph(static_cast<char>(ci));
+    const int col0 = (ci % kAtlasCols) * kAtlasCell;
+    const int row0 = (ci / kAtlasCols) * kAtlasCell;
     for (int row = 0; row < kGlyphH; ++row) {
       std::uint8_t bits = rows[row];
       for (int col = 0; col < kGlyphW; ++col) {
         if (bits & (1u << (kGlyphW - 1 - col))) {
-          rects.push_back(Rect{cx + col * scale, y + row * scale, scale, scale});
+          const int px = col0 + 1 + col;
+          const int py = row0 + 1 + row;
+          const std::size_t i = std::size_t(py * tw + px) * 4u;
+          rgba[i] = 255;
+          rgba[i + 1] = 255;
+          rgba[i + 2] = 255;
+          rgba[i + 3] = 255;
         }
       }
     }
-    cx += kCellW * scale;
   }
-  if (!rects.empty()) r.fill_rects(rects.data(), rects.size(), color);
+}
+
+struct AtlasCache {
+  void* tex = nullptr;
+  Renderer* owner = nullptr;
+};
+
+inline AtlasCache& atlas_cache() {
+  static AtlasCache c;
+  return c;
+}
+
+inline void* ensure_atlas(Renderer& r) {
+  AtlasCache& ac = atlas_cache();
+  if (ac.tex && ac.owner == &r) return ac.tex;
+  // Drop stale cache without destroy: owning OpenGLRenderer frees textures in dtor.
+  ac.tex = nullptr;
+  ac.owner = nullptr;
+  static std::vector<std::uint8_t> pixels;
+  static int tw = 0, th = 0;
+  static bool built = false;
+  if (!built) {
+    build_atlas_rgba(pixels, tw, th);
+    built = true;
+  }
+  void* tex = r.create_texture_rgba8(tw, th, pixels.data());
+  if (!tex) throw std::runtime_error("bitmap_font atlas texture create failed");
+  ac.tex = tex;
+  ac.owner = &r;
+  return tex;
+}
+
+inline void draw(Renderer& r, float x, float y, std::string_view text, Color color, float scale = float(kScale)) {
+  if (text.size() > kMaxTextLen)
+    throw std::invalid_argument("text exceeds kMaxTextLen");
+  if (text.empty()) return;
+  void* tex = ensure_atlas(r);
+  std::vector<TexturedQuad> quads;
+  quads.reserve(text.size());
+  float cx = x;
+  const float adv = float(kCellW) * scale;
+  const float dw = float(kGlyphW) * scale;
+  const float dh = float(kGlyphH) * scale;
+  for (char raw : text) {
+    const unsigned char ch = static_cast<unsigned char>(raw);
+    if (ch != ' ') {
+      const int ci = ch < 128 ? int(ch) : 0;
+      const int col = ci % kAtlasCols;
+      const int row = ci / kAtlasCols;
+      TexturedQuad q;
+      q.dst = Rect{cx, y, dw, dh};
+      q.uv = Rect{
+        float(col * kAtlasCell + 1),
+        float(row * kAtlasCell + 1),
+        float(kGlyphW),
+        float(kGlyphH)};
+      quads.push_back(q);
+    }
+    cx += adv;
+  }
+  if (!quads.empty())
+    r.draw_textured_quads(tex, quads.data(), quads.size(), color);
 }
 }  // namespace bitmap_font
 }  // namespace saturn

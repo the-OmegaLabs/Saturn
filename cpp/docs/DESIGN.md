@@ -54,4 +54,6 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Page clips children to bounds (overflow cropped; no scroll yet)
 - Pointer down/up routed to buttons
 - Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).
-- Text glyphs batch into one `Renderer::fill_rects` draw (not per-pixel fill_rect).
+- Glyph path: CPU atlas (16x8 cells of 8px, ASCII 0..127) uploaded once; one textured quad per character via `draw_textured_quads` (not per-pixel / not solid `fill_rects`).
+- Caps: `kMaxTextLen` (4096) on text draw; `kMaxFillRects` (16384) on `fill_rects` / `draw_textured_quads` (throw, no silent truncate).
+- Hello track closed; next knives are elsewhere (e.g. stroke_rect/radius, layout widgets) - not more ColorBox/hello churn.

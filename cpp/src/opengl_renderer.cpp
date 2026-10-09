@@ -5,6 +5,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -33,6 +34,7 @@ using PFNGLUSEPROGRAMPROC = void (*)(unsigned);
 using PFNGLGETUNIFORMLOCATIONPROC = int (*)(unsigned, const char*);
 using PFNGLUNIFORM4FPROC = void (*)(int, float, float, float, float);
 using PFNGLUNIFORM2FPROC = void (*)(int, float, float);
+using PFNGLUNIFORM1IPROC = void (*)(int, int);
 using PFNGLGENVERTEXARRAYSPROC = void (*)(int, unsigned*);
 using PFNGLBINDVERTEXARRAYPROC = void (*)(unsigned);
 using PFNGLENABLEVERTEXATTRIBARRAYPROC = void (*)(unsigned);
@@ -47,6 +49,13 @@ using PFNGLGETPROGRAMIVPROC = void (*)(unsigned, unsigned, int*);
 using PFNGLENABLEPROC = void (*)(unsigned);
 using PFNGLDISABLEPROC = void (*)(unsigned);
 using PFNGLSCISSORPROC = void (*)(int, int, int, int);
+using PFNGLGENTEXTURESPROC = void (*)(int, unsigned*);
+using PFNGLDELETETEXTURESPROC = void (*)(int, const unsigned*);
+using PFNGLBINDTEXTUREPROC = void (*)(unsigned, unsigned);
+using PFNGLTEXIMAGE2DPROC = void (*)(unsigned, int, int, int, int, int, unsigned, unsigned, const void*);
+using PFNGLTEXPARAMETERIPROC = void (*)(unsigned, unsigned, int);
+using PFNGLACTIVETEXTUREPROC = void (*)(unsigned);
+using PFNGLBLENDFUNCPROC = void (*)(unsigned, unsigned);
 
 constexpr unsigned kArrBuf = 0x8892;
 constexpr unsigned kDynamicDraw = 0x88E8;
@@ -57,6 +66,20 @@ constexpr unsigned kLinkStatus = 0x8B82;
 constexpr unsigned kScissorTest = 0x0C11;
 constexpr unsigned kFloat = 0x1406;
 constexpr unsigned kFalse = 0;
+constexpr unsigned kTexture2D = 0x0DE1;
+constexpr unsigned kRGBA = 0x1908;
+constexpr unsigned kUnsignedByte = 0x1401;
+constexpr unsigned kNearest = 0x2600;
+constexpr unsigned kClampToEdge = 0x812F;
+constexpr unsigned kTexture0 = 0x84C0;
+constexpr unsigned kTexMinFilter = 0x2801;
+constexpr unsigned kTexMagFilter = 0x2800;
+constexpr unsigned kTexWrapS = 0x2802;
+constexpr unsigned kTexWrapT = 0x2803;
+constexpr unsigned kBlend = 0x0BE2;
+constexpr unsigned kSrcAlpha = 0x0302;
+constexpr unsigned kOneMinusSrcAlpha = 0x0303;
+constexpr int kRgba8 = 0x8058; // GL_RGBA8
 
 struct GlApi {
   PFNGLGENBUFFERSPROC genBuffers = nullptr;
@@ -73,6 +96,7 @@ struct GlApi {
   PFNGLGETUNIFORMLOCATIONPROC getUniformLocation = nullptr;
   PFNGLUNIFORM4FPROC uniform4f = nullptr;
   PFNGLUNIFORM2FPROC uniform2f = nullptr;
+  PFNGLUNIFORM1IPROC uniform1i = nullptr;
   PFNGLGENVERTEXARRAYSPROC genVertexArrays = nullptr;
   PFNGLBINDVERTEXARRAYPROC bindVertexArray = nullptr;
   PFNGLENABLEVERTEXATTRIBARRAYPROC enableVertexAttribArray = nullptr;
@@ -87,6 +111,13 @@ struct GlApi {
   PFNGLENABLEPROC enable = nullptr;
   PFNGLDISABLEPROC disable = nullptr;
   PFNGLSCISSORPROC scissor = nullptr;
+  PFNGLGENTEXTURESPROC genTextures = nullptr;
+  PFNGLDELETETEXTURESPROC deleteTextures = nullptr;
+  PFNGLBINDTEXTUREPROC bindTexture = nullptr;
+  PFNGLTEXIMAGE2DPROC texImage2D = nullptr;
+  PFNGLTEXPARAMETERIPROC texParameteri = nullptr;
+  PFNGLACTIVETEXTUREPROC activeTexture = nullptr;
+  PFNGLBLENDFUNCPROC blendFunc = nullptr;
   bool loaded = false;
 
   void load_all() {
@@ -106,6 +137,7 @@ struct GlApi {
     getUniformLocation = reinterpret_cast<PFNGLGETUNIFORMLOCATIONPROC>(L("glGetUniformLocation"));
     uniform4f = reinterpret_cast<PFNGLUNIFORM4FPROC>(L("glUniform4f"));
     uniform2f = reinterpret_cast<PFNGLUNIFORM2FPROC>(L("glUniform2f"));
+    uniform1i = reinterpret_cast<PFNGLUNIFORM1IPROC>(L("glUniform1i"));
     genVertexArrays = reinterpret_cast<PFNGLGENVERTEXARRAYSPROC>(L("glGenVertexArrays"));
     bindVertexArray = reinterpret_cast<PFNGLBINDVERTEXARRAYPROC>(L("glBindVertexArray"));
     enableVertexAttribArray = reinterpret_cast<PFNGLENABLEVERTEXATTRIBARRAYPROC>(L("glEnableVertexAttribArray"));
@@ -120,14 +152,28 @@ struct GlApi {
     enable = reinterpret_cast<PFNGLENABLEPROC>(L("glEnable"));
     disable = reinterpret_cast<PFNGLDISABLEPROC>(L("glDisable"));
     scissor = reinterpret_cast<PFNGLSCISSORPROC>(L("glScissor"));
+    genTextures = reinterpret_cast<PFNGLGENTEXTURESPROC>(L("glGenTextures"));
+    deleteTextures = reinterpret_cast<PFNGLDELETETEXTURESPROC>(L("glDeleteTextures"));
+    bindTexture = reinterpret_cast<PFNGLBINDTEXTUREPROC>(L("glBindTexture"));
+    texImage2D = reinterpret_cast<PFNGLTEXIMAGE2DPROC>(L("glTexImage2D"));
+    texParameteri = reinterpret_cast<PFNGLTEXPARAMETERIPROC>(L("glTexParameteri"));
+    activeTexture = reinterpret_cast<PFNGLACTIVETEXTUREPROC>(L("glActiveTexture"));
+    blendFunc = reinterpret_cast<PFNGLBLENDFUNCPROC>(L("glBlendFunc"));
     loaded = genVertexArrays && createShader && createProgram && drawArrays &&
              enableVertexAttribArray && vertexAttribPointer &&
-             enable && disable && scissor;
+             enable && disable && scissor &&
+             genTextures && bindTexture && texImage2D && texParameteri;
   }
 };
-}
+
+}  // namespace
 
 struct OpenGLRenderer::Impl {
+  struct GpuTexture {
+    unsigned id = 0;
+    int w = 0;
+    int h = 0;
+  };
   SDL_Window* window = nullptr;
   SDL_GLContext ctx = nullptr;
   int w = 0, h = 0;
@@ -135,8 +181,13 @@ struct OpenGLRenderer::Impl {
   int u_color = -1, u_viewport = -1;
   bool pipeline = false;
   std::size_t vbo_capacity = 0; // floats
+  unsigned tex_vao = 0, tex_vbo = 0, tex_prog = 0;
+  int u_tex_viewport = -1, u_tex_size = -1, u_tint = -1, u_sampler = -1;
+  bool tex_pipeline = false;
+  std::size_t tex_vbo_capacity = 0; // floats
   std::vector<Rect> clips;
-  std::vector<float> scratch; // x,y pairs
+  std::vector<float> scratch; // solid: x,y; textured: x,y,u,v
+  std::vector<GpuTexture*> textures;
   GlApi gl;
 };
 
@@ -156,6 +207,28 @@ out vec4 frag;
 void main() { frag = uColor; }
 )";
 
+static const char* kTexVert = R"(#version 330 core
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
+uniform vec2 uViewport;
+uniform vec2 uTexSize;
+out vec2 vUV;
+void main() {
+  vec2 ndc = vec2(aPos.x / uViewport.x * 2.0 - 1.0,
+                  1.0 - aPos.y / uViewport.y * 2.0);
+  gl_Position = vec4(ndc, 0.0, 1.0);
+  vUV = aUV / uTexSize;
+}
+)";
+
+static const char* kTexFrag = R"(#version 330 core
+uniform sampler2D uTex;
+uniform vec4 uTint;
+in vec2 vUV;
+out vec4 frag;
+void main() { frag = texture(uTex, vUV) * uTint; }
+)";
+
 OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>()) {
   impl_->window = static_cast<SDL_Window*>(sdl_window);
   impl_->ctx = SDL_GL_CreateContext(impl_->window);
@@ -173,10 +246,21 @@ OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>(
 OpenGLRenderer::~OpenGLRenderer() {
   if (impl_ && impl_->ctx) {
     SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+    auto& g = impl_->gl;
+    for (Impl::GpuTexture* t : impl_->textures) {
+      if (t && t->id && g.deleteTextures) g.deleteTextures(1, &t->id);
+      delete t;
+    }
+    impl_->textures.clear();
+    if (impl_->tex_pipeline) {
+      if (g.deleteProgram && impl_->tex_prog) g.deleteProgram(impl_->tex_prog);
+      if (g.deleteBuffers && impl_->tex_vbo) g.deleteBuffers(1, &impl_->tex_vbo);
+      if (g.deleteVertexArrays && impl_->tex_vao) g.deleteVertexArrays(1, &impl_->tex_vao);
+    }
     if (impl_->pipeline) {
-      if (impl_->gl.deleteProgram && impl_->prog) impl_->gl.deleteProgram(impl_->prog);
-      if (impl_->gl.deleteBuffers && impl_->vbo) impl_->gl.deleteBuffers(1, &impl_->vbo);
-      if (impl_->gl.deleteVertexArrays && impl_->vao) impl_->gl.deleteVertexArrays(1, &impl_->vao);
+      if (g.deleteProgram && impl_->prog) g.deleteProgram(impl_->prog);
+      if (g.deleteBuffers && impl_->vbo) g.deleteBuffers(1, &impl_->vbo);
+      if (g.deleteVertexArrays && impl_->vao) g.deleteVertexArrays(1, &impl_->vao);
     }
     SDL_GL_DestroyContext(impl_->ctx);
     impl_->ctx = nullptr;
@@ -241,6 +325,69 @@ void OpenGLRenderer::ensure_quad_pipeline() {
   }
 }
 
+void OpenGLRenderer::ensure_tex_pipeline() {
+  if (impl_->tex_pipeline) return;
+  auto& g = impl_->gl;
+  g.load_all();
+  if (!g.loaded) return;
+
+  unsigned vs = 0, fs = 0;
+  auto cleanup_shaders = [&]() {
+    if (vs && g.deleteShader) g.deleteShader(vs);
+    if (fs && g.deleteShader) g.deleteShader(fs);
+  };
+  try {
+    auto make = [&](unsigned type, const char* src) {
+      unsigned s = g.createShader(type);
+      g.shaderSource(s, 1, &src, nullptr);
+      g.compileShader(s);
+      int ok = 0; g.getShaderiv(s, kCompileStatus, &ok);
+      if (!ok) {
+        if (g.deleteShader) g.deleteShader(s);
+        throw std::runtime_error("tex shader compile failed");
+      }
+      return s;
+    };
+    vs = make(kVertShader, kTexVert);
+    fs = make(kFragShader, kTexFrag);
+    impl_->tex_prog = g.createProgram();
+    g.attachShader(impl_->tex_prog, vs);
+    g.attachShader(impl_->tex_prog, fs);
+    g.linkProgram(impl_->tex_prog);
+    int ok = 0; g.getProgramiv(impl_->tex_prog, kLinkStatus, &ok);
+    if (!ok) {
+      if (g.deleteProgram) { g.deleteProgram(impl_->tex_prog); impl_->tex_prog = 0; }
+      cleanup_shaders();
+      throw std::runtime_error("tex shader link failed");
+    }
+    cleanup_shaders();
+    vs = fs = 0;
+    g.genVertexArrays(1, &impl_->tex_vao);
+    g.bindVertexArray(impl_->tex_vao);
+    g.genBuffers(1, &impl_->tex_vbo);
+    g.bindBuffer(kArrBuf, impl_->tex_vbo);
+    impl_->tex_vbo_capacity = 64;
+    g.bufferData(kArrBuf, ptrdiff_t(impl_->tex_vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
+    const int stride = int(4 * sizeof(float));
+    g.enableVertexAttribArray(0);
+    g.vertexAttribPointer(0, 2, kFloat, kFalse, stride, nullptr);
+    g.enableVertexAttribArray(1);
+    g.vertexAttribPointer(1, 2, kFloat, kFalse, stride, reinterpret_cast<const void*>(sizeof(float) * 2));
+    impl_->u_tex_viewport = g.getUniformLocation(impl_->tex_prog, "uViewport");
+    impl_->u_tex_size = g.getUniformLocation(impl_->tex_prog, "uTexSize");
+    impl_->u_tint = g.getUniformLocation(impl_->tex_prog, "uTint");
+    impl_->u_sampler = g.getUniformLocation(impl_->tex_prog, "uTex");
+    g.useProgram(0);
+    impl_->tex_pipeline = true;
+  } catch (...) {
+    cleanup_shaders();
+    if (impl_->tex_prog && g.deleteProgram) { g.deleteProgram(impl_->tex_prog); impl_->tex_prog = 0; }
+    if (impl_->tex_vbo && g.deleteBuffers) { g.deleteBuffers(1, &impl_->tex_vbo); impl_->tex_vbo = 0; }
+    if (impl_->tex_vao && g.deleteVertexArrays) { g.deleteVertexArrays(1, &impl_->tex_vao); impl_->tex_vao = 0; }
+    throw;
+  }
+}
+
 void OpenGLRenderer::apply_scissor() {
   auto& g = impl_->gl;
   if (impl_->clips.empty()) {
@@ -285,11 +432,21 @@ static void append_rect(std::vector<float>& out, const Rect& r) {
   out.insert(out.end(), {x0,y0, x1,y0, x1,y1, x0,y0, x1,y1, x0,y1});
 }
 
+static void append_textured(std::vector<float>& out, const Rect& dst, const Rect& uv) {
+  float x0 = dst.x, y0 = dst.y, x1 = dst.x + dst.w, y1 = dst.y + dst.h;
+  float u0 = uv.x, v0 = uv.y, u1 = uv.x + uv.w, v1 = uv.y + uv.h;
+  out.insert(out.end(), {
+    x0,y0,u0,v0, x1,y0,u1,v0, x1,y1,u1,v1,
+    x0,y0,u0,v0, x1,y1,u1,v1, x0,y1,u0,v1});
+}
+
 void OpenGLRenderer::fill_rect(Rect r, Color c, float /*radius*/) {
   fill_rects(&r, 1, c);
 }
 
 void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
+  if (count > kMaxFillRects)
+    throw std::runtime_error("fill_rects exceeds kMaxFillRects");
   if (!impl_ || !impl_->ctx || !rects || count == 0) return;
   SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
   ensure_quad_pipeline();
@@ -321,6 +478,93 @@ void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
   g.uniform4f(impl_->u_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
   g.drawArrays(GL_TRIANGLES, 0, int(floats / 2));
   g.useProgram(0);
+}
+
+void* OpenGLRenderer::create_texture_rgba8(int w, int h, const std::uint8_t* rgba) {
+  if (!impl_ || !impl_->ctx || !rgba || w <= 0 || h <= 0) return nullptr;
+  if (static_cast<std::size_t>(w) > kMaxLayoutDim || static_cast<std::size_t>(h) > kMaxLayoutDim)
+    return nullptr;
+  SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+  auto& g = impl_->gl;
+  g.load_all();
+  if (!g.genTextures || !g.bindTexture || !g.texImage2D || !g.texParameteri) return nullptr;
+  unsigned id = 0;
+  g.genTextures(1, &id);
+  if (!id) return nullptr;
+  g.bindTexture(kTexture2D, id);
+  g.texParameteri(kTexture2D, kTexMinFilter, int(kNearest));
+  g.texParameteri(kTexture2D, kTexMagFilter, int(kNearest));
+  g.texParameteri(kTexture2D, kTexWrapS, int(kClampToEdge));
+  g.texParameteri(kTexture2D, kTexWrapT, int(kClampToEdge));
+  g.texImage2D(kTexture2D, 0, kRgba8, w, h, 0, kRGBA, kUnsignedByte, rgba);
+  g.bindTexture(kTexture2D, 0);
+  auto* rec = new Impl::GpuTexture{id, w, h};
+  impl_->textures.push_back(rec);
+  return rec;
+}
+
+void OpenGLRenderer::destroy_texture(void* tex) {
+  if (!tex || !impl_) return;
+  auto* rec = static_cast<Impl::GpuTexture*>(tex);
+  auto& vec = impl_->textures;
+  auto it = std::find(vec.begin(), vec.end(), rec);
+  if (it == vec.end()) return;
+  if (impl_->ctx) {
+    SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+    if (rec->id && impl_->gl.deleteTextures) impl_->gl.deleteTextures(1, &rec->id);
+  }
+  vec.erase(it);
+  delete rec;
+}
+
+void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count, Color tint) {
+  if (count > kMaxFillRects)
+    throw std::runtime_error("draw_textured_quads exceeds kMaxFillRects");
+  if (!impl_ || !impl_->ctx || !tex || !quads || count == 0) return;
+  auto* rec = static_cast<Impl::GpuTexture*>(tex);
+  if (!rec->id || rec->w <= 0 || rec->h <= 0) return;
+  SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+  ensure_tex_pipeline();
+  if (!impl_->tex_pipeline) return;
+
+  impl_->scratch.clear();
+  impl_->scratch.reserve(count * 24);
+  for (std::size_t i = 0; i < count; ++i) {
+    const TexturedQuad& q = quads[i];
+    if (!(q.dst.w > 0 && q.dst.h > 0)) continue;
+    if (!std::isfinite(q.dst.x) || !std::isfinite(q.dst.y) ||
+        !std::isfinite(q.dst.w) || !std::isfinite(q.dst.h)) continue;
+    if (!std::isfinite(q.uv.x) || !std::isfinite(q.uv.y) ||
+        !std::isfinite(q.uv.w) || !std::isfinite(q.uv.h)) continue;
+    if (q.dst.w > kMaxLayoutDim || q.dst.h > kMaxLayoutDim) continue;
+    append_textured(impl_->scratch, q.dst, q.uv);
+  }
+  if (impl_->scratch.empty()) return;
+
+  auto& g = impl_->gl;
+  apply_scissor();
+  if (g.enable && g.blendFunc) {
+    g.enable(kBlend);
+    g.blendFunc(kSrcAlpha, kOneMinusSrcAlpha);
+  }
+  if (g.activeTexture) g.activeTexture(kTexture0);
+  g.bindTexture(kTexture2D, rec->id);
+  g.bindVertexArray(impl_->tex_vao);
+  g.bindBuffer(kArrBuf, impl_->tex_vbo);
+  const std::size_t floats = impl_->scratch.size();
+  if (floats > impl_->tex_vbo_capacity) {
+    impl_->tex_vbo_capacity = floats * 2;
+    g.bufferData(kArrBuf, ptrdiff_t(impl_->tex_vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
+  }
+  g.bufferSubData(kArrBuf, 0, ptrdiff_t(floats * sizeof(float)), impl_->scratch.data());
+  g.useProgram(impl_->tex_prog);
+  g.uniform2f(impl_->u_tex_viewport, float(impl_->w), float(impl_->h));
+  g.uniform2f(impl_->u_tex_size, float(rec->w), float(rec->h));
+  g.uniform4f(impl_->u_tint, tint.r / 255.f, tint.g / 255.f, tint.b / 255.f, tint.a / 255.f);
+  if (g.uniform1i && impl_->u_sampler >= 0) g.uniform1i(impl_->u_sampler, 0);
+  g.drawArrays(GL_TRIANGLES, 0, int(floats / 4));
+  g.useProgram(0);
+  g.bindTexture(kTexture2D, 0);
 }
 
 void OpenGLRenderer::stroke_rect(Rect, Color, float, float) {}
