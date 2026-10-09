@@ -147,6 +147,15 @@ bool Window::poll_quit() {
         if (impl_->pointers.size() < kMaxEventQueue) impl_->pointers.push_back(pe);
       }
     }
+    if (e.type == SDL_EVENT_MOUSE_MOTION) {
+      if (e.motion.state & SDL_BUTTON_LMASK) {
+        PointerEvent pe;
+        pe.x = float(e.motion.x);
+        pe.y = float(e.motion.y);
+        pe.move = true;
+        if (impl_->pointers.size() < kMaxEventQueue) impl_->pointers.push_back(pe);
+      }
+    }
   }
   return false;
 }

@@ -9,6 +9,7 @@
 namespace saturn {
 class Page;
 class Renderer;
+
 class Control {
   friend class Page;
 public:
@@ -42,6 +43,42 @@ protected:
   std::vector<std::unique_ptr<Control>> children_;
 };
 
+// Shared click press/release + on_click. Subclasses own hit_test.
+class Pressable : public Control {
+public:
+  void on_pointer(const PointerEvent& e) override;
+protected:
+  Pressable(std::function<void()> on_click, ControlOptions opt = {});
+  bool pressed() const { return pressed_; }
+  void set_pressed(bool v) { pressed_ = v; }
+private:
+  std::function<void()> on_click_;
+  bool pressed_ = false;
+};
+
+// M3 labeled button skeleton: measure / paint label(+optional leading icon) /
+// round hit / corner radius. Style via paint_background + content_color.
+class ButtonBase : public Pressable {
+public:
+  static constexpr float kDefaultCornerRadius = 20.f;
+  void set_corner_radius(float radius);
+  float corner_radius() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+protected:
+  ButtonBase(std::string label, std::function<void()> on_click,
+             std::string leading_icon, ControlOptions opt = {});
+  virtual void paint_background(Renderer& r) = 0;
+  virtual Color content_color() const = 0;
+  const std::string& label() const { return label_; }
+  const std::string& leading_icon() const { return icon_; }
+private:
+  std::string label_;
+  std::string icon_;
+  float corner_radius_ = kDefaultCornerRadius;
+};
+
 class ColorBox final : public Control {
 public:
   ColorBox(Color color, ControlOptions opt = {});
@@ -66,77 +103,63 @@ private:
   float size_ = 16.f;
 };
 
-// Shared M3 button metrics (h40 / padH24 / label14 / pill radius).
-class FilledButton final : public Control {
+// M3 filled: PRIMARY idle / PRIMARY_CONTAINER pressed.
+class FilledButton final : public ButtonBase {
 public:
-  static constexpr float kDefaultCornerRadius = 20.f;
   FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
-  void set_corner_radius(float radius);
-  float corner_radius() const;
-  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
-  void paint(Renderer& r) override;
-  bool hit_test(float x, float y) const override;
-  void on_pointer(const PointerEvent& e) override;
-private:
-  std::string label_;
-  std::function<void()> on_click_;
-  float corner_radius_ = kDefaultCornerRadius;
-  bool pressed_ = false;
+protected:
+  void paint_background(Renderer& r) override;
+  Color content_color() const override;
 };
 
-// M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg, elev=1 via fill.
-class ElevatedButton final : public Control {
+// M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg.
+// leading_icon is Inter text glyph (e.g. "+"); empty skips icon slot.
+class ElevatedButton final : public ButtonBase {
 public:
-  static constexpr float kDefaultCornerRadius = 20.f;
-  // Optional leading icon glyph (e.g. "+"); empty skips icon slot.
   ElevatedButton(std::string label, std::function<void()> on_click,
                  std::string icon = "+", ControlOptions opt = {});
-  void set_corner_radius(float radius);
-  float corner_radius() const;
-  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
-  void paint(Renderer& r) override;
-  bool hit_test(float x, float y) const override;
-  void on_pointer(const PointerEvent& e) override;
-private:
-  std::string label_;
-  std::string icon_;
-  std::function<void()> on_click_;
-  float corner_radius_ = kDefaultCornerRadius;
-  bool pressed_ = false;
+protected:
+  void paint_background(Renderer& r) override;
+  Color content_color() const override;
 };
 
-// M3 outlined: no fill, ON_SURFACE_VARIANT fg, OUTLINE_VARIANT 1px stroke.
-class OutlinedButton final : public Control {
+// M3 outlined: no fill (pressed SURFACE_CONTAINER), OUTLINE_VARIANT stroke.
+class OutlinedButton final : public ButtonBase {
 public:
-  static constexpr float kDefaultCornerRadius = 20.f;
   OutlinedButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
-  void set_corner_radius(float radius);
-  float corner_radius() const;
-  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
-  void paint(Renderer& r) override;
-  bool hit_test(float x, float y) const override;
-  void on_pointer(const PointerEvent& e) override;
-private:
-  std::string label_;
-  std::function<void()> on_click_;
-  float corner_radius_ = kDefaultCornerRadius;
-  bool pressed_ = false;
+protected:
+  void paint_background(Renderer& r) override;
+  Color content_color() const override;
 };
 
-// M3 IconButton: side 40, icon_size 24. Glyph via Inter text (no icon font yet).
-class IconButton final : public Control {
+// M3 IconButton: side 40, icon 24. Loads a white+alpha PNG (Material glyph
+// raster) and tints with theme tokens — not Inter ♥ pretending to be Material.
+class IconButton final : public Pressable {
 public:
   static constexpr float kSide = 40.f;
   static constexpr float kIconPx = 24.f;
-  IconButton(std::string icon, std::function<void()> on_click, ControlOptions opt = {});
+  // icon_path: PNG under assets/ (e.g. "icons/favorite.png"). Caps: path /
+  // file bytes / decode dim same as Image.
+  IconButton(std::string icon_path, std::function<void()> on_click,
+             ControlOptions opt = {});
+  ~IconButton() override;
+  IconButton(const IconButton&) = delete;
+  IconButton& operator=(const IconButton&) = delete;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
-  void on_pointer(const PointerEvent& e) override;
 private:
-  std::string icon_;
-  std::function<void()> on_click_;
-  bool pressed_ = false;
+  void ensure_loaded() const;
+  void ensure_texture(Renderer& r);
+  void release_texture();
+  std::string path_;
+  mutable std::vector<std::uint8_t> rgba_;
+  mutable int src_w_ = 0;
+  mutable int src_h_ = 0;
+  mutable bool tried_load_ = false;
+  mutable bool load_ok_ = false;
+  void* tex_ = nullptr;
+  Renderer* tex_r_ = nullptr;
 };
 
 // PNG Image via stb_image. Optional tint (multiply). BoxFit.CONTAIN when both
@@ -167,6 +190,54 @@ private:
   Color tint_{255, 255, 255, 255};
   void* tex_ = nullptr;
   Renderer* tex_r_ = nullptr;
+};
+
+// M3 Checkbox: 18×18 box radius 2, active PRIMARY, optional label.
+class Checkbox final : public Control {
+public:
+  static constexpr float kBox = 18.f;
+  static constexpr float kBoxRadius = 2.f;
+  static constexpr float kLabelGap = 8.f;
+  static constexpr float kLabelPx = 14.f;
+  Checkbox(std::string label, bool value = false,
+           std::function<void(bool)> on_change = {}, ControlOptions opt = {});
+  bool value() const;
+  void set_value(bool v);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  std::string label_;
+  bool value_ = false;
+  std::function<void(bool)> on_change_;
+  bool pressed_ = false;
+};
+
+// M3 Slider: intrinsic ~300×48, active PRIMARY. Click + drag (pointer move
+// while captured). divisions>0 snaps to steps.
+class Slider final : public Control {
+public:
+  static constexpr float kDefaultWidth = 300.f;
+  static constexpr float kDefaultHeight = 48.f;
+  Slider(float min_v, float max_v, int divisions = 0,
+         std::function<void(float)> on_change = {}, ControlOptions opt = {});
+  float value() const;
+  void set_value(float v);
+  float min_value() const { return min_; }
+  float max_value() const { return max_; }
+  int divisions() const { return divisions_; }
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  float value_from_x(float x) const;
+  void apply_value(float v);
+  float min_ = 0.f;
+  float max_ = 100.f;
+  int divisions_ = 0;
+  float value_ = 0.f;
+  std::function<void(float)> on_change_;
+  bool dragging_ = false;
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.

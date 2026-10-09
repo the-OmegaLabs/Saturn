@@ -80,6 +80,10 @@ void Page::dispatch_pointer(const PointerEvent& e) {
     }
     return;
   }
+  if (e.move) {
+    if (pointer_capture_) pointer_capture_->on_pointer(e);
+    return;
+  }
   if (e.up) {
     if (pointer_capture_) {
       Control* c = pointer_capture_;
