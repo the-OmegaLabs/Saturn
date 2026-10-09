@@ -93,6 +93,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
 - Dropdown: hint + options (≤ `kMaxDropdownOptions`); width default 180; field
   height 56 / text 16; inline popup (no overlay animation). `on_select(key)`.
+  Hint / option `key`/`text` > `kMaxTextBytes` → throw (no `resize` truncate).
 
 ## Font (TTF metrics)
 - `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
