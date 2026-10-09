@@ -46,17 +46,20 @@ Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
 
 ## Skeleton (`saturn_demo`)
 Layout register cut toward `examples/demo.py` — **not** pixel parity.
-Has: SURFACE page, brand header slot (52×40 spacer + title 28 + `v0.1.0` 12),
-status 13, two 440px panels (pad 20 / radius 16), M3 `FilledButton` (PRIMARY /
-ON_PRIMARY, 40× pad24 / label14 / radius20), static fake list items.
-**Missing** (expect `compare_shots` FAIL): real logo Image+PRIMARY tint, Elevated /
-Outlined / IconButton, TextField, Checkbox, Slider, Switch, ProgressRing, Dropdown,
-Image, Dialog/SnackBar, ListView scroll, variable Inter weight / Noto SC.
+Has: SURFACE page, brand header (logo `Image` 52×40 CONTAIN + PRIMARY tint +
+title 28 + `v0.1.0` 12), status 13, two 440px panels (pad 20 / radius 16),
+button row spacing 8: `ElevatedButton` (+ icon) / `FilledButton` / `OutlinedButton`
+/ `IconButton` (Inter ♥). Pressed fills use theme tokens (`PRIMARY_CONTAINER` /
+surface-container family) — no hand-written RGB. Right panel: `ListView TBD`
+until scroll caps land with security review.
+**Still deferred** (expect `compare_shots` FAIL): TextField, Checkbox, Slider,
+Switch, ProgressRing, Dropdown, Dialog/SnackBar, ListView scroll, variable Inter
+weight / Noto SC, flex weights / MainAxisAlignment.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
 cmake --build cpp/build --config Release --target saturn_demo
-# Windows: run beside copied assets/Inter-Regular.ttf
+# Windows: run beside copied assets/Inter-Regular.ttf + saturn-logo-transparent.png
 set SATURN_SHOT=cpp_skeleton.png
 saturn_demo.exe
 # optional: SATURN_SHOT_FRAMES=5 (default 3)
@@ -90,8 +93,10 @@ python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png pat
 
 ## Caps (security)
 See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
-`kMaxScrollBackBytes`, `kMaxScreenshotPixels`. Screenshot path length capped by
-`kMaxPathBytes`. ListView scroll caches must honor these — no unbounded tile buffers.
+`kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`.
+Screenshot / image path length capped by `kMaxPathBytes`. Image decode dims
+clamped to `kMaxLayoutDim` / `kMaxScreenshotPixels`. ListView scroll caches
+must honor these — no unbounded tile buffers.
 
 ## Ownership
 Containers / Row / Column own children via `unique_ptr`. Page `pointer_capture_`

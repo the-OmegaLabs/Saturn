@@ -21,4 +21,7 @@ inline constexpr float kMinFontPx = 1.f;
 inline constexpr float kMaxFontPx = 512.f;
 inline constexpr std::size_t kMaxFontFileBytes = 32u << 20; // 32 MiB
 inline constexpr int kFontAtlasDim = 1024; // square atlas edge (<= kMaxLayoutDim)
+// Image decode (stb_image): path length uses kMaxPathBytes; dims <= kMaxLayoutDim;
+// pixels <= kMaxScreenshotPixels; file bytes capped separately.
+inline constexpr std::size_t kMaxImageFileBytes = 32u << 20; // 32 MiB
 } // namespace saturn
