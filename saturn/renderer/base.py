@@ -173,6 +173,15 @@ class Renderer(ABC):
         """Draw ambient and key elevation shadows analytically on the GPU."""
         raise NotImplementedError
 
+    def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
+        """Blur pixels already drawn under this logical rect (Container.blur).
+
+        Software uses a downscaled pygame gaussian; OpenGL runs a separable
+        GPU pass. No-op when both sigmas are zero. ``radius`` rounds the
+        affected region to match the container corner radius.
+        """
+        raise NotImplementedError
+
     def shader(self, x, y, w, h, effect, color, secondary_color,
                parameters, information):
         """Draw a procedural fragment effect without an intermediate bitmap."""

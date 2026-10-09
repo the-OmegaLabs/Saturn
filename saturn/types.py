@@ -464,6 +464,43 @@ class BoxShadow:
     offset: Offset = field(default_factory=Offset)
 
 
+class BlurTileMode(enum.Enum):
+    """How samples outside the source bounds are treated during blur."""
+    CLAMP = "clamp"
+    MIRROR = "mirror"
+    REPEATED = "repeated"
+    DECAL = "decal"
+
+
+@dataclass
+class Blur:
+    """Gaussian blur sigmas for Container.blur (Flet-compatible)."""
+    sigma_x: float = 0.0
+    sigma_y: float = 0.0
+    tile_mode: BlurTileMode = BlurTileMode.CLAMP
+
+
+def as_blur(value) -> Blur | None:
+    """Normalize Container.blur: None, number, (sx, sy), or Blur."""
+    if value is None:
+        return None
+    if isinstance(value, Blur):
+        mode = value.tile_mode
+        if not isinstance(mode, BlurTileMode):
+            mode = BlurTileMode(getattr(mode, "value", mode))
+        return Blur(float(value.sigma_x), float(value.sigma_y), mode)
+    if isinstance(value, (int, float)):
+        sigma = float(value)
+        return Blur(sigma, sigma)
+    if isinstance(value, (tuple, list)):
+        if not value:
+            return Blur()
+        sx = float(value[0])
+        sy = float(value[1]) if len(value) > 1 else sx
+        return Blur(sx, sy)
+    raise TypeError(f"blur must be a number, pair, or Blur, got {type(value)!r}")
+
+
 class SliderInteraction(enum.Enum):
     TAP_AND_SLIDE = "tapAndSlide"
     TAP_ONLY = "tapOnly"

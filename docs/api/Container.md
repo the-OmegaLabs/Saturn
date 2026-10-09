@@ -62,7 +62,7 @@ saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, borde
 | `ignore_interactions` | `—` | `False` | Disable Slider interaction without changing appearance. |
 | `blend_mode` | `—` | `None` | Unsupported for non-default requests. Requested blend mode option; see the control comparison for supported values and restrictions. |
 | `image` | `—` | `None` | Unsupported for non-default requests. Requested image option; see the control comparison for supported values and restrictions. |
-| `blur` | `—` | `None` | Unsupported for non-default requests. Requested blur option; see the control comparison for supported values and restrictions. |
+| `blur` | `—` | `None` | Backdrop Gaussian blur under this container (number, (sigma_x, sigma_y), or Blur). |
 | `theme` | `—` | `None` | Unsupported for non-default requests. Light theme configuration. |
 | `dark_theme` | `—` | `None` | Unsupported for non-default requests. Dark theme configuration. |
 | `theme_mode` | `—` | `None` | Unsupported for non-default requests. Light, dark, or detected system preference. |

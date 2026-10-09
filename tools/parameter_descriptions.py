@@ -148,6 +148,7 @@ DESCRIPTIONS = {
     "scale_x": "Horizontal scale factor.",
     "scale_y": "Vertical scale factor.",
     "blur_radius": "Shadow blur radius.",
+"blur": "Backdrop Gaussian blur under this container (number, (sigma_x, sigma_y), or Blur).",
     "spread_radius": "Distance the shadow outline expands outward.",
     "side": "Settings for one border side.",
     "origin": "Reference origin for the transformation.",

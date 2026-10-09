@@ -89,3 +89,57 @@ def draw_notched_outline(renderer, rect, color, width, radius, left, gap, *, dep
             renderer.stroke_rect(x, y, w, h, color, width=width, radius=radius)
         finally:
             renderer.clip_pop()
+
+
+# Cap device-pixel sigma so a large Container.blur cannot stall the UI thread.
+_MAX_DEVICE_SIGMA = 48.0
+
+
+def normalize_blur_sigmas(sigma_x, sigma_y, scale):
+    """Logical sigmas -> device-pixel radii, clamped for cost."""
+    sx = max(0.0, float(sigma_x)) * scale
+    sy = max(0.0, float(sigma_y)) * scale
+    peak = max(sx, sy)
+    if peak > _MAX_DEVICE_SIGMA:
+        factor = _MAX_DEVICE_SIGMA / peak
+        sx *= factor
+        sy *= factor
+    return sx, sy
+
+
+def blur_downsample_factor(sigma_x, sigma_y):
+    """Keep the intermediate blur near a cheap radius (matches elevation shadows)."""
+    peak = max(sigma_x, sigma_y)
+    if peak <= 4:
+        return 1
+    if peak <= 12:
+        return 2
+    if peak <= 24:
+        return 3
+    return 4
+
+
+def backdrop_blur_surface(surface, sigma_x, sigma_y):
+    """Gaussian-blur an RGBA surface; downscale for large sigmas then upscale.
+
+    pygame.transform.gaussian_blur is isotropic. When sigmas differ, the larger
+    radius is used so a Flet-style (0, 10) still softens the backdrop.
+    """
+    import pygame
+    sx = max(0.0, float(sigma_x))
+    sy = max(0.0, float(sigma_y))
+    radius = max(sx, sy)
+    if radius < 0.5 or surface.get_width() <= 0 or surface.get_height() <= 0:
+        return surface
+    factor = blur_downsample_factor(sx, sy)
+    work = surface
+    if factor > 1:
+        size = (max(1, surface.get_width() // factor),
+                max(1, surface.get_height() // factor))
+        work = pygame.transform.smoothscale(surface, size)
+        radius = max(0.5, radius / factor)
+    blurred = pygame.transform.gaussian_blur(work, max(1, round(radius)), False)
+    if factor > 1:
+        blurred = pygame.transform.smoothscale(blurred, surface.get_size())
+    return blurred
+
