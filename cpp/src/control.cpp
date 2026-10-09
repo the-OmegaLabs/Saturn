@@ -18,6 +18,7 @@
 // Must match saturn::kMaxImageDecodeDim (limits.hpp). Set before stb include.
 #define STBI_MAX_DIMENSIONS 4096
 #include "stb_image.h"
+#include "icon_assets.hpp"
 
 namespace saturn {
 static_assert(STBI_MAX_DIMENSIONS == kMaxImageDecodeDim,
@@ -138,21 +139,18 @@ struct DecodedPng {
   int w = 0;
   int h = 0;
 };
-DecodedPng decode_png_capped(const std::string& path) {
-  if (path.empty())
-    throw std::invalid_argument("image path is empty");
-  if (path.size() > kMaxPathBytes)
-    throw std::invalid_argument("image path exceeds kMaxPathBytes");
-  const std::string resolved = resolve_asset_path(path);
-  if (resolved.size() > kMaxPathBytes)
-    throw std::invalid_argument("image resolved path exceeds kMaxPathBytes");
-  auto file = read_file_capped(resolved, kMaxImageFileBytes);
+DecodedPng decode_png_from_bytes(const std::uint8_t* data, std::size_t len,
+                                  const std::string& label) {
+  if (!data || len == 0)
+    throw std::runtime_error("image bytes empty: " + label);
+  if (len > kMaxImageFileBytes)
+    throw std::runtime_error("image bytes exceed kMaxImageFileBytes: " + label);
   int w = 0, h = 0, n = 0;
   stbi_uc* pixels = stbi_load_from_memory(
-      file.data(), static_cast<int>(file.size()), &w, &h, &n, 4);
+      data, static_cast<int>(len), &w, &h, &n, 4);
   if (!pixels || w <= 0 || h <= 0) {
     if (pixels) stbi_image_free(pixels);
-    throw std::runtime_error("image decode failed: " + path);
+    throw std::runtime_error("image decode failed: " + label);
   }
   const auto uw = static_cast<std::size_t>(w);
   const auto uh = static_cast<std::size_t>(h);
@@ -160,7 +158,7 @@ DecodedPng decode_png_capped(const std::string& path) {
       uw > kMaxLayoutDim || uh > kMaxLayoutDim ||
       uw * uh > kMaxScreenshotPixels) {
     stbi_image_free(pixels);
-    throw std::runtime_error("image dimensions exceed caps: " + path);
+    throw std::runtime_error("image dimensions exceed caps: " + label);
   }
   DecodedPng out;
   out.rgba.assign(pixels, pixels + uw * uh * 4u);
@@ -168,6 +166,21 @@ DecodedPng decode_png_capped(const std::string& path) {
   out.w = w;
   out.h = h;
   return out;
+}
+
+DecodedPng decode_png_capped(const std::string& path) {
+  if (path.empty())
+    throw std::invalid_argument("image path is empty");
+  if (path.size() > kMaxPathBytes)
+    throw std::invalid_argument("image path exceeds kMaxPathBytes");
+  // Bundled Material icon bitmaps (also shipped under assets/icons/).
+  if (auto emb = icon_assets::find(path.c_str()); emb.data)
+    return decode_png_from_bytes(emb.data, emb.len, path);
+  const std::string resolved = resolve_asset_path(path);
+  if (resolved.size() > kMaxPathBytes)
+    throw std::invalid_argument("image resolved path exceeds kMaxPathBytes");
+  auto file = read_file_capped(resolved, kMaxImageFileBytes);
+  return decode_png_from_bytes(file.data(), file.size(), path);
 }
 
 } // namespace
