@@ -709,34 +709,6 @@ void Switch::paint(Renderer& r) {
   r.fill_rect(Rect{tx - thumb_r, ty - thumb_r, thumb_r * 2.f, thumb_r * 2.f},
               thumb, thumb_r);
 }
-namespace {
-// Pixel debt: no angular SDF / line-strip in Renderer yet — approximate the
-// stroked arc with overlapping discs along the centerline (batched). Cap 180.
-void paint_ring_arc(Renderer& r, float cx, float cy, float outer_r, float stroke,
-                    float start_rad, float sweep_rad, Color c) {
-  if (!(stroke > 0.f) || !(outer_r > 0.f) || !(std::fabs(sweep_rad) > 1e-6f))
-    return;
-  const float centerline = std::max(0.f, outer_r - stroke * 0.5f);
-  const float abs_sweep = std::fabs(sweep_rad);
-  // ~1.5° per segment; hard cap keeps us under kMaxFillRects.
-  int segs = static_cast<int>(abs_sweep / 0.026f);
-  if (segs < 8) segs = 8;
-  if (segs > 180) segs = 180;
-  const float step = sweep_rad / float(segs);
-  const float half = stroke * 0.5f;
-  std::vector<Rect> discs;
-  discs.reserve(static_cast<std::size_t>(segs));
-  for (int i = 0; i < segs; ++i) {
-    const float a = start_rad + step * (float(i) + 0.5f);
-    const float x = cx + std::cos(a) * centerline;
-    const float y = cy + std::sin(a) * centerline;
-    discs.push_back(Rect{x - half, y - half, stroke, stroke});
-  }
-  // fill_rects is axis-aligned only; round each disc via fill_rect radius.
-  for (const Rect& d : discs) r.fill_rect(d, c, half);
-}
-} // namespace
-
 ProgressRing::ProgressRing(float value, ControlOptions opt)
   : Control(std::move(opt)) {
   if (!(std::isfinite(value)))
@@ -769,16 +741,28 @@ void ProgressRing::paint(Renderer& r) {
   if (!(side > 0.f)) return;
   float stroke = kStroke;
   if (stroke > side) stroke = side;
+  if (!(stroke > 0.f)) return;
   const float cx = rect_.x + rect_.w * 0.5f;
   const float cy = rect_.y + rect_.h * 0.5f;
-  // Full track annulus via SDF stroke_rect (circle).
-  const Rect ring{cx - side * 0.5f, cy - side * 0.5f, side, side};
-  r.stroke_rect(ring, colors::kSecondaryContainer, stroke, side * 0.5f);
-  if (value_ <= 0.f) return;
+  const float outer = side * 0.5f;
+  // Match Python ProgressRing: start=-π/2, round-capped stroke_arc, track gap.
   constexpr float kPi = 3.14159265358979323846f;
+  constexpr float kTau = 2.f * kPi;
+  constexpr float kTrackGap = 4.f; // Python default (non-year_2023)
   const float start = -0.5f * kPi;
-  const float sweep = 2.f * kPi * value_;
-  paint_ring_arc(r, cx, cy, side * 0.5f, stroke, start, sweep, colors::kPrimary);
+  const float sweep = kTau * value_;
+  if (value_ <= 0.f) {
+    // Full track when idle.
+    r.stroke_arc(cx, cy, outer, start, kTau, colors::kSecondaryContainer, stroke);
+    return;
+  }
+  // Track is the complementary arc with Material track_gap (not a full ring).
+  const float gap = (std::min)(sweep, 2.f * (kTrackGap + stroke) / side);
+  const float track_sweep = kTau - sweep - 2.f * gap;
+  if (track_sweep > 1e-6f)
+    r.stroke_arc(cx, cy, outer, start + sweep + gap, track_sweep,
+                 colors::kSecondaryContainer, stroke);
+  r.stroke_arc(cx, cy, outer, start, sweep, colors::kPrimary, stroke);
 }
 
 

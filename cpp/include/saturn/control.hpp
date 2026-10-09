@@ -282,9 +282,8 @@ private:
 };
 
 // M3 ProgressRing: default 40×40, stroke 4, color PRIMARY. value in [0,1].
-// Track = SDF annulus (SECONDARY_CONTAINER). Progress arc is segmented discs
-// along the centerline (no rotated stroke / angular SDF yet) — pixel debt vs
-// Python; see DEMO.md. Safety: segs capped at 180; value finite + clamped.
+// Track + progress via Renderer::stroke_arc (angular SDF, round caps); track
+// uses Python-style gap. value finite + clamped to [0,1].
 class ProgressRing final : public Control {
 public:
   static constexpr float kSide = 40.f;

@@ -91,9 +91,9 @@ Synced with group agreement (Saturn room). Update when constraints change.
 ## Switch / Checkbox / ProgressRing / Dropdown
 - Switch + Checkbox: inherit `Pressable` for press/click (no hand-rolled pointer).
 - Switch: track 52×32 in 52×40 hit box; no animation yet.
-- ProgressRing: value ∈ [0,1] (non-finite throw); track = SDF annulus; progress =
-  segmented discs (pixel debt — no angular SDF yet; segs capped 180). Default
-  40×40 / stroke 4 / PRIMARY.
+- ProgressRing: value ∈ [0,1] (non-finite throw); track + progress via
+  `Renderer::stroke_arc` (angular SDF annulus sector, round caps; OpenGL).
+  Track uses Material-style gap vs progress. Default 40×40 / stroke 4 / PRIMARY.
 - Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
 - Dropdown: hint + options (≤ `kMaxDropdownOptions`); width default 180; field
   height 56 / text 16; inline popup (no overlay animation). `on_select(key)`.

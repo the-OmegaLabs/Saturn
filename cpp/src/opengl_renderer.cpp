@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -47,6 +48,7 @@ using PFNGLDELETEVERTEXARRAYSPROC = void (*)(int, const unsigned*);
 using PFNGLDELETESHADERPROC = void (*)(unsigned);
 using PFNGLDELETEPROGRAMPROC = void (*)(unsigned);
 using PFNGLGETSHADERIVPROC = void (*)(unsigned, unsigned, int*);
+using PFNGLGETSHADERINFOLOGPROC = void (*)(unsigned, int, int*, char*);
 using PFNGLGETPROGRAMIVPROC = void (*)(unsigned, unsigned, int*);
 using PFNGLENABLEPROC = void (*)(unsigned);
 using PFNGLDISABLEPROC = void (*)(unsigned);
@@ -110,6 +112,7 @@ struct GlApi {
   PFNGLDELETESHADERPROC deleteShader = nullptr;
   PFNGLDELETEPROGRAMPROC deleteProgram = nullptr;
   PFNGLGETSHADERIVPROC getShaderiv = nullptr;
+  PFNGLGETSHADERINFOLOGPROC getShaderInfoLog = nullptr;
   PFNGLGETPROGRAMIVPROC getProgramiv = nullptr;
   PFNGLENABLEPROC enable = nullptr;
   PFNGLDISABLEPROC disable = nullptr;
@@ -152,6 +155,7 @@ struct GlApi {
     deleteShader = reinterpret_cast<PFNGLDELETESHADERPROC>(L("glDeleteShader"));
     deleteProgram = reinterpret_cast<PFNGLDELETEPROGRAMPROC>(L("glDeleteProgram"));
     getShaderiv = reinterpret_cast<PFNGLGETSHADERIVPROC>(L("glGetShaderiv"));
+    getShaderInfoLog = reinterpret_cast<PFNGLGETSHADERINFOLOGPROC>(L("glGetShaderInfoLog"));
     getProgramiv = reinterpret_cast<PFNGLGETPROGRAMIVPROC>(L("glGetProgramiv"));
     enable = reinterpret_cast<PFNGLENABLEPROC>(L("glEnable"));
     disable = reinterpret_cast<PFNGLDISABLEPROC>(L("glDisable"));
@@ -194,6 +198,11 @@ struct OpenGLRenderer::Impl {
   int u_sdf_viewport = -1, u_sdf_rect = -1, u_sdf_radius = -1;
   int u_sdf_stroke = -1, u_sdf_color = -1;
   bool sdf_pipeline = false;
+  // Angular SDF stroked arc (round caps). Shares no program with rect SDF.
+  unsigned arc_vao = 0, arc_vbo = 0, arc_prog = 0;
+  int u_arc_viewport = -1, u_arc_center = -1, u_arc_outer = -1;
+  int u_arc_stroke = -1, u_arc_start = -1, u_arc_sweep = -1, u_arc_color = -1;
+  bool arc_pipeline = false;
   std::vector<Rect> clips;
   std::vector<float> scratch; // solid: x,y; textured: x,y,u,v
   std::vector<GpuTexture*> textures;
@@ -303,6 +312,59 @@ void main() {
 }
 )";
 
+// Angular SDF annular sector + round endpoint caps (ProgressRing / stroke_arc).
+static const char* kArcVert = R"(#version 330 core
+layout(location = 0) in vec2 aPos;
+uniform vec2 uViewport;
+out vec2 vPos;
+void main() {
+  vec2 ndc = vec2(aPos.x / uViewport.x * 2.0 - 1.0,
+                  1.0 - aPos.y / uViewport.y * 2.0);
+  gl_Position = vec4(ndc, 0.0, 1.0);
+  vPos = aPos;
+}
+)";
+
+static const char* kArcFrag = R"(#version 330 core
+uniform vec2 uCenter;
+uniform float uOuterRadius;
+uniform float uStrokeWidth;
+uniform float uStart;
+uniform float uSweep;
+uniform vec4 uColor;
+in vec2 vPos;
+out vec4 frag;
+const float TAU = 6.28318530718;
+void main() {
+  vec2 p = vPos - uCenter;
+  float outer = uOuterRadius;
+  float sw = uStrokeWidth;
+  float inner = max(outer - sw, 0.0);
+  float mid = (outer + inner) * 0.5;
+  float halfStroke = (outer - inner) * 0.5;
+  float aa = 1.0;
+  float r = length(p);
+  float dRad = abs(r - mid) - halfStroke;
+  float sweep = clamp(uSweep, 0.0, TAU);
+  float d;
+  if (sweep >= TAU - 1e-4) {
+    d = dRad;
+  } else {
+    float ang = atan(p.y, p.x);
+    float rel = mod(ang - uStart, TAU);
+    vec2 c0 = vec2(cos(uStart), sin(uStart)) * mid;
+    vec2 c1 = vec2(cos(uStart + sweep), sin(uStart + sweep)) * mid;
+    float dCap0 = length(p - c0) - halfStroke;
+    float dCap1 = length(p - c1) - halfStroke;
+    float dSec = (rel <= sweep) ? dRad : 1e5;
+    d = min(dSec, min(dCap0, dCap1));
+  }
+  float alpha = 1.0 - smoothstep(-aa, aa, d);
+  if (alpha <= 0.001) discard;
+  frag = vec4(uColor.rgb, uColor.a * alpha);
+}
+)";
+
 OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>()) {
   impl_->window = static_cast<SDL_Window*>(sdl_window);
   impl_->ctx = SDL_GL_CreateContext(impl_->window);
@@ -330,6 +392,11 @@ OpenGLRenderer::~OpenGLRenderer() {
       if (g.deleteProgram && impl_->sdf_prog) g.deleteProgram(impl_->sdf_prog);
       if (g.deleteBuffers && impl_->sdf_vbo) g.deleteBuffers(1, &impl_->sdf_vbo);
       if (g.deleteVertexArrays && impl_->sdf_vao) g.deleteVertexArrays(1, &impl_->sdf_vao);
+    }
+    if (impl_->arc_pipeline) {
+      if (g.deleteProgram && impl_->arc_prog) g.deleteProgram(impl_->arc_prog);
+      if (g.deleteBuffers && impl_->arc_vbo) g.deleteBuffers(1, &impl_->arc_vbo);
+      if (g.deleteVertexArrays && impl_->arc_vao) g.deleteVertexArrays(1, &impl_->arc_vao);
     }
     if (impl_->tex_pipeline) {
       if (g.deleteProgram && impl_->tex_prog) g.deleteProgram(impl_->tex_prog);
@@ -525,6 +592,70 @@ void OpenGLRenderer::ensure_sdf_pipeline() {
     if (impl_->sdf_prog && g.deleteProgram) { g.deleteProgram(impl_->sdf_prog); impl_->sdf_prog = 0; }
     if (impl_->sdf_vbo && g.deleteBuffers) { g.deleteBuffers(1, &impl_->sdf_vbo); impl_->sdf_vbo = 0; }
     if (impl_->sdf_vao && g.deleteVertexArrays) { g.deleteVertexArrays(1, &impl_->sdf_vao); impl_->sdf_vao = 0; }
+    throw;
+  }
+}
+
+void OpenGLRenderer::ensure_arc_pipeline() {
+  if (impl_->arc_pipeline) return;
+  auto& g = impl_->gl;
+  g.load_all();
+  if (!g.loaded || !g.uniform1f || !g.uniform2f) return;
+
+  unsigned vs = 0, fs = 0;
+  auto cleanup_shaders = [&]() {
+    if (vs && g.deleteShader) g.deleteShader(vs);
+    if (fs && g.deleteShader) g.deleteShader(fs);
+  };
+  try {
+    auto make = [&](unsigned type, const char* src, const char* tag) {
+      unsigned s = g.createShader(type);
+      g.shaderSource(s, 1, &src, nullptr);
+      g.compileShader(s);
+      int ok = 0; g.getShaderiv(s, kCompileStatus, &ok);
+      if (!ok) {
+        char log[1024] = {};
+        if (g.getShaderInfoLog) g.getShaderInfoLog(s, 1023, nullptr, log);
+        if (g.deleteShader) g.deleteShader(s);
+        throw std::runtime_error(std::string("arc shader compile failed: ") + tag + " " + log);
+      }
+      return s;
+    };
+    vs = make(kVertShader, kArcVert, "vert");
+    fs = make(kFragShader, kArcFrag, "frag");
+    impl_->arc_prog = g.createProgram();
+    g.attachShader(impl_->arc_prog, vs);
+    g.attachShader(impl_->arc_prog, fs);
+    g.linkProgram(impl_->arc_prog);
+    int ok = 0; g.getProgramiv(impl_->arc_prog, kLinkStatus, &ok);
+    if (!ok) {
+      if (g.deleteProgram) { g.deleteProgram(impl_->arc_prog); impl_->arc_prog = 0; }
+      cleanup_shaders();
+      throw std::runtime_error("arc shader link failed");
+    }
+    cleanup_shaders();
+    vs = fs = 0;
+    g.genVertexArrays(1, &impl_->arc_vao);
+    g.bindVertexArray(impl_->arc_vao);
+    g.genBuffers(1, &impl_->arc_vbo);
+    g.bindBuffer(kArrBuf, impl_->arc_vbo);
+    g.bufferData(kArrBuf, ptrdiff_t(12 * sizeof(float)), nullptr, kDynamicDraw);
+    g.enableVertexAttribArray(0);
+    g.vertexAttribPointer(0, 2, kFloat, kFalse, 0, nullptr);
+    impl_->u_arc_viewport = g.getUniformLocation(impl_->arc_prog, "uViewport");
+    impl_->u_arc_center = g.getUniformLocation(impl_->arc_prog, "uCenter");
+    impl_->u_arc_outer = g.getUniformLocation(impl_->arc_prog, "uOuterRadius");
+    impl_->u_arc_stroke = g.getUniformLocation(impl_->arc_prog, "uStrokeWidth");
+    impl_->u_arc_start = g.getUniformLocation(impl_->arc_prog, "uStart");
+    impl_->u_arc_sweep = g.getUniformLocation(impl_->arc_prog, "uSweep");
+    impl_->u_arc_color = g.getUniformLocation(impl_->arc_prog, "uColor");
+    g.useProgram(0);
+    impl_->arc_pipeline = true;
+  } catch (...) {
+    cleanup_shaders();
+    if (impl_->arc_prog && g.deleteProgram) { g.deleteProgram(impl_->arc_prog); impl_->arc_prog = 0; }
+    if (impl_->arc_vbo && g.deleteBuffers) { g.deleteBuffers(1, &impl_->arc_vbo); impl_->arc_vbo = 0; }
+    if (impl_->arc_vao && g.deleteVertexArrays) { g.deleteVertexArrays(1, &impl_->arc_vao); impl_->arc_vao = 0; }
     throw;
   }
 }
@@ -758,6 +889,70 @@ void OpenGLRenderer::stroke_rect(Rect r, Color c, float width, float radius) {
   if (!(width > 0.f)) return;
   if (radius < 0.f) radius = 0.f;
   draw_sdf_rect(r, c, radius, width);
+}
+
+void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
+                                float start_rad, float sweep_rad, Color c,
+                                float width) {
+  if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(outer_radius) ||
+      !std::isfinite(start_rad) || !std::isfinite(sweep_rad) || !std::isfinite(width))
+    throw std::invalid_argument("stroke_arc args must be finite");
+  if (!(outer_radius > 0.f) || !(width > 0.f)) return;
+  if (!impl_ || !impl_->ctx) return;
+
+  float sweep = sweep_rad;
+  float start = start_rad;
+  if (sweep < 0.f) {
+    start += sweep;
+    sweep = -sweep;
+  }
+  constexpr float kTau = 6.28318530718f;
+  if (sweep > kTau) sweep = kTau;
+  if (!(sweep > 1e-6f)) return;
+
+  float outer = outer_radius;
+  if (outer > float(kMaxLayoutDim)) return;
+  float sw = width;
+  if (sw > kMaxStrokeWidth) sw = kMaxStrokeWidth;
+  if (sw > outer) sw = outer;
+  if (!(sw > 0.f)) return;
+
+  SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+  ensure_arc_pipeline();
+  if (!impl_->arc_pipeline) return;
+  // Fail loud if required uniforms missing (no silent empty arc).
+  if (impl_->u_arc_center < 0 || impl_->u_arc_outer < 0 || impl_->u_arc_stroke < 0 ||
+      impl_->u_arc_start < 0 || impl_->u_arc_sweep < 0 || impl_->u_arc_color < 0 ||
+      impl_->u_arc_viewport < 0 || !impl_->gl.uniform1f || !impl_->gl.uniform2f ||
+      !impl_->gl.uniform4f)
+    throw std::runtime_error("stroke_arc: required uniforms unavailable");
+
+  // AABB around ring + AA pad (+ half stroke for round caps already inside outer).
+  const float pad = 1.f;
+  const float extent = outer + pad;
+  const float x0 = cx - extent, y0 = cy - extent;
+  const float x1 = cx + extent, y1 = cy + extent;
+  float verts[12] = {x0,y0, x1,y0, x1,y1, x0,y0, x1,y1, x0,y1};
+
+  auto& g = impl_->gl;
+  apply_scissor();
+  if (g.enable && g.blendFunc) {
+    g.enable(kBlend);
+    g.blendFunc(kSrcAlpha, kOneMinusSrcAlpha);
+  }
+  g.bindVertexArray(impl_->arc_vao);
+  g.bindBuffer(kArrBuf, impl_->arc_vbo);
+  g.bufferSubData(kArrBuf, 0, ptrdiff_t(sizeof(verts)), verts);
+  g.useProgram(impl_->arc_prog);
+  g.uniform2f(impl_->u_arc_viewport, float(impl_->w), float(impl_->h));
+  g.uniform2f(impl_->u_arc_center, cx, cy);
+  g.uniform1f(impl_->u_arc_outer, outer);
+  g.uniform1f(impl_->u_arc_stroke, sw);
+  g.uniform1f(impl_->u_arc_start, start);
+  g.uniform1f(impl_->u_arc_sweep, sweep);
+  g.uniform4f(impl_->u_arc_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
+  g.drawArrays(GL_TRIANGLES, 0, 6);
+  g.useProgram(0);
 }
 
 void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_width) {

@@ -63,10 +63,9 @@ Cancel `TextButton` + Delete `FilledButton`) via `Page::show_dialog`;
 `ElevatedButton("SnackBar")` → `SnackBar("Saved!", "Undo", 3000)`.
 Right panel: `ListView TBD` until scroll caps land with security review.
 
-**ProgressRing pixel debt:** track is a real SDF annulus (`stroke_rect`);
-progress is still **segmented discs** along the centerline (no angular SDF /
-rotated stroke / line-strip in `Renderer` yet). Safety caps (segs ≤ 180,
-finite value clamp) stay. Do **not** claim ProgressRing matches golden.
+**ProgressRing:** `stroke_arc` angular SDF (round caps) for track + progress;
+track gap matches Python default (4). Finite value clamp stays. Remaining
+parity noise is AA / HiDPI, not the old disc-segment fake.
 
 **TextureImage:** shared PNG decode + GPU upload + destroy used by `Image`,
 `IconButton`, Checkbox check, Elevated leading — one lifetime, fail-loud caps.
@@ -91,8 +90,8 @@ text clips; not Python multi-line card wrap). TextField/ListView still frozen.
 
 **Still deferred** (expect `compare_shots` FAIL): TextField, ListView scroll,
 variable Inter weight / Noto SC, flex weights / MainAxisAlignment, HiDPI
-scale-aware golden, ProgressRing true stroked arc, Dropdown outside-click
-dismiss / true overlay+clip, Dialog open/close motion.
+scale-aware golden, Dropdown outside-click dismiss / true overlay+clip,
+Dialog open/close motion, Elevated shadow.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3

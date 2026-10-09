@@ -13,6 +13,11 @@ public:
   // Throws if count > kMaxFillRects.
   virtual void fill_rects(const Rect* rects, std::size_t count, Color c);
   virtual void stroke_rect(Rect r, Color c, float width = 1, float radius = 0) = 0;
+  // Stroked circular arc (outer radius, stroke inward). Angles in radians;
+  // sweep normalized to (0, 2π]. Round endpoint caps. Non-finite args throw.
+  // Default no-op (OpenGL implements). width/radius soft-capped like stroke_rect.
+  virtual void stroke_arc(float cx, float cy, float outer_radius,
+                          float start_rad, float sweep_rad, Color c, float width);
   virtual void clip_push(Rect r) = 0;
   virtual void clip_pop() = 0;
   virtual void flip() = 0;

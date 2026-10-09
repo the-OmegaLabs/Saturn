@@ -10,6 +10,8 @@ public:
   void fill_rect(Rect r, Color c, float radius) override;
   void fill_rects(const Rect* rects, std::size_t count, Color c) override;
   void stroke_rect(Rect r, Color c, float width, float radius) override;
+  void stroke_arc(float cx, float cy, float outer_radius,
+                  float start_rad, float sweep_rad, Color c, float width) override;
   void clip_push(Rect r) override;
   void clip_pop() override;
   void flip() override;
@@ -25,6 +27,7 @@ private:
   void ensure_quad_pipeline();
   void ensure_tex_pipeline();
   void ensure_sdf_pipeline();
+  void ensure_arc_pipeline();
   void apply_scissor();
   // stroke_width == 0 -> solid rounded fill; >0 -> inside stroke. Respects scissor.
   void draw_sdf_rect(Rect r, Color c, float radius, float stroke_width);

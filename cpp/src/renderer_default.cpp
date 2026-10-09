@@ -19,4 +19,15 @@ void Renderer::draw_textured_quads(void*, const TexturedQuad*, std::size_t count
     throw std::invalid_argument("draw_textured_quads radius must be finite");
 }
 bool Renderer::read_pixels_rgba(std::vector<std::uint8_t>*, int*, int*) { return false; }
+
+void Renderer::stroke_arc(float cx, float cy, float outer_radius,
+                          float start_rad, float sweep_rad, Color, float width) {
+  if (!std::isfinite(cx) || !std::isfinite(cy) || !std::isfinite(outer_radius) ||
+      !std::isfinite(start_rad) || !std::isfinite(sweep_rad) || !std::isfinite(width))
+    throw std::invalid_argument("stroke_arc args must be finite");
+  // Default: no GPU path (OpenGL overrides).
+  (void)outer_radius;
+  (void)width;
+}
+
 }
