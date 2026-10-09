@@ -466,11 +466,16 @@ class BoxShadow:
 
 
 class BlurTileMode(enum.Enum):
-    """How samples outside the source bounds are treated during blur."""
+    """Edge sampling mode for ``Blur`` (Flet name compatibility).
+
+    Only ``CLAMP`` is implemented for software and OpenGL. ``MIRROR``,
+    ``REPEATED``, and ``DECAL`` remain on the enum so Flet-style names exist,
+    but ``as_blur`` / ``Container(blur=…)`` reject them with ``ValueError``.
+    """
     CLAMP = "clamp"
-    MIRROR = "mirror"
-    REPEATED = "repeated"
-    DECAL = "decal"
+    MIRROR = "mirror"  # not implemented — rejected by as_blur
+    REPEATED = "repeated"  # not implemented — rejected by as_blur
+    DECAL = "decal"  # not implemented — rejected by as_blur
 
 
 @dataclass

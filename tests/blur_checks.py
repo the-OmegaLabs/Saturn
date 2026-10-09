@@ -15,6 +15,7 @@ from saturn.painting import (
     BlurResultCache,
     backdrop_blur_surface,
     blur_source_digest,
+    normalize_blur_radius,
     plan_backdrop_blur,
 )
 
@@ -141,7 +142,7 @@ def check_blur_none_and_zero_skip():
 
 
 def check_software_anisotropy():
-    """Software path must honor distinct sx/sy (not max-collapse)."""
+    """Software path must run true H-then-V separable (not scale+isotropic)."""
     pygame.display.init()
     try:
         surf = pygame.Surface((64, 64), pygame.SRCALPHA)
@@ -159,7 +160,19 @@ def check_software_anisotropy():
         # Vertical-only blur should leave column 34 mostly blue (no X pass).
         assert hy_px.r < 40 and hy_px.b > 180, hy_px
         assert hx_px.r > hy_px.r + 30, (hx_px, hy_px)
-        print("Container.blur software anisotropy OK", hx_px, hy_px)
+
+        # Horizontal seam: red on top half, blue on bottom — Y-only should smear.
+        both = pygame.Surface((64, 64), pygame.SRCALPHA)
+        both.fill((0, 0, 255, 255))
+        both.fill((255, 0, 0, 255), pygame.Rect(0, 0, 64, 32))
+        vy = backdrop_blur_surface(both.copy(), 0.0, 8.0)
+        vx = backdrop_blur_surface(both.copy(), 8.0, 0.0)
+        vy_px = vy.get_at((32, 34))
+        vx_px = vx.get_at((32, 34))
+        assert vy_px.r > 40, vy_px
+        assert vx_px.r < 40 and vx_px.b > 180, vx_px
+        assert vy_px.r > vx_px.r + 30, (vy_px, vx_px)
+        print("Container.blur software anisotropy OK", hx_px, hy_px, vy_px)
     finally:
         pygame.display.quit()
 
@@ -199,7 +212,37 @@ def check_blur_result_cache():
     assert cache.hits == 1
     assert cache.get(key, blur_source_digest(b"other-pixels")) is None
     assert cache.misses >= 2
+    # Forced hit/miss without GL: second get with same digest hits again.
+    assert cache.get(key, digest_a) is payload_a
+    assert cache.hits == 2
     print("BlurResultCache OK", cache.hits, cache.misses)
+
+
+def check_blur_source_digest_detects_sparse_change():
+    """Full-buffer digest must not false-hit when only a skipped byte changes.
+
+    The old stepped sampler (every len//1024 bytes) missed odd offsets on a
+    4096-byte buffer (step=4). Full blake2b must distinguish them.
+    """
+    raw_a = bytearray(4096)
+    raw_b = bytearray(4096)
+    raw_b[1] = 1  # offset that step=4 sampling previously skipped
+    assert blur_source_digest(bytes(raw_a)) != blur_source_digest(bytes(raw_b))
+    # Geometry is part of the fingerprint.
+    assert (blur_source_digest(b"abcd", width=2, height=2)
+            != blur_source_digest(b"abcd", width=4, height=1))
+    print("blur_source_digest sparse-change OK")
+
+
+def check_normalize_blur_radius():
+    """Non-finite compose radius must zero out like sigmas."""
+    assert normalize_blur_radius(4) == 4.0
+    assert normalize_blur_radius(0) == 0.0
+    assert normalize_blur_radius(-1) == 0.0
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        assert normalize_blur_radius(bad) == 0.0, bad
+    assert normalize_blur_radius((float("nan"), 3, -2)) == (0.0, 3.0, 0.0)
+    print("normalize_blur_radius OK")
 
 
 def check_software_stack_blur_cache():
@@ -264,11 +307,15 @@ def check_opengl_backdrop_blur_smoke():
         renderer.fill_rect(0, 0, 80, 120, (255, 0, 0, 255))
         renderer.fill_rect(80, 0, 80, 120, (0, 0, 255, 255))
         before_hits = renderer._blur_cache.hits
+        before_misses = renderer._blur_cache.misses
         renderer.backdrop_blur(40, 30, 80, 60, 10, 6)
-        # Cache may or may not hit depending on downsample float variance;
-        # at minimum the call must not throw and plan must have run passes.
         plan = plan_backdrop_blur(10, 6, renderer.scale, 80, 60)
         assert not plan["skip"] and len(plan["passes"]) == 2
+        # Identical redraw must hit the digest cache (no new miss).
+        assert renderer._blur_cache.hits > before_hits, (
+            renderer._blur_cache.hits, before_hits)
+        assert renderer._blur_cache.misses == before_misses, (
+            renderer._blur_cache.misses, before_misses)
         shot = renderer.screenshot()
         assert shot.get_width() > 0
         print("Container.blur OpenGL smoke OK",
@@ -286,8 +333,10 @@ if __name__ == "__main__":
     check_accepts_blur_api()
     check_rejects_unsupported_tile_mode()
     check_rejects_nonfinite_blur()
+    check_normalize_blur_radius()
     check_plan_backdrop_blur_pingpong()
     check_blur_result_cache()
+    check_blur_source_digest_detects_sparse_change()
     check_software_anisotropy()
     check_blur_none_and_zero_skip()
     check_software_screenshot()

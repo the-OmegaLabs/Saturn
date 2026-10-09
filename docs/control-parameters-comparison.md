@@ -111,7 +111,7 @@ Across **30 controls**: **1417** shared parameter occurrences implemented, **191
 
 **Saturn extensions:** `can_request_focus`, `mouse_cursor`, `semantics_label`.
 
-Backdrop `blur` accepts a number, `(sigma_x, sigma_y)`, or `Blur`. Software and OpenGL both run a separable (per-axis) Gaussian via `Renderer.backdrop_blur`, with a digest-keyed result cache. Only `BlurTileMode.CLAMP` is supported; other tile modes raise `ValueError`.
+Backdrop `blur` accepts a number, `(sigma_x, sigma_y)`, or `Blur`. Software and OpenGL both run a true separable (horizontal then vertical) Gaussian via `Renderer.backdrop_blur` with matching per-axis kernels, a full-buffer digest-keyed result cache, and non-finite radius/sigma rejected. Only `BlurTileMode.CLAMP` is supported; other tile modes raise `ValueError`.
 
 ## Divider
 

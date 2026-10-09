@@ -11,6 +11,7 @@ dependencies = [
     "pygame-ce>=2.5.8",
     "saturn-fonts-cjk>=0.1.0,<0.2.0",
     "saturn-icons-material>=0.1.0,<0.2.0",
+    "numpy>=2.2.6",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
