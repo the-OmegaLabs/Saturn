@@ -36,6 +36,7 @@ void Page::layout(float width, float height, float padding, float gap) {
     Size s = child->intrinsic(inner_w, {});
     if (s.w > inner_w) s.w = inner_w;
     child->set_rect(Rect{padding, y, s.w, s.h});
+    child->layout(); // Row/Column position their own kids
     y += s.h + gap;
   }
   layout_dirty_ = false;
@@ -51,9 +52,10 @@ void Page::dispatch_pointer(const PointerEvent& e) {
     for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
       Control* c = it->get();
       if (!c || !c->options().visible || c->options().disabled) continue;
-      if (!c->hit_test(e.x, e.y)) continue;
-      pointer_capture_ = c;
-      c->on_pointer(e);
+      Control* target = c->hit_target(e.x, e.y);
+      if (!target) continue;
+      pointer_capture_ = target;
+      target->on_pointer(e);
       break;
     }
     return;

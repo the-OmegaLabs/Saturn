@@ -17,6 +17,7 @@ public:
 private:
   std::string title_;
   bool layout_dirty_ = true;
-  Control* pointer_capture_ = nullptr; // child owned by this page; not owning
+  // Deepest hit target under page subtree; not owning. Clear before remove if remove lands.
+  Control* pointer_capture_ = nullptr;
 };
 }

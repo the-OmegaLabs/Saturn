@@ -18,13 +18,19 @@ public:
   void set_options(ControlOptions opt);
   const ControlOptions& options() const;
   virtual Size intrinsic(OptionalSize max_w, OptionalSize max_h) const;
+  // Position children from rect_. Default: recurse. Row/Column override.
+  virtual void layout();
   virtual void paint(Renderer& r);
   virtual bool hit_test(float x, float y) const;
+  // Deepest visible enabled control under (x,y); children back-to-front, then self.
+  Control* hit_target(float x, float y);
   virtual void on_pointer(const PointerEvent& e);
   void set_rect(Rect rect);
   Rect rect() const;
 protected:
-  void attach(Page* page, Control* parent) { page_ = page; parent_ = parent; }
+  // Propagates page_ to existing subtree (so build-then-page.add works).
+  void attach(Page* page, Control* parent);
+  void add_child(std::unique_ptr<Control> child);
   ControlOptions opt_;
   Page* page_ = nullptr;
   Control* parent_ = nullptr;
@@ -61,6 +67,7 @@ public:
   float corner_radius() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
+  // Same effective radius as paint (kMaxCornerRadius / half min(w,h)).
   bool hit_test(float x, float y) const override;
   void on_pointer(const PointerEvent& e) override;
 private:
@@ -68,5 +75,29 @@ private:
   std::function<void()> on_click_;
   float corner_radius_ = kDefaultCornerRadius;
   bool pressed_ = false;
+};
+
+// Vertical stack. Owns children via unique_ptr; spacing between visible kids.
+class Column final : public Control {
+public:
+  explicit Column(float spacing = 0.f, ControlOptions opt = {});
+  void add(std::unique_ptr<Control> child);
+  float spacing() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void layout() override;
+private:
+  float spacing_ = 0.f;
+};
+
+// Horizontal stack. Owns children via unique_ptr; spacing between visible kids.
+class Row final : public Control {
+public:
+  explicit Row(float spacing = 0.f, ControlOptions opt = {});
+  void add(std::unique_ptr<Control> child);
+  float spacing() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void layout() override;
+private:
+  float spacing_ = 0.f;
 };
 }

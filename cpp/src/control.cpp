@@ -3,13 +3,45 @@
 #include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
 #include "bitmap_font.hpp"
+#include <algorithm>
 #include <cmath>
+#include <stdexcept>
 namespace saturn {
+namespace {
+float clamp_spacing(float spacing) {
+  if (!std::isfinite(spacing) || spacing < 0.f) return 0.f;
+  if (spacing > float(kMaxLayoutDim)) return float(kMaxLayoutDim);
+  return spacing;
+}
+float effective_corner_radius(float radius, float w, float h) {
+  float rad = radius;
+  if (!std::isfinite(rad) || rad < 0.f) rad = 0.f;
+  if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
+  float half_min = 0.5f * (std::min)(w, h);
+  if (rad > half_min) rad = half_min;
+  return rad;
+}
+} // namespace
+
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
 void Control::set_options(ControlOptions opt) { opt_ = std::move(opt); }
 const ControlOptions& Control::options() const { return opt_; }
 void Control::set_rect(Rect rect) { rect_ = rect; }
 Rect Control::rect() const { return rect_; }
+void Control::attach(Page* page, Control* parent) {
+  page_ = page;
+  parent_ = parent;
+  for (auto& c : children_) {
+    if (c) c->attach(page, this);
+  }
+}
+void Control::add_child(std::unique_ptr<Control> child) {
+  if (!child) return;
+  if (children_.size() >= kMaxChildren) throw std::runtime_error("too many children");
+  child->attach(page_, this);
+  children_.push_back(std::move(child));
+  if (page_) page_->update();
+}
 Size Control::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   float w = opt_.width.value_or(max_w.value_or(0));
   float h = opt_.height.value_or(max_h.value_or(0));
@@ -18,6 +50,11 @@ Size Control::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (w < 0) w = 0; if (h < 0) h = 0;
   return {w, h};
 }
+void Control::layout() {
+  for (auto& child : children_) {
+    if (child) child->layout();
+  }
+}
 void Control::paint(Renderer& r) {
   for (auto& child : children_) {
     if (child && child->opt_.visible) child->paint(r);
@@ -25,6 +62,15 @@ void Control::paint(Renderer& r) {
 }
 bool Control::hit_test(float x, float y) const {
   return x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h;
+}
+Control* Control::hit_target(float x, float y) {
+  for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+    Control* c = it->get();
+    if (!c || !c->opt_.visible || c->opt_.disabled) continue;
+    if (Control* t = c->hit_target(x, y)) return t;
+  }
+  if (hit_test(x, y)) return this;
+  return nullptr;
 }
 void Control::on_pointer(const PointerEvent&) {}
 
@@ -88,7 +134,22 @@ void FilledButton::paint(Renderer& r) {
   bitmap_font::draw(r, tx, ty, label_, Color{0xff, 0xff, 0xff, 0xff});
 }
 bool FilledButton::hit_test(float x, float y) const {
-  return Control::hit_test(x, y);
+  if (!(x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h))
+    return false;
+  float rad = effective_corner_radius(corner_radius_, rect_.w, rect_.h);
+  if (rad <= 0.f) return true;
+  float lx = x - rect_.x;
+  float ly = y - rect_.y;
+  float rw = rect_.w;
+  float rh = rect_.h;
+  // Center strips (not in a corner pocket) are inside.
+  if (lx >= rad && lx <= rw - rad) return true;
+  if (ly >= rad && ly <= rh - rad) return true;
+  float cx = (lx < rad) ? rad : (rw - rad);
+  float cy = (ly < rad) ? rad : (rh - rad);
+  float dx = lx - cx;
+  float dy = ly - cy;
+  return dx * dx + dy * dy <= rad * rad;
 }
 void FilledButton::on_pointer(const PointerEvent& e) {
   if (!opt_.visible || opt_.disabled) return;
@@ -97,6 +158,88 @@ void FilledButton::on_pointer(const PointerEvent& e) {
     bool inside = hit_test(e.x, e.y);
     if (pressed_ && inside && on_click_) on_click_();
     pressed_ = false;
+  }
+}
+
+Column::Column(float spacing, ControlOptions opt)
+  : Control(std::move(opt)), spacing_(clamp_spacing(spacing)) {}
+void Column::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
+float Column::spacing() const { return spacing_; }
+Size Column::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  if (opt_.width && opt_.height) return Control::intrinsic(max_w, max_h);
+  float w = 0.f;
+  float h = 0.f;
+  std::size_t n_vis = 0;
+  for (const auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic(max_w, {});
+    if (s.w > w) w = s.w;
+    h += s.h;
+    ++n_vis;
+  }
+  if (n_vis > 1) h += spacing_ * float(n_vis - 1);
+  if (opt_.width) w = *opt_.width;
+  if (opt_.height) h = *opt_.height;
+  if (max_w && w > *max_w) w = *max_w;
+  if (max_h && h > *max_h) h = *max_h;
+  if (w > float(kMaxLayoutDim)) w = float(kMaxLayoutDim);
+  if (h > float(kMaxLayoutDim)) h = float(kMaxLayoutDim);
+  if (w < 0) w = 0;
+  if (h < 0) h = 0;
+  return {w, h};
+}
+void Column::layout() {
+  float y = rect_.y;
+  const float x = rect_.x;
+  const float inner_w = rect_.w > 0.f ? rect_.w : 0.f;
+  for (auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic(inner_w, {});
+    if (s.w > inner_w) s.w = inner_w;
+    child->set_rect(Rect{x, y, s.w, s.h});
+    child->layout();
+    y += s.h + spacing_;
+  }
+}
+
+Row::Row(float spacing, ControlOptions opt)
+  : Control(std::move(opt)), spacing_(clamp_spacing(spacing)) {}
+void Row::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
+float Row::spacing() const { return spacing_; }
+Size Row::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  if (opt_.width && opt_.height) return Control::intrinsic(max_w, max_h);
+  float w = 0.f;
+  float h = 0.f;
+  std::size_t n_vis = 0;
+  for (const auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic({}, max_h);
+    if (s.h > h) h = s.h;
+    w += s.w;
+    ++n_vis;
+  }
+  if (n_vis > 1) w += spacing_ * float(n_vis - 1);
+  if (opt_.width) w = *opt_.width;
+  if (opt_.height) h = *opt_.height;
+  if (max_w && w > *max_w) w = *max_w;
+  if (max_h && h > *max_h) h = *max_h;
+  if (w > float(kMaxLayoutDim)) w = float(kMaxLayoutDim);
+  if (h > float(kMaxLayoutDim)) h = float(kMaxLayoutDim);
+  if (w < 0) w = 0;
+  if (h < 0) h = 0;
+  return {w, h};
+}
+void Row::layout() {
+  float x = rect_.x;
+  const float y = rect_.y;
+  const float inner_h = rect_.h > 0.f ? rect_.h : 0.f;
+  for (auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic({}, inner_h);
+    if (s.h > inner_h && inner_h > 0.f) s.h = inner_h;
+    child->set_rect(Rect{x, y, s.w, s.h});
+    child->layout();
+    x += s.w + spacing_;
   }
 }
 }
