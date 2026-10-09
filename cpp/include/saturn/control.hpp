@@ -383,8 +383,9 @@ private:
 };
 
 // M3 SnackBar: bottom bar (INVERSE_SURFACE), optional action TextButton.
-// Non-barrier. duration_ms in (0, kMaxSnackBarDurationMs]; with a non-empty
-// action label the bar persists until action/dismiss (Python persist default).
+// Non-barrier; queued under kMaxSnackBarQueue (separate from kMaxDialogDepth).
+// duration_ms in (0, kMaxSnackBarDurationMs]; with a non-empty action label the
+// bar persists until action/dismiss (Python persist default).
 // Message / action label over kMaxTextBytes → throw.
 class SnackBar final : public DialogControl {
 public:

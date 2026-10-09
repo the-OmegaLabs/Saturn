@@ -78,13 +78,16 @@ finite value clamp) stay. Do **not** claim ProgressRing matches golden.
 **Dropdown:** simple inline popup (expands intrinsic height when open; no
 animation / no page overlay). Options capped by `kMaxDropdownOptions`.
 
-**Dialog / SnackBar:** `Page` overlay stack (`kMaxDialogDepth=8`);
+**Dialog / SnackBar:** `Page` overlay stack with **separate** budgets —
+barrier `AlertDialog` ≤ `kMaxDialogDepth=8`, non-barrier `SnackBar` ≤
+`kMaxSnackBarQueue=8` (neither steals the other's slots; oversize throws).
 `AlertDialog` scrim + centered card (pad 24 / inset 40 / radius 28;
 `kMaxDialogActions=8`; title/content/action labels > `kMaxTextBytes` throw).
 `SnackBar` bottom bar (INVERSE_SURFACE); duration `(0, kMaxSnackBarDurationMs]`;
 with action label persists until Undo (Python default). Overlay is simple —
 no animation; true menu overlay/clip depth still deferred for Dropdown.
-TextField/ListView still frozen.
+**Pixel debt:** title/content/message are single-line `measure`+`draw` (long
+text clips; not Python multi-line card wrap). TextField/ListView still frozen.
 
 **Still deferred** (expect `compare_shots` FAIL): TextField, ListView scroll,
 variable Inter weight / Noto SC, flex weights / MainAxisAlignment, HiDPI
@@ -132,7 +135,8 @@ See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
 `kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`),
 `kMaxSliderDivisions` (ctor throw if out of range; `set_value` rejects non-finite),
 `kMaxDropdownOptions` (ctor throw if options oversize),
-`kMaxDialogDepth` / `kMaxDialogActions` / `kMaxSnackBarDurationMs` (throw, no truncate).
+`kMaxDialogDepth` / `kMaxDialogActions` / `kMaxSnackBarQueue` /
+`kMaxSnackBarDurationMs` (throw, no truncate; Dialog vs SnackBar budgets split).
 Screenshot / image / icon path length capped by `kMaxPathBytes` — oversize paths
 **throw**, never truncate. `Image` / `IconButton` fail loud on bad/oversize
 decode (no silent empty paint). ListView scroll caches must honor these —

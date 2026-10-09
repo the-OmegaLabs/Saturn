@@ -106,10 +106,13 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## Dialog / SnackBar
 - `DialogControl` overlay base; `Page::show_dialog` / `pop_dialog` / `tick`.
-  Depth ≤ `kMaxDialogDepth` (8). Pops deferred until after pointer dispatch
-  (action `on_click` cannot UAF the button).
+  Barrier dialogs ≤ `kMaxDialogDepth` (8); SnackBars ≤ `kMaxSnackBarQueue`
+  (8) — separate counters on the shared overlay vector so Snack cannot starve
+  Dialog (and vice versa). Oversize throws (no silent drop). Pops deferred
+  until after pointer dispatch (action `on_click` cannot UAF the button).
 - `AlertDialog`: barrier scrim (`kScrim`) + card `SURFACE_CONTAINER_HIGH`;
   actions ≤ `kMaxDialogActions`; title/content > `kMaxTextBytes` → throw.
+  Title/content single-line paint is pixel debt vs Python wrap (see DEMO.md).
 - `TextButton`: no fill / PRIMARY label (dialog Cancel).
 - `SnackBar`: non-barrier bottom bar; `INVERSE_SURFACE` / `ON_INVERSE_SURFACE`;
   duration in `(0, kMaxSnackBarDurationMs]`; action present → persist until
