@@ -25,7 +25,7 @@ from .. import colors
 from ..animation import ease
 from ..control import Control, ControlOptions
 from ..types import (Alignment, AnimationCurve, CrossAxisAlignment,
-                     MainAxisAlignment, as_border_radius, as_padding)
+                     MainAxisAlignment, as_blur, as_border_radius, as_padding)
 from ._material import (draw_state_layer, init_state_layer, press,
                         release, set_hover, tick_state_layer)
 from ._compat import axis_distribution, value, reject_options
@@ -359,7 +359,7 @@ class Container(Control):
                  ignore_interactions=False, blend_mode=None, image=None,
                  blur=None, theme=None, dark_theme=None, theme_mode=None,
                  color_filter=None, foreground_decoration=None, **base: Unpack[ControlOptions]):
-        reject_options("Container", blend_mode=blend_mode, image=image, blur=blur,
+        reject_options("Container", blend_mode=blend_mode, image=image,
                        theme=theme, dark_theme=dark_theme, theme_mode=theme_mode,
                        color_filter=color_filter, foreground_decoration=foreground_decoration)
         super().__init__(**base)
@@ -371,6 +371,7 @@ class Container(Control):
         self.alignment = alignment
         self.gradient = gradient
         self.shadow = shadow
+        self.blur = as_blur(blur)
         self.ink = ink
         self.animate = animate
         self.on_click = on_click
@@ -509,6 +510,10 @@ class Container(Control):
             shadows = self.shadow if isinstance(self.shadow, list) else [self.shadow]
             for sh in shadows:
                 _draw_shadow(r, x, y, w, h, sh, self._radius())
+        blur = self.blur
+        if blur is not None and (blur.sigma_x > 0 or blur.sigma_y > 0):
+            r.backdrop_blur(x, y, w, h, blur.sigma_x, blur.sigma_y,
+                            radius=self._radius())
         if self.bgcolor is not None:
             r.fill_rect(x, y, w, h, colors.parse_color(self.bgcolor),
                         radius=self._radius())
@@ -609,7 +614,7 @@ class Container(Control):
             self._gradient_surface, self._gradient_key = surface, key
         r.blit_cached(self._gradient_surface, x, y)
 
-    __unsupported_parameters__ = {"blend_mode", "image", "blur", "theme", "dark_theme",
+    __unsupported_parameters__ = {"blend_mode", "image", "theme", "dark_theme",
                                   "theme_mode", "color_filter", "foreground_decoration"}
 
 

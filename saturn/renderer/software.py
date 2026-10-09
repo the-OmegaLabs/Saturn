@@ -325,6 +325,47 @@ class SoftwareRenderer(Renderer):
         if os.environ.get("SATURN_SHOT"):  # test hook: dump last frame to png
             pygame.image.save(self.screenshot(), os.environ["SATURN_SHOT"])
 
+    def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
+        """Blur the already-drawn buffer under this logical rect in place."""
+        from ..painting import (backdrop_blur_surface, corners,
+                                normalize_blur_sigmas, shape_mask)
+        if w <= 0 or h <= 0:
+            return
+        sx, sy = normalize_blur_sigmas(sigma_x, sigma_y, self.scale)
+        if sx < 0.5 and sy < 0.5:
+            return
+        x, y = self._translate(x, y)
+        # Expand slightly so the blur kernel can sample edge neighbors.
+        pad = math.ceil(3 * max(sx, sy))
+        x0 = max(0, math.floor(x * self.scale) - pad)
+        y0 = max(0, math.floor(y * self.scale) - pad)
+        x1 = min(self._buf.get_width(), math.ceil((x + w) * self.scale) + pad)
+        y1 = min(self._buf.get_height(), math.ceil((y + h) * self.scale) + pad)
+        rw, rh = x1 - x0, y1 - y0
+        if rw <= 0 or rh <= 0:
+            return
+        region = self._buf.subsurface((x0, y0, rw, rh)).copy()
+        blurred = backdrop_blur_surface(region, sx, sy)
+        # Restrict the write to the container's rounded rect in device pixels.
+        cx0 = max(x0, round(x * self.scale))
+        cy0 = max(y0, round(y * self.scale))
+        cx1 = min(x1, round((x + w) * self.scale))
+        cy1 = min(y1, round((y + h) * self.scale))
+        cw, ch = cx1 - cx0, cy1 - cy0
+        if cw <= 0 or ch <= 0:
+            return
+        cropped = blurred.subsurface((cx0 - x0, cy0 - y0, cw, ch)).copy()
+        if radius:
+            mask = shape_mask(cw, ch, corners(radius, self.scale, cw, ch))
+            cropped.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            # Keep unblurred pixels outside the rounded corner instead of
+            # wiping them to transparent when the mask has alpha < 255.
+            dest = self._buf.subsurface((cx0, cy0, cw, ch)).copy()
+            dest.blit(cropped, (0, 0))
+            self._buf.blit(dest, (cx0, cy0))
+        else:
+            self._buf.blit(cropped, (cx0, cy0))
+
     def screenshot(self):
         """The composited frame (2x buffer downscaled to window size)."""
         return pygame.transform.smoothscale(self._buf, self.screen.get_size())

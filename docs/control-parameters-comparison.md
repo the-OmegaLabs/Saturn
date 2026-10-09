@@ -15,7 +15,7 @@ Unknown arguments raise `TypeError`. Explicitly listed unsupported options rejec
 | [Card](#card) | 42 | 5 | 0 |
 | [Checkbox](#checkbox) | 53 | 5 | 2 |
 | [Column](#column) | 46 | 5 | 1 |
-| [Container](#container) | 52 | 6 | 8 |
+| [Container](#container) | 53 | 6 | 7 |
 | [Divider](#divider) | 16 | 2 | 0 |
 | [Dropdown](#dropdown) | 77 | 4 | 2 |
 | [DropdownOption](#dropdownoption) | 15 | 2 | 0 |
@@ -41,7 +41,7 @@ Unknown arguments raise `TypeError`. Explicitly listed unsupported options rejec
 | [TextButton](#textbutton) | 45 | 6 | 0 |
 | [TextField](#textfield) | 105 | 19 | 22 |
 
-Across **30 controls**: **1416** shared parameter occurrences implemented, **191** missing, and **57** explicitly unsupported. Common inherited parameters occur once per control in these totals.
+Across **30 controls**: **1417** shared parameter occurrences implemented, **191** missing, and **56** explicitly unsupported. Common inherited parameters occur once per control in these totals.
 
 ## Shared behavior and limits
 
@@ -103,13 +103,15 @@ Across **30 controls**: **1416** shared parameter occurrences implemented, **191
 
 ## Container
 
-**Shared implemented:** `align`, `alignment`, `animate`, `animate_align`, `animate_margin`, `animate_offset`, `animate_opacity`, `animate_position`, `animate_rotation`, `animate_scale`, `animate_size`, `aspect_ratio`, `bgcolor`, `border`, `border_radius`, `bottom`, `clip_behavior`, `content`, `data`, `disabled`, `expand`, `expand_loose`, `gradient`, `height`, `ignore_interactions`, `ink`, `ink_color`, `key`, `left`, `margin`, `offset`, `on_animation_end`, `on_click`, `on_hover`, `on_long_press`, `on_size_change`, `on_tap_down`, `opacity`, `padding`, `ref`, `right`, `rotate`, `rtl`, `scale`, `shadow`, `shape`, `size_change_interval`, `tooltip`, `top`, `url`, `visible`, `width`.
+**Shared implemented:** `align`, `alignment`, `animate`, `animate_align`, `animate_margin`, `animate_offset`, `animate_opacity`, `animate_position`, `animate_rotation`, `animate_scale`, `animate_size`, `aspect_ratio`, `bgcolor`, `blur`, `border`, `border_radius`, `bottom`, `clip_behavior`, `content`, `data`, `disabled`, `expand`, `expand_loose`, `gradient`, `height`, `ignore_interactions`, `ink`, `ink_color`, `key`, `left`, `margin`, `offset`, `on_animation_end`, `on_click`, `on_hover`, `on_long_press`, `on_size_change`, `on_tap_down`, `opacity`, `padding`, `ref`, `right`, `rotate`, `rtl`, `scale`, `shadow`, `shape`, `size_change_interval`, `tooltip`, `top`, `url`, `visible`, `width`.
 
 **Missing:** `action`, `adaptive`, `badge`, `col`, `flip`, `transform`.
 
-**Explicitly unsupported:** `blend_mode`, `blur`, `color_filter`, `dark_theme`, `foreground_decoration`, `image`, `theme`, `theme_mode`.
+**Explicitly unsupported:** `blend_mode`, `color_filter`, `dark_theme`, `foreground_decoration`, `image`, `theme`, `theme_mode`.
 
 **Saturn extensions:** `can_request_focus`, `mouse_cursor`, `semantics_label`.
+
+Backdrop `blur` accepts a number, `(sigma_x, sigma_y)`, or `Blur`. Software uses a downscaled `pygame.transform.gaussian_blur`; OpenGL runs a separable GPU pass via `Renderer.backdrop_blur`. `Blur.tile_mode` is accepted for Flet parity; sampling currently clamps.
 
 ## Divider
 

@@ -36,6 +36,9 @@ def _set_swap_interval(enabled: bool) -> bool:
     except (AttributeError, OSError):
         return False
 
+# Match cpp saturn::kMaxLayoutDim — hard ceiling for blur FBO edge length.
+_MAX_BLUR_TARGET_DIM = 1 << 15
+
 RECT_VS = """
 #version 330
 in vec2 in_pos;          // px, origin top-left
@@ -123,6 +126,61 @@ out vec4 frag;
 void main() {
     vec4 t = texture(u_tex, v_uv);
     frag = vec4(t.rgb, t.a) * v_color;
+}
+"""
+
+# Fullscreen/pass-through blur: in_pos is NDC-like 0..1 with y up inside the FBO.
+BLUR_VS = """
+#version 330
+in vec2 in_pos;
+in vec2 in_uv;
+out vec2 v_uv;
+void main() {
+    gl_Position = vec4(in_pos.x * 2.0 - 1.0, in_pos.y * 2.0 - 1.0, 0.0, 1.0);
+    v_uv = in_uv;
+}
+"""
+
+BLUR_FS = """
+#version 330
+in vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_direction;
+uniform float u_sigma;
+out vec4 frag;
+void main() {
+    float sigma = max(u_sigma, 0.001);
+    int radius = int(clamp(ceil(sigma * 3.0), 1.0, 24.0));
+    float total = 0.0;
+    vec4 color = vec4(0.0);
+    for (int i = -24; i <= 24; ++i) {
+        if (i < -radius || i > radius) continue;
+        float w = exp(-0.5 * float(i * i) / (sigma * sigma));
+        color += texture(u_tex, v_uv + u_direction * float(i)) * w;
+        total += w;
+    }
+    frag = color / max(total, 0.0001);
+}
+"""
+
+# Composite blurred region back with optional rounded-rect coverage.
+BLUR_COMPOSE_FS = """
+#version 330
+in vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_rect_size;
+uniform float u_radius;
+out vec4 frag;
+void main() {
+    vec4 color = texture(u_tex, v_uv);
+    float radius = clamp(u_radius, 0.0, min(u_rect_size.x, u_rect_size.y) * 0.5);
+    vec2 local = (v_uv - 0.5) * u_rect_size;
+    vec2 q = abs(local) - (u_rect_size * 0.5 - radius);
+    float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    float feather = max(0.65 * fwidth(distance), 0.001);
+    float coverage = 1.0 - smoothstep(-feather, feather, distance);
+    if (coverage <= 0.0) discard;
+    frag = vec4(color.rgb, color.a * coverage);
 }
 """
 
@@ -268,6 +326,19 @@ class GLRenderer(Renderer):
         self._prog = self.ctx.program(vertex_shader=RECT_VS, fragment_shader=RECT_FS)
         self._prog_tex = self.ctx.program(vertex_shader=TEX_VS, fragment_shader=TEX_FS)
         self._prog_state = self.ctx.program(vertex_shader=STATE_VS, fragment_shader=STATE_FS)
+        self._prog_blur = self.ctx.program(vertex_shader=BLUR_VS, fragment_shader=BLUR_FS)
+        self._prog_blur_compose = self.ctx.program(
+            vertex_shader=BLUR_VS, fragment_shader=BLUR_COMPOSE_FS)
+        self._prog_blur["u_tex"].value = 0
+        self._prog_blur_compose["u_tex"].value = 0
+        self._blur_vbo = self.ctx.buffer(reserve=128)
+        self._blur_vao = self.ctx.vertex_array(
+            self._prog_blur, [(self._blur_vbo, "2f 2f", "in_pos", "in_uv")])
+        self._blur_compose_vao = self.ctx.vertex_array(
+            self._prog_blur_compose, [(self._blur_vbo, "2f 2f", "in_pos", "in_uv")])
+        self._blur_tex_a = self._blur_tex_b = None
+        self._blur_fbo_a = self._blur_fbo_b = None
+        self._blur_size = (0, 0)
         self._custom_programs = OrderedDict()
         self._shader_buffers = OrderedDict()
         self._buffer_programs = OrderedDict()
@@ -808,6 +879,129 @@ class GLRenderer(Renderer):
         self.ctx.scissor = self._clip_stack[-1] if self._clip_stack else None
 
     # -- present -------------------------------------------------------------
+
+    def _ensure_blur_targets(self, width, height):
+        # Absolute cap matches cpp saturn::kMaxLayoutDim — dual FBOs must not
+        # explode VRAM when a huge framebuffer meets a small downsample factor.
+        w = max(1, min(_MAX_BLUR_TARGET_DIM, int(width)))
+        h = max(1, min(_MAX_BLUR_TARGET_DIM, int(height)))
+        size = (w, h)
+        if self._blur_size == size and self._blur_tex_a is not None:
+            return
+        for resource in (self._blur_fbo_a, self._blur_fbo_b,
+                         self._blur_tex_a, self._blur_tex_b):
+            if resource is not None:
+                resource.release()
+        self._blur_tex_a = self.ctx.texture(size, 4)
+        self._blur_tex_b = self.ctx.texture(size, 4)
+        for tex in (self._blur_tex_a, self._blur_tex_b):
+            tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+            tex.repeat_x = tex.repeat_y = False
+        self._blur_fbo_a = self.ctx.framebuffer(color_attachments=[self._blur_tex_a])
+        self._blur_fbo_b = self.ctx.framebuffer(color_attachments=[self._blur_tex_b])
+        self._blur_size = size
+
+    def _blur_draw_quad(self, vao, u0, v0, u1, v1):
+        # pos in 0..1 FBO space (y up); uv samples the source texture.
+        data = struct.pack(
+            "16f",
+            0.0, 1.0, u0, v1, 1.0, 1.0, u1, v1,
+            1.0, 0.0, u1, v0, 0.0, 1.0, u0, v1,
+            1.0, 0.0, u1, v0, 0.0, 0.0, u0, v0)
+        self._blur_vbo.write(data)
+        vao.render(moderngl.TRIANGLES)
+
+    def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
+        """Separable Gaussian backdrop blur on the supersampled frame target."""
+        from ..painting import blur_downsample_factor, normalize_blur_sigmas
+        if w <= 0 or h <= 0:
+            return
+        sx, sy = normalize_blur_sigmas(sigma_x, sigma_y, self.scale)
+        if sx < 0.5 and sy < 0.5:
+            return
+        self._flush_rects()
+        x, y = self._translate(x, y)
+        tw = max(1, int(self._pixel_size[0]) * self._ssaa)
+        th = max(1, int(self._pixel_size[1]) * self._ssaa)
+        x0 = max(0, int(math.floor(x * self.scale)))
+        y0 = max(0, int(math.floor(y * self.scale)))
+        x1 = min(tw, int(math.ceil((x + w) * self.scale)))
+        y1 = min(th, int(math.ceil((y + h) * self.scale)))
+        rw, rh = x1 - x0, y1 - y0
+        if rw <= 0 or rh <= 0:
+            return
+        factor = blur_downsample_factor(sx, sy)
+        bw, bh = max(1, rw // factor), max(1, rh // factor)
+        if bw > _MAX_BLUR_TARGET_DIM or bh > _MAX_BLUR_TARGET_DIM:
+            extra = max(
+                math.ceil(bw / _MAX_BLUR_TARGET_DIM),
+                math.ceil(bh / _MAX_BLUR_TARGET_DIM),
+            )
+            factor = max(factor, factor * extra)
+            bw, bh = max(1, rw // factor), max(1, rh // factor)
+            bw = min(bw, _MAX_BLUR_TARGET_DIM)
+            bh = min(bh, _MAX_BLUR_TARGET_DIM)
+        self._ensure_blur_targets(bw, bh)
+        u0, u1 = x0 / tw, x1 / tw
+        v_top, v_bottom = 1.0 - y0 / th, 1.0 - y1 / th
+        viewport, scissor = self.ctx.viewport, self.ctx.scissor
+        blend = self.ctx.blend_func
+        try:
+            self.ctx.disable(moderngl.BLEND)
+            self.ctx.scissor = None
+            # Copy / downsample the region into A (sigma~0 keeps the center tap).
+            self._blur_fbo_a.use()
+            self.ctx.viewport = (0, 0, bw, bh)
+            self._frame_color.use(0)
+            self._prog_blur["u_sigma"].value = 0.001
+            self._prog_blur["u_direction"].value = (0.0, 0.0)
+            self._blur_draw_quad(self._blur_vao, u0, v_bottom, u1, v_top)
+            result = self._blur_tex_a
+            if sx >= 0.5:
+                self._blur_fbo_b.use()
+                self.ctx.viewport = (0, 0, bw, bh)
+                result.use(0)
+                self._prog_blur["u_sigma"].value = max(0.5, sx / factor)
+                self._prog_blur["u_direction"].value = (1.0 / bw, 0.0)
+                self._blur_draw_quad(self._blur_vao, 0.0, 0.0, 1.0, 1.0)
+                result = self._blur_tex_b
+            if sy >= 0.5:
+                target = self._blur_fbo_a if result is self._blur_tex_b else self._blur_fbo_b
+                target.use()
+                self.ctx.viewport = (0, 0, bw, bh)
+                result.use(0)
+                self._prog_blur["u_sigma"].value = max(0.5, sy / factor)
+                self._prog_blur["u_direction"].value = (0.0, 1.0 / bh)
+                self._blur_draw_quad(self._blur_vao, 0.0, 0.0, 1.0, 1.0)
+                result = self._blur_tex_a if target is self._blur_fbo_a else self._blur_tex_b
+            # Composite the blurred region back with optional rounded coverage.
+            self._use_frame_target()
+            self.ctx.enable(moderngl.BLEND)
+            self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA,
+                                   moderngl.ONE, moderngl.ONE_MINUS_SRC_ALPHA)
+            logical_w = (x1 - x0) / self.scale
+            logical_h = (y1 - y0) / self.scale
+            self._prog_blur_compose["u_rect_size"].value = (
+                float(logical_w), float(logical_h))
+            self._prog_blur_compose["u_radius"].value = float(max(0.0, radius))
+            nx0, nx1 = x0 / tw, x1 / tw
+            ny0, ny1 = 1.0 - y1 / th, 1.0 - y0 / th
+            data = struct.pack(
+                "16f",
+                nx0, ny1, 0.0, 1.0, nx1, ny1, 1.0, 1.0,
+                nx1, ny0, 1.0, 0.0, nx0, ny1, 0.0, 1.0,
+                nx1, ny0, 1.0, 0.0, nx0, ny0, 0.0, 0.0)
+            self._blur_vbo.write(data)
+            result.use(0)
+            self._blur_compose_vao.render(moderngl.TRIANGLES)
+        finally:
+            self._use_frame_target()
+            self.ctx.viewport = viewport
+            self.ctx.scissor = scissor
+            self.ctx.enable(moderngl.BLEND)
+            self.ctx.blend_func = blend
+
+
     def screenshot(self):
         """Current framebuffer contents (must run on the UI thread, pre-swap)."""
         self.activate()
@@ -891,6 +1085,14 @@ class GLRenderer(Renderer):
             vao.release()
             program.release()
         self._custom_programs.clear()
+        for resource in (self._blur_fbo_a, self._blur_fbo_b,
+                         self._blur_tex_a, self._blur_tex_b,
+                         self._blur_vao, self._blur_compose_vao, self._blur_vbo,
+                         self._prog_blur, self._prog_blur_compose):
+            if resource is not None:
+                resource.release()
+        self._blur_fbo_a = self._blur_fbo_b = None
+        self._blur_tex_a = self._blur_tex_b = None
         for resource in (self._rect_vao, self._tex_vao, self._state_vao,
                          self._rect_vbo, self._tex_vbo, self._state_vbo,
                          self._frame_target, self._frame_color,
