@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.20)
+project(saturn_cpp LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(SDL3 REQUIRED CONFIG)
+add_library(saturn
+  src/app.cpp src/window.cpp src/page.cpp src/control.cpp src/opengl_renderer.cpp)
+target_include_directories(saturn PUBLIC include PRIVATE src)
+target_link_libraries(saturn PUBLIC SDL3::SDL3)
+add_executable(saturn_hello src/main.cpp)
+target_link_libraries(saturn_hello PRIVATE saturn)
