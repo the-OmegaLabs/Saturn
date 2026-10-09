@@ -19,7 +19,10 @@ void Page::add(std::unique_ptr<Control> child) {
 void Page::update() { layout_dirty_ = true; }
 bool Page::layout_dirty() const { return layout_dirty_; }
 void Page::layout(float width, float height, float padding, float gap) {
-  if (!(width > 0) || !(height > 0)) return;
+  if (!(width > 0) || !(height > 0)) {
+    layout_dirty_ = false; // avoid per-frame spin on invalid size
+    return;
+  }
   if (width > kMaxLayoutDim) width = float(kMaxLayoutDim);
   if (height > kMaxLayoutDim) height = float(kMaxLayoutDim);
   if (padding < 0) padding = 0;
