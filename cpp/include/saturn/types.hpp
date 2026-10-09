@@ -6,6 +6,8 @@ namespace saturn {
 struct Color { std::uint8_t r,g,b,a; };
 struct Rect { float x,y,w,h; };
 struct Size { float w,h; };
+// dst = screen px; uv = atlas px (shader divides by texture size)
+struct TexturedQuad { Rect dst; Rect uv; };
 using OptionalSize = std::optional<float>; // nullopt = unconstrained; clamp via limits.hpp
 struct ControlOptions {
   bool visible = true;
