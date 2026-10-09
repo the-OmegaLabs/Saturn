@@ -26,16 +26,12 @@ public:
 
   // PIXEL framebuffer size (SDL_GetWindowSizeInPixels). Matches GL viewport /
   // SATURN_SHOT. Equals client_* only at 100% DPI.
+  // No width()/height() aliases — always pick client_* (layout) or drawable_* (GL/shot).
   int drawable_width() const;
   int drawable_height() const;
 
-  // Back-compat aliases → drawable_* (GL/shot). Prefer explicit client_/drawable_.
-  int width() const { return drawable_width(); }
-  int height() const { return drawable_height(); }
-
-  // Client size requested at construction (logical).
-  int requested_width() const;
-  int requested_height() const;
+  // Construction intent is the ctor `w`,`h` (logical client). After pin_client,
+  // client_* is the live source of truth — no separate requested_* API.
 
   Renderer& renderer();
   void swap();
