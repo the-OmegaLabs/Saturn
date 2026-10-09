@@ -15,10 +15,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define STBI_NO_STDIO
-#define STBI_MAX_DIMENSIONS 32768
+// Must match saturn::kMaxImageDecodeDim (limits.hpp). Set before stb include.
+#define STBI_MAX_DIMENSIONS 4096
 #include "stb_image.h"
 
 namespace saturn {
+static_assert(STBI_MAX_DIMENSIONS == kMaxImageDecodeDim,
+              "STBI_MAX_DIMENSIONS must equal kMaxImageDecodeDim");
 namespace {
 constexpr float kUiFontPx = 16.f;
 // M3 button metrics (saturn/widgets/buttons.py non-expressive).
@@ -368,7 +371,10 @@ void IconButton::on_pointer(const PointerEvent& e) {
 
 Image::Image(std::string path, ControlOptions opt)
   : Control(std::move(opt)), path_(std::move(path)) {
-  if (path_.size() > kMaxPathBytes) path_.resize(kMaxPathBytes);
+  if (path_.empty())
+    throw std::invalid_argument("Image path is empty");
+  if (path_.size() > kMaxPathBytes)
+    throw std::invalid_argument("Image path exceeds kMaxPathBytes");
 }
 Image::~Image() { release_texture(); }
 void Image::set_tint(Color c) {
@@ -390,33 +396,34 @@ void Image::release_texture() {
   tex_r_ = nullptr;
 }
 void Image::ensure_loaded() const {
-  if (tried_load_) return;
+  if (load_ok_) return;
+  if (tried_load_)
+    throw std::runtime_error("image load previously failed: " + path_);
   tried_load_ = true;
-  try {
-    const std::string resolved = resolve_asset_path(path_);
-    auto file = read_file_capped(resolved, kMaxImageFileBytes);
-    int w = 0, h = 0, n = 0;
-    stbi_uc* pixels = stbi_load_from_memory(
-        file.data(), static_cast<int>(file.size()), &w, &h, &n, 4);
-    if (!pixels || w <= 0 || h <= 0) {
-      if (pixels) stbi_image_free(pixels);
-      return;
-    }
-    const auto uw = static_cast<std::size_t>(w);
-    const auto uh = static_cast<std::size_t>(h);
-    if (uw > kMaxLayoutDim || uh > kMaxLayoutDim ||
-        uw * uh > kMaxScreenshotPixels) {
-      stbi_image_free(pixels);
-      return;
-    }
-    rgba_.assign(pixels, pixels + static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 4u);
-    stbi_image_free(pixels);
-    src_w_ = w;
-    src_h_ = h;
-    load_ok_ = true;
-  } catch (...) {
-    load_ok_ = false;
+  const std::string resolved = resolve_asset_path(path_);
+  if (resolved.size() > kMaxPathBytes)
+    throw std::invalid_argument("image resolved path exceeds kMaxPathBytes");
+  auto file = read_file_capped(resolved, kMaxImageFileBytes);
+  int w = 0, h = 0, n = 0;
+  stbi_uc* pixels = stbi_load_from_memory(
+      file.data(), static_cast<int>(file.size()), &w, &h, &n, 4);
+  if (!pixels || w <= 0 || h <= 0) {
+    if (pixels) stbi_image_free(pixels);
+    throw std::runtime_error("image decode failed: " + path_);
   }
+  const auto uw = static_cast<std::size_t>(w);
+  const auto uh = static_cast<std::size_t>(h);
+  if (w > kMaxImageDecodeDim || h > kMaxImageDecodeDim ||
+      uw > kMaxLayoutDim || uh > kMaxLayoutDim ||
+      uw * uh > kMaxScreenshotPixels) {
+    stbi_image_free(pixels);
+    throw std::runtime_error("image dimensions exceed caps: " + path_);
+  }
+  rgba_.assign(pixels, pixels + uw * uh * 4u);
+  stbi_image_free(pixels);
+  src_w_ = w;
+  src_h_ = h;
+  load_ok_ = true;
 }
 void Image::ensure_texture(Renderer& r) {
   if (!load_ok_ || rgba_.empty()) return;

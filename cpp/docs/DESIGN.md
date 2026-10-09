@@ -66,6 +66,13 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Caps: `kMaxTextLen` / `kMaxFillRects` throw, no silent truncate
 - Hello track closed; layout widgets (`Row`/`Column`/`Container`) landed
 
+## Image (PNG via stb_image)
+- Path > `kMaxPathBytes` or empty → throw in ctor (no `resize` truncate).
+- `ensure_loaded` throws on open/size/decode failure and on dims over
+  `kMaxImageDecodeDim` / `kMaxLayoutDim` / `kMaxScreenshotPixels`.
+- `STBI_MAX_DIMENSIONS` == `kMaxImageDecodeDim` (4096), set before stb include;
+  file bytes capped by `kMaxImageFileBytes`. No silent `catch (...)`.
+
 ## Font (TTF metrics)
 - `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
   (OFL; instanced from Python `saturn/assets` Inter variable @ wght=400/opsz=14).

@@ -93,10 +93,12 @@ python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png pat
 
 ## Caps (security)
 See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
-`kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`.
-Screenshot / image path length capped by `kMaxPathBytes`. Image decode dims
-clamped to `kMaxLayoutDim` / `kMaxScreenshotPixels`. ListView scroll caches
-must honor these — no unbounded tile buffers.
+`kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`,
+`kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`).
+Screenshot / image path length capped by `kMaxPathBytes` — oversize paths
+**throw**, never truncate. `Image::ensure_loaded` fails loud on bad/oversize
+decode (no silent empty paint). ListView scroll caches must honor these —
+no unbounded tile buffers.
 
 ## Ownership
 Containers / Row / Column own children via `unique_ptr`. Page `pointer_capture_`
