@@ -76,5 +76,6 @@ int main() {
         panels->add(make_panel("Scrollable list", std::move(right_body)));
         page.add(std::move(panels));
       },
-      saturn::kDemoWindowWidth, saturn::kDemoWindowHeight);
+      // Drawable/client contract (not Python outer 960x800) — matches golden.
+      saturn::kDemoDrawableWidth, saturn::kDemoDrawableHeight);
 }

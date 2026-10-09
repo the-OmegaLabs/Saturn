@@ -5,6 +5,7 @@
 #include "saturn/types.hpp"
 #include "saturn/font.hpp"
 #include "saturn/limits.hpp"
+#include "saturn/colors.hpp"
 #include <SDL3/SDL.h>
 #include <cstdlib>
 #include <cstring>
@@ -63,6 +64,23 @@ int App::run() {
       int sw = 0, sh = 0;
       if (!r.read_pixels_rgba(&rgba, &sw, &sh))
         throw std::runtime_error("screenshot readback unsupported");
+      // Always record actual framebuffer pixels. Demo mode must match the
+      // Windows true-GL golden drawable (944x761), not Python outer 960x800.
+      const int req_w = impl_->window.requested_width();
+      const int req_h = impl_->window.requested_height();
+      const bool demo_contract =
+          (req_w == kDemoDrawableWidth && req_h == kDemoDrawableHeight) ||
+          (req_w == kDemoWindowWidth && req_h == kDemoWindowHeight) ||
+          (std::getenv("SATURN_DEMO_CONTRACT") != nullptr);
+      if (demo_contract &&
+          (sw != kDemoDrawableWidth || sh != kDemoDrawableHeight)) {
+        throw std::runtime_error(
+            "SATURN_SHOT demo contract mismatch: framebuffer " +
+            std::to_string(sw) + "x" + std::to_string(sh) +
+            " != drawable " + std::to_string(kDemoDrawableWidth) + "x" +
+            std::to_string(kDemoDrawableHeight) +
+            " (Python DEMO_WIDTH/HEIGHT are outer; golden is client 944x761)");
+      }
       if (!write_png_rgba(shot, sw, sh, rgba.data()))
         throw std::runtime_error("failed to write SATURN_SHOT png");
       return 0;

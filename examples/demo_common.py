@@ -5,6 +5,10 @@ from pathlib import Path
 import saturn
 
 
+# Outer window intent via page.window.width/height (see saturn.window._set_size).
+# On Windows the drawable/client is smaller by the Win32 frame (~944x761);
+# that client size is the C++ / SATURN_SHOT golden contract — do not treat
+# these constants as framebuffer pixels.
 DEMO_WIDTH = 960
 DEMO_HEIGHT = 800
 LOGO = Path(__file__).resolve().parents[1] / ".static" / "saturn-logo-transparent.png"
