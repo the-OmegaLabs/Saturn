@@ -8,6 +8,7 @@ public:
   ~OpenGLRenderer() override;
   void clear(Color c) override;
   void fill_rect(Rect r, Color c, float radius) override;
+  void fill_rects(const Rect* rects, std::size_t count, Color c) override;
   void stroke_rect(Rect r, Color c, float width, float radius) override;
   void clip_push(Rect r) override;
   void clip_pop() override;
