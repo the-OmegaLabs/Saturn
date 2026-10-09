@@ -1,18 +1,22 @@
-# C++ demo pixel parity
+﻿# C++ demo pixel parity
 
-Goal: first shippable C++ demo matches Python [`examples/demo.py`](../../examples/demo.py)
-against [`.static/shots/demo.png`](../../.static/shots/demo.png) (pixel compare).
+Goal: first shippable C++ demo matches Python `examples/demo.py`
+against a **Windows true-OpenGL** golden (not Mesa soft GL).
 
 ## Contract
 - Window intent: 960×800 (`demo_common.DEMO_WIDTH/HEIGHT`).
-- Golden PNG on main is currently **944×761** — compare that file, or regenerate
-  OpenGL golden at the same size before claiming parity.
+- **Golden source (pinned):** `.static/shots/demo-opengl-win-960x800.png`
+  captured on DESKTOP Windows with `--backend opengl` via `SATURN_SHOT`.
+  Measured client pixels today: **944×761** (window chrome / DPI path).
+  Do **not** use Mesa soft-GL `demo-opengl-960x800.png` as golden.
 - Theme: `ThemeMode.DARK`, `Colors.SURFACE` background, Material baseline dark
   tokens in `include/saturn/colors.hpp`.
+- Hard blockers before claiming pixel parity: real font metrics (not 5×7 bitmap),
+  same-backend golden, Row/Column expand/align later.
 
 ## Compare
 ```bash
-python3 cpp/tools/compare_shots.py .static/shots/demo.png path/to/cpp_shot.png \
+python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-960x800.png path/to/cpp_shot.png \
   --diff-out /tmp/demo-diff.png
 ```
 
