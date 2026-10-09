@@ -35,6 +35,7 @@ using PFNGLGETUNIFORMLOCATIONPROC = int (*)(unsigned, const char*);
 using PFNGLUNIFORM4FPROC = void (*)(int, float, float, float, float);
 using PFNGLUNIFORM2FPROC = void (*)(int, float, float);
 using PFNGLUNIFORM1IPROC = void (*)(int, int);
+using PFNGLUNIFORM1FPROC = void (*)(int, float);
 using PFNGLGENVERTEXARRAYSPROC = void (*)(int, unsigned*);
 using PFNGLBINDVERTEXARRAYPROC = void (*)(unsigned);
 using PFNGLENABLEVERTEXATTRIBARRAYPROC = void (*)(unsigned);
@@ -97,6 +98,7 @@ struct GlApi {
   PFNGLUNIFORM4FPROC uniform4f = nullptr;
   PFNGLUNIFORM2FPROC uniform2f = nullptr;
   PFNGLUNIFORM1IPROC uniform1i = nullptr;
+  PFNGLUNIFORM1FPROC uniform1f = nullptr;
   PFNGLGENVERTEXARRAYSPROC genVertexArrays = nullptr;
   PFNGLBINDVERTEXARRAYPROC bindVertexArray = nullptr;
   PFNGLENABLEVERTEXATTRIBARRAYPROC enableVertexAttribArray = nullptr;
@@ -138,6 +140,7 @@ struct GlApi {
     uniform4f = reinterpret_cast<PFNGLUNIFORM4FPROC>(L("glUniform4f"));
     uniform2f = reinterpret_cast<PFNGLUNIFORM2FPROC>(L("glUniform2f"));
     uniform1i = reinterpret_cast<PFNGLUNIFORM1IPROC>(L("glUniform1i"));
+    uniform1f = reinterpret_cast<PFNGLUNIFORM1FPROC>(L("glUniform1f"));
     genVertexArrays = reinterpret_cast<PFNGLGENVERTEXARRAYSPROC>(L("glGenVertexArrays"));
     bindVertexArray = reinterpret_cast<PFNGLBINDVERTEXARRAYPROC>(L("glBindVertexArray"));
     enableVertexAttribArray = reinterpret_cast<PFNGLENABLEVERTEXATTRIBARRAYPROC>(L("glEnableVertexAttribArray"));
@@ -185,6 +188,10 @@ struct OpenGLRenderer::Impl {
   int u_tex_viewport = -1, u_tex_size = -1, u_tint = -1, u_sampler = -1;
   bool tex_pipeline = false;
   std::size_t tex_vbo_capacity = 0; // floats
+  unsigned sdf_vao = 0, sdf_vbo = 0, sdf_prog = 0;
+  int u_sdf_viewport = -1, u_sdf_rect = -1, u_sdf_radius = -1;
+  int u_sdf_stroke = -1, u_sdf_color = -1;
+  bool sdf_pipeline = false;
   std::vector<Rect> clips;
   std::vector<float> scratch; // solid: x,y; textured: x,y,u,v
   std::vector<GpuTexture*> textures;
@@ -229,6 +236,49 @@ out vec4 frag;
 void main() { frag = texture(uTex, vUV) * uTint; }
 )";
 
+// Screen-space pos in; SDF rounded rect fill (uStrokeWidth==0) or inside stroke.
+static const char* kSdfVert = R"(#version 330 core
+layout(location = 0) in vec2 aPos;
+uniform vec2 uViewport;
+out vec2 vPos;
+void main() {
+  vec2 ndc = vec2(aPos.x / uViewport.x * 2.0 - 1.0,
+                  1.0 - aPos.y / uViewport.y * 2.0);
+  gl_Position = vec4(ndc, 0.0, 1.0);
+  vPos = aPos;
+}
+)";
+
+static const char* kSdfFrag = R"(#version 330 core
+uniform vec4 uRect;
+uniform float uRadius;
+uniform float uStrokeWidth;
+uniform vec4 uColor;
+in vec2 vPos;
+out vec4 frag;
+float sdRoundBox(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p) - b + r;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+void main() {
+  vec2 center = uRect.xy + uRect.zw * 0.5;
+  vec2 halfSize = uRect.zw * 0.5;
+  float r = min(uRadius, min(halfSize.x, halfSize.y));
+  float d = sdRoundBox(vPos - center, halfSize, r);
+  float aa = 1.0;
+  float alpha;
+  if (uStrokeWidth <= 0.0) {
+    alpha = 1.0 - smoothstep(-aa, aa, d);
+  } else {
+    float outer = 1.0 - smoothstep(-aa, aa, d);
+    float inner = 1.0 - smoothstep(-aa, aa, d + uStrokeWidth);
+    alpha = clamp(outer - inner, 0.0, 1.0);
+  }
+  if (alpha <= 0.001) discard;
+  frag = vec4(uColor.rgb, uColor.a * alpha);
+}
+)";
+
 OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>()) {
   impl_->window = static_cast<SDL_Window*>(sdl_window);
   impl_->ctx = SDL_GL_CreateContext(impl_->window);
@@ -252,6 +302,11 @@ OpenGLRenderer::~OpenGLRenderer() {
       delete t;
     }
     impl_->textures.clear();
+    if (impl_->sdf_pipeline) {
+      if (g.deleteProgram && impl_->sdf_prog) g.deleteProgram(impl_->sdf_prog);
+      if (g.deleteBuffers && impl_->sdf_vbo) g.deleteBuffers(1, &impl_->sdf_vbo);
+      if (g.deleteVertexArrays && impl_->sdf_vao) g.deleteVertexArrays(1, &impl_->sdf_vao);
+    }
     if (impl_->tex_pipeline) {
       if (g.deleteProgram && impl_->tex_prog) g.deleteProgram(impl_->tex_prog);
       if (g.deleteBuffers && impl_->tex_vbo) g.deleteBuffers(1, &impl_->tex_vbo);
@@ -388,6 +443,66 @@ void OpenGLRenderer::ensure_tex_pipeline() {
   }
 }
 
+void OpenGLRenderer::ensure_sdf_pipeline() {
+  if (impl_->sdf_pipeline) return;
+  auto& g = impl_->gl;
+  g.load_all();
+  if (!g.loaded || !g.uniform1f) return;
+
+  unsigned vs = 0, fs = 0;
+  auto cleanup_shaders = [&]() {
+    if (vs && g.deleteShader) g.deleteShader(vs);
+    if (fs && g.deleteShader) g.deleteShader(fs);
+  };
+  try {
+    auto make = [&](unsigned type, const char* src) {
+      unsigned s = g.createShader(type);
+      g.shaderSource(s, 1, &src, nullptr);
+      g.compileShader(s);
+      int ok = 0; g.getShaderiv(s, kCompileStatus, &ok);
+      if (!ok) {
+        if (g.deleteShader) g.deleteShader(s);
+        throw std::runtime_error("sdf shader compile failed");
+      }
+      return s;
+    };
+    vs = make(kVertShader, kSdfVert);
+    fs = make(kFragShader, kSdfFrag);
+    impl_->sdf_prog = g.createProgram();
+    g.attachShader(impl_->sdf_prog, vs);
+    g.attachShader(impl_->sdf_prog, fs);
+    g.linkProgram(impl_->sdf_prog);
+    int ok = 0; g.getProgramiv(impl_->sdf_prog, kLinkStatus, &ok);
+    if (!ok) {
+      if (g.deleteProgram) { g.deleteProgram(impl_->sdf_prog); impl_->sdf_prog = 0; }
+      cleanup_shaders();
+      throw std::runtime_error("sdf shader link failed");
+    }
+    cleanup_shaders();
+    vs = fs = 0;
+    g.genVertexArrays(1, &impl_->sdf_vao);
+    g.bindVertexArray(impl_->sdf_vao);
+    g.genBuffers(1, &impl_->sdf_vbo);
+    g.bindBuffer(kArrBuf, impl_->sdf_vbo);
+    g.bufferData(kArrBuf, ptrdiff_t(12 * sizeof(float)), nullptr, kDynamicDraw);
+    g.enableVertexAttribArray(0);
+    g.vertexAttribPointer(0, 2, kFloat, kFalse, 0, nullptr);
+    impl_->u_sdf_viewport = g.getUniformLocation(impl_->sdf_prog, "uViewport");
+    impl_->u_sdf_rect = g.getUniformLocation(impl_->sdf_prog, "uRect");
+    impl_->u_sdf_radius = g.getUniformLocation(impl_->sdf_prog, "uRadius");
+    impl_->u_sdf_stroke = g.getUniformLocation(impl_->sdf_prog, "uStrokeWidth");
+    impl_->u_sdf_color = g.getUniformLocation(impl_->sdf_prog, "uColor");
+    g.useProgram(0);
+    impl_->sdf_pipeline = true;
+  } catch (...) {
+    cleanup_shaders();
+    if (impl_->sdf_prog && g.deleteProgram) { g.deleteProgram(impl_->sdf_prog); impl_->sdf_prog = 0; }
+    if (impl_->sdf_vbo && g.deleteBuffers) { g.deleteBuffers(1, &impl_->sdf_vbo); impl_->sdf_vbo = 0; }
+    if (impl_->sdf_vao && g.deleteVertexArrays) { g.deleteVertexArrays(1, &impl_->sdf_vao); impl_->sdf_vao = 0; }
+    throw;
+  }
+}
+
 void OpenGLRenderer::apply_scissor() {
   auto& g = impl_->gl;
   if (impl_->clips.empty()) {
@@ -440,8 +555,14 @@ static void append_textured(std::vector<float>& out, const Rect& dst, const Rect
     x0,y0,u0,v0, x1,y1,u1,v1, x0,y1,u0,v1});
 }
 
-void OpenGLRenderer::fill_rect(Rect r, Color c, float /*radius*/) {
-  fill_rects(&r, 1, c);
+void OpenGLRenderer::fill_rect(Rect r, Color c, float radius) {
+  if (!std::isfinite(radius))
+    throw std::invalid_argument("fill_rect radius must be finite");
+  if (radius <= 0.f) {
+    fill_rects(&r, 1, c);
+    return;
+  }
+  draw_sdf_rect(r, c, radius, 0.f);
 }
 
 void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
@@ -567,7 +688,68 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
   g.bindTexture(kTexture2D, 0);
 }
 
-void OpenGLRenderer::stroke_rect(Rect, Color, float, float) {}
+void OpenGLRenderer::stroke_rect(Rect r, Color c, float width, float radius) {
+  if (!std::isfinite(width) || !std::isfinite(radius))
+    throw std::invalid_argument("stroke_rect width/radius must be finite");
+  if (!(width > 0.f)) return;
+  if (radius < 0.f) radius = 0.f;
+  draw_sdf_rect(r, c, radius, width);
+}
+
+void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_width) {
+  if (!impl_ || !impl_->ctx) return;
+  if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h))
+    throw std::invalid_argument("sdf rect must be finite");
+  if (!(r.w > 0.f && r.h > 0.f)) return;
+  if (r.w > kMaxLayoutDim || r.h > kMaxLayoutDim) return;
+
+  float rad = radius;
+  if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
+  float half_min = 0.5f * (std::min)(r.w, r.h);
+  if (rad > half_min) rad = half_min;
+
+  float sw = stroke_width;
+  if (sw > 0.f) {
+    if (sw > kMaxStrokeWidth) sw = kMaxStrokeWidth;
+    // Inside stroke: outer edge on rect bounds; clamp so ring stays inside.
+    float max_sw = half_min;
+    if (sw > max_sw) sw = max_sw;
+    if (!(sw > 0.f)) return;
+  }
+
+  SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
+  ensure_sdf_pipeline();
+  if (!impl_->sdf_pipeline) return;
+
+  // Pad 1px for AA fringe (outside rect edge).
+  const float pad = 1.f;
+  Rect pad_r{r.x - pad, r.y - pad, r.w + pad * 2.f, r.h + pad * 2.f};
+  float verts[12];
+  {
+    float x0 = pad_r.x, y0 = pad_r.y, x1 = pad_r.x + pad_r.w, y1 = pad_r.y + pad_r.h;
+    float tmp[12] = {x0,y0, x1,y0, x1,y1, x0,y0, x1,y1, x0,y1};
+    for (int i = 0; i < 12; ++i) verts[i] = tmp[i];
+  }
+
+  auto& g = impl_->gl;
+  apply_scissor();
+  if (g.enable && g.blendFunc) {
+    g.enable(kBlend);
+    g.blendFunc(kSrcAlpha, kOneMinusSrcAlpha);
+  }
+  g.bindVertexArray(impl_->sdf_vao);
+  g.bindBuffer(kArrBuf, impl_->sdf_vbo);
+  g.bufferSubData(kArrBuf, 0, ptrdiff_t(sizeof(verts)), verts);
+  g.useProgram(impl_->sdf_prog);
+  g.uniform2f(impl_->u_sdf_viewport, float(impl_->w), float(impl_->h));
+  g.uniform4f(impl_->u_sdf_rect, r.x, r.y, r.w, r.h);
+  g.uniform1f(impl_->u_sdf_radius, rad);
+  g.uniform1f(impl_->u_sdf_stroke, sw);
+  g.uniform4f(impl_->u_sdf_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
+  g.drawArrays(GL_TRIANGLES, 0, 6);
+  g.useProgram(0);
+}
+
 
 void OpenGLRenderer::clip_push(Rect r) {
   if (impl_->clips.size() >= kMaxClipDepth)
