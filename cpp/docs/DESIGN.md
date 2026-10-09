@@ -49,7 +49,9 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## Layout note
 - `Page::layout` remains a top-level vertical column (padding/gap) for hello zero churn; after `set_rect` it calls `child->layout()` so nested `Row`/`Column` can position kids.
-- `Row` / `Column`: own children via `unique_ptr` + `add()`; explicit `spacing` ctor arg (no kwargs); `kMaxChildren` cap; intrinsic = sum main-axis + gaps, max cross-axis; left/top aligned (no flex expand yet).
+- `Row` / `Column`: own children via `unique_ptr` + `add()`; explicit `spacing` / `set_spacing` (no kwargs); `kMaxChildren` cap; intrinsic = sum main-axis + gaps, max cross-axis.
+- Cross-axis: `CrossAxisAlignment` {Start, Center, End, Stretch} via `set_cross_axis_alignment`. Row default Center (Python `vertical_alignment`); Column default Start (Python `horizontal_alignment`). Stretch fills cross size unless child has explicit width/height.
+- Expand: `Control::set_expand(bool)` / `ControlOptions::expand` — leftover main-axis space shared equally among expand siblings (bool only; no flex weights yet). Intrinsic size still sums natural footprints.
 - Pointer: `Control::hit_target` walks children back-to-front then self `hit_test`; `Page::dispatch_pointer` captures the deepest target (nested buttons work).
 - `FilledButton::hit_test` uses the same effective corner radius as paint (`kMaxCornerRadius` / half min(w,h)); corner pockets use circle tests so round paint and hit agree.
 - `clip_push` throws if stack exceeds `kMaxClipDepth` (no silent drop).
@@ -71,5 +73,5 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## Next goal (not done)
 - First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare against
-  Windows true-GL golden `demo-opengl-win-944x761.png`). Full control port / expand-align /
-  parity pixels are **not** claimed here.
+  Windows true-GL golden `demo-opengl-win-944x761.png`). Full control port / parity pixels are **not** claimed here.
+  `expand`/`CrossAxisAlignment` landed on Row/Column; MainAxisAlignment / flex weights still deferred.

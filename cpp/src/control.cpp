@@ -15,11 +15,30 @@ float clamp_spacing(float spacing) {
   if (spacing > float(kMaxLayoutDim)) return float(kMaxLayoutDim);
   return spacing;
 }
+// Offset of child along cross axis inside parent cross size.
+float cross_offset(CrossAxisAlignment a, float child_cross, float parent_cross) {
+  if (parent_cross <= 0.f || child_cross >= parent_cross) return 0.f;
+  switch (a) {
+    case CrossAxisAlignment::End:
+      return parent_cross - child_cross;
+    case CrossAxisAlignment::Center:
+      return (parent_cross - child_cross) * 0.5f;
+    case CrossAxisAlignment::Start:
+    case CrossAxisAlignment::Stretch:
+    default:
+      return 0.f;
+  }
+}
 } // namespace
 
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
 void Control::set_options(ControlOptions opt) { opt_ = std::move(opt); }
 const ControlOptions& Control::options() const { return opt_; }
+void Control::set_expand(bool expand) {
+  opt_.expand = expand;
+  if (page_) page_->update();
+}
+bool Control::expand() const { return opt_.expand; }
 void Control::set_rect(Rect rect) { rect_ = rect; }
 Rect Control::rect() const { return rect_; }
 void Control::attach(Page* page, Control* parent) {
@@ -143,7 +162,16 @@ void FilledButton::on_pointer(const PointerEvent& e) {
 Column::Column(float spacing, ControlOptions opt)
   : Control(std::move(opt)), spacing_(clamp_spacing(spacing)) {}
 void Column::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
+void Column::set_spacing(float spacing) {
+  spacing_ = clamp_spacing(spacing);
+  if (page_) page_->update();
+}
 float Column::spacing() const { return spacing_; }
+void Column::set_cross_axis_alignment(CrossAxisAlignment align) {
+  cross_align_ = align;
+  if (page_) page_->update();
+}
+CrossAxisAlignment Column::cross_axis_alignment() const { return cross_align_; }
 Size Column::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width && opt_.height) return Control::intrinsic(max_w, max_h);
   float w = 0.f;
@@ -168,23 +196,71 @@ Size Column::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   return {w, h};
 }
 void Column::layout() {
-  float y = rect_.y;
-  const float x = rect_.x;
+  // Main = Y, cross = X. Expand kids share leftover height equally.
   const float inner_w = rect_.w > 0.f ? rect_.w : 0.f;
+  const float inner_h = rect_.h > 0.f ? rect_.h : 0.f;
+  std::size_t n_vis = 0;
+  std::size_t n_expand = 0;
+  float fixed_h = 0.f;
+  for (const auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    ++n_vis;
+    if (child->expand()) {
+      ++n_expand;
+      continue;
+    }
+    Size s = child->intrinsic(inner_w, {});
+    fixed_h += s.h;
+  }
+  const float gaps = n_vis > 1 ? spacing_ * float(n_vis - 1) : 0.f;
+  float leftover = inner_h - fixed_h - gaps;
+  if (leftover < 0.f) leftover = 0.f;
+  const float expand_share = n_expand > 0 ? leftover / float(n_expand) : 0.f;
+
+  float y = rect_.y;
   for (auto& child : children_) {
     if (!child || !child->options().visible) continue;
-    Size s = child->intrinsic(inner_w, {});
-    if (s.w > inner_w) s.w = inner_w;
-    child->set_rect(Rect{x, y, s.w, s.h});
+    float main_h = 0.f;
+    float cross_w = 0.f;
+    if (child->expand()) {
+      main_h = expand_share;
+      Size s = child->intrinsic(inner_w, main_h);
+      cross_w = s.w;
+    } else {
+      Size s = child->intrinsic(inner_w, {});
+      main_h = s.h;
+      cross_w = s.w;
+    }
+    // Stretch fills cross unless child has an explicit width.
+    if (cross_align_ == CrossAxisAlignment::Stretch && !child->options().width) {
+      cross_w = inner_w;
+    } else if (cross_w > inner_w) {
+      cross_w = inner_w;
+    }
+    if (main_h > float(kMaxLayoutDim)) main_h = float(kMaxLayoutDim);
+    if (cross_w > float(kMaxLayoutDim)) cross_w = float(kMaxLayoutDim);
+    if (main_h < 0.f) main_h = 0.f;
+    if (cross_w < 0.f) cross_w = 0.f;
+    const float cx = cross_offset(cross_align_, cross_w, inner_w);
+    child->set_rect(Rect{rect_.x + cx, y, cross_w, main_h});
     child->layout();
-    y += s.h + spacing_;
+    y += main_h + spacing_;
   }
 }
 
 Row::Row(float spacing, ControlOptions opt)
   : Control(std::move(opt)), spacing_(clamp_spacing(spacing)) {}
 void Row::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
+void Row::set_spacing(float spacing) {
+  spacing_ = clamp_spacing(spacing);
+  if (page_) page_->update();
+}
 float Row::spacing() const { return spacing_; }
+void Row::set_cross_axis_alignment(CrossAxisAlignment align) {
+  cross_align_ = align;
+  if (page_) page_->update();
+}
+CrossAxisAlignment Row::cross_axis_alignment() const { return cross_align_; }
 Size Row::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width && opt_.height) return Control::intrinsic(max_w, max_h);
   float w = 0.f;
@@ -209,16 +285,55 @@ Size Row::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   return {w, h};
 }
 void Row::layout() {
-  float x = rect_.x;
-  const float y = rect_.y;
+  // Main = X, cross = Y. Expand kids share leftover width equally.
+  const float inner_w = rect_.w > 0.f ? rect_.w : 0.f;
   const float inner_h = rect_.h > 0.f ? rect_.h : 0.f;
+  std::size_t n_vis = 0;
+  std::size_t n_expand = 0;
+  float fixed_w = 0.f;
+  for (const auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    ++n_vis;
+    if (child->expand()) {
+      ++n_expand;
+      continue;
+    }
+    Size s = child->intrinsic({}, inner_h);
+    fixed_w += s.w;
+  }
+  const float gaps = n_vis > 1 ? spacing_ * float(n_vis - 1) : 0.f;
+  float leftover = inner_w - fixed_w - gaps;
+  if (leftover < 0.f) leftover = 0.f;
+  const float expand_share = n_expand > 0 ? leftover / float(n_expand) : 0.f;
+
+  float x = rect_.x;
   for (auto& child : children_) {
     if (!child || !child->options().visible) continue;
-    Size s = child->intrinsic({}, inner_h);
-    if (s.h > inner_h && inner_h > 0.f) s.h = inner_h;
-    child->set_rect(Rect{x, y, s.w, s.h});
+    float main_w = 0.f;
+    float cross_h = 0.f;
+    if (child->expand()) {
+      main_w = expand_share;
+      Size s = child->intrinsic(main_w, inner_h);
+      cross_h = s.h;
+    } else {
+      Size s = child->intrinsic({}, inner_h);
+      main_w = s.w;
+      cross_h = s.h;
+    }
+    // Stretch fills cross unless child has an explicit height.
+    if (cross_align_ == CrossAxisAlignment::Stretch && !child->options().height) {
+      cross_h = inner_h;
+    } else if (cross_h > inner_h && inner_h > 0.f) {
+      cross_h = inner_h;
+    }
+    if (main_w > float(kMaxLayoutDim)) main_w = float(kMaxLayoutDim);
+    if (cross_h > float(kMaxLayoutDim)) cross_h = float(kMaxLayoutDim);
+    if (main_w < 0.f) main_w = 0.f;
+    if (cross_h < 0.f) cross_h = 0.f;
+    const float cy = cross_offset(cross_align_, cross_h, inner_h);
+    child->set_rect(Rect{x, rect_.y + cy, main_w, cross_h});
     child->layout();
-    x += s.w + spacing_;
+    x += main_w + spacing_;
   }
 }
 

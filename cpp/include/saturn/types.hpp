@@ -9,12 +9,16 @@ struct Size { float w,h; };
 // dst = screen px; uv = atlas px (shader divides by texture size)
 struct TexturedQuad { Rect dst; Rect uv; };
 using OptionalSize = std::optional<float>; // nullopt = unconstrained; clamp via limits.hpp
+// Cross-axis align for Row (vertical) / Column (horizontal). Names match Python CrossAxisAlignment.
+enum class CrossAxisAlignment { Start, Center, End, Stretch };
 struct ControlOptions {
   bool visible = true;
   bool disabled = false;
   float opacity = 1.f;
   OptionalSize width;
   OptionalSize height;
+  // Share leftover main-axis space in Row/Column (equal among expand siblings).
+  bool expand = false;
   // open fields: typed/opaque only - no untyped dump
   std::optional<std::int64_t> data_i64;
   std::optional<std::string> data_str;

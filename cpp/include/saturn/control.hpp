@@ -17,6 +17,9 @@ public:
   Control& operator=(const Control&) = delete;
   void set_options(ControlOptions opt);
   const ControlOptions& options() const;
+  // Row/Column: share leftover main-axis space equally among expand children.
+  void set_expand(bool expand);
+  bool expand() const;
   virtual Size intrinsic(OptionalSize max_w, OptionalSize max_h) const;
   // Position children from rect_. Default: recurse. Row/Column override.
   virtual void layout();
@@ -78,27 +81,37 @@ private:
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.
+// Cross-axis = horizontal (set_cross_axis_alignment). Default Start (Python Column).
 class Column final : public Control {
 public:
   explicit Column(float spacing = 0.f, ControlOptions opt = {});
   void add(std::unique_ptr<Control> child);
+  void set_spacing(float spacing);
   float spacing() const;
+  void set_cross_axis_alignment(CrossAxisAlignment align);
+  CrossAxisAlignment cross_axis_alignment() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void layout() override;
 private:
   float spacing_ = 0.f;
+  CrossAxisAlignment cross_align_ = CrossAxisAlignment::Start;
 };
 
 // Horizontal stack. Owns children via unique_ptr; spacing between visible kids.
+// Cross-axis = vertical (set_cross_axis_alignment). Default Center (Python Row).
 class Row final : public Control {
 public:
   explicit Row(float spacing = 0.f, ControlOptions opt = {});
   void add(std::unique_ptr<Control> child);
+  void set_spacing(float spacing);
   float spacing() const;
+  void set_cross_axis_alignment(CrossAxisAlignment align);
+  CrossAxisAlignment cross_axis_alignment() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void layout() override;
 private:
   float spacing_ = 0.f;
+  CrossAxisAlignment cross_align_ = CrossAxisAlignment::Center;
 };
 
 // Box with padding/bgcolor/radius. Owns children; clips paint to bounds.
