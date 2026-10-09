@@ -13,9 +13,6 @@
 #endif
 #include <GL/gl.h>
 
-// Minimal GL 1.1 path for phase-2 fill (compat profile via SDL attrs if needed).
-// Core 3.3 would need shaders; for skeleton demo we request compat-friendly clear+rect.
-
 namespace saturn {
 namespace {
 using PFNGLGENBUFFERSPROC = void (*)(int, unsigned*);
@@ -33,8 +30,6 @@ using PFNGLUNIFORM4FPROC = void (*)(int, float, float, float, float);
 using PFNGLUNIFORM2FPROC = void (*)(int, float, float);
 using PFNGLGENVERTEXARRAYSPROC = void (*)(int, unsigned*);
 using PFNGLBINDVERTEXARRAYPROC = void (*)(unsigned);
-using PFNGLENABLEVERTEXATTRIBARRAYPROC = void (*)(unsigned);
-using PFNGLVERTEXATTRIBPOINTERPROC = void (*)(unsigned, int, unsigned, unsigned char, int, const void*);
 using PFNGLDRAWARRAYSPROC = void (*)(unsigned, int, int);
 using PFNGLDELETEBUFFERSPROC = void (*)(int, const unsigned*);
 using PFNGLDELETEVERTEXARRAYSPROC = void (*)(int, const unsigned*);
@@ -43,15 +38,12 @@ using PFNGLDELETEPROGRAMPROC = void (*)(unsigned);
 using PFNGLGETSHADERIVPROC = void (*)(unsigned, unsigned, int*);
 using PFNGLGETPROGRAMIVPROC = void (*)(unsigned, unsigned, int*);
 
-constexpr unsigned GL_ARRAY_BUFFER = 0x8892;
-constexpr unsigned GL_STATIC_DRAW = 0x88E4;
-constexpr unsigned GL_FRAGMENT_SHADER = 0x8B30;
-constexpr unsigned GL_VERTEX_SHADER = 0x8B31;
-constexpr unsigned GL_COMPILE_STATUS = 0x8B81;
-constexpr unsigned GL_LINK_STATUS = 0x8B82;
-constexpr unsigned GL_TRIANGLES = 0x0004;
-constexpr unsigned GL_FLOAT = 0x1406;
-constexpr unsigned GL_FALSE_ = 0;
+constexpr unsigned kArrBuf = 0x8892;
+constexpr unsigned kStaticDraw = 0x88E4;
+constexpr unsigned kFragShader = 0x8B30;
+constexpr unsigned kVertShader = 0x8B31;
+constexpr unsigned kCompileStatus = 0x8B81;
+constexpr unsigned kLinkStatus = 0x8B82;
 
 template <class T>
 T load(const char* name) {
@@ -70,7 +62,7 @@ struct OpenGLRenderer::Impl {
 };
 
 static const char* kVert = R"(#version 330 core
-uniform vec4 uRect; // x,y,w,h logical top-left
+uniform vec4 uRect;
 uniform vec2 uViewport;
 void main() {
   vec2 corners[6] = vec2[](
@@ -143,23 +135,23 @@ void OpenGLRenderer::ensure_quad_pipeline() {
     unsigned s = createShader(type);
     shaderSource(s, 1, &src, nullptr);
     compile(s);
-    int ok = 0; getShaderiv(s, GL_COMPILE_STATUS, &ok);
+    int ok = 0; getShaderiv(s, kCompileStatus, &ok);
     if (!ok) throw std::runtime_error("shader compile failed");
     return s;
   };
-  unsigned vs = make(GL_VERTEX_SHADER, kVert);
-  unsigned fs = make(GL_FRAGMENT_SHADER, kFrag);
+  unsigned vs = make(kVertShader, kVert);
+  unsigned fs = make(kFragShader, kFrag);
   impl_->prog = createProg();
   attach(impl_->prog, vs); attach(impl_->prog, fs); link(impl_->prog);
-  int ok = 0; getProgramiv(impl_->prog, GL_LINK_STATUS, &ok);
+  int ok = 0; getProgramiv(impl_->prog, kLinkStatus, &ok);
   if (!ok) throw std::runtime_error("shader link failed");
   delShader(vs); delShader(fs);
   genVao(1, &impl_->vao);
   bindVao(impl_->vao);
   genBuf(1, &impl_->vbo);
-  bindBuf(GL_ARRAY_BUFFER, impl_->vbo);
+  bindBuf(kArrBuf, impl_->vbo);
   float dummy = 0.f;
-  bufData(GL_ARRAY_BUFFER, sizeof(dummy), &dummy, GL_STATIC_DRAW);
+  bufData(kArrBuf, sizeof(dummy), &dummy, kStaticDraw);
   impl_->u_color = getLoc(impl_->prog, "uColor");
   impl_->u_rect = getLoc(impl_->prog, "uRect");
   impl_->u_viewport = getLoc(impl_->prog, "uViewport");
