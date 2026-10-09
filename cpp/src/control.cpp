@@ -46,45 +46,59 @@ float clamp_radius(float radius) {
   return radius;
 }
 
-// Python containers._draw_shadow: BoxShadow as stacked translucent rounded
-// fills (no blur kernel / FBO). blur_radius / radius eat clamp_radius +
-// kMaxCornerRadius; oversize layers throw (no silent drop).
-void draw_box_shadow(Renderer& r, const Rect& box, float radius,
-                     float blur_radius, float offset_x, float offset_y,
-                     Color color, float spread = 0.f) {
-  if (!std::isfinite(blur_radius) || !std::isfinite(spread) ||
-      !std::isfinite(offset_x) || !std::isfinite(offset_y) ||
-      !std::isfinite(radius) ||
+// Approximate Python painting.draw_shadow (ambient + key) with a few
+// translucent rounded fills per layer — no blur kernel / FBO.
+// At elevation e (logical px, scale=1):
+//   ambient: α=28, blur≈1+0.7e, dy=0
+//   key:     α=40, blur≈0.5+0.8e, dy≈0.5e
+// Not containers._draw_shadow / BoxShadow(blur=3*e).
+void draw_elevation_shadow(Renderer& r, const Rect& box, float radius,
+                           float elevation) {
+  if (!std::isfinite(elevation) || !std::isfinite(radius) ||
       !std::isfinite(box.x) || !std::isfinite(box.y) ||
       !std::isfinite(box.w) || !std::isfinite(box.h)) {
-    throw std::invalid_argument("draw_box_shadow args must be finite");
+    throw std::invalid_argument("draw_elevation_shadow args must be finite");
   }
-  if (color.a == 0) return;
-  if (blur_radius < 0.f) blur_radius = 0.f;
-  if (spread < 0.f) spread = 0.f;
-  if (blur_radius > kMaxCornerRadius) blur_radius = kMaxCornerRadius;
-  if (spread > kMaxCornerRadius) spread = kMaxCornerRadius;
-  if (blur_radius <= 0.f && spread <= 0.f && offset_x == 0.f && offset_y == 0.f)
-    return;
+  if (elevation <= 0.f) return;
   if (!(box.w > 0.f && box.h > 0.f)) return;
 
-  constexpr int kSteps = 4;
-  for (int j = kSteps; j >= 1; --j) {
-    const float grow = spread + blur_radius * float(j) / float(kSteps);
-    Rect layer{
-      box.x - grow + offset_x,
-      box.y - grow + offset_y,
-      box.w + 2.f * grow,
-      box.h + 2.f * grow};
-    if (!(layer.w > 0.f && layer.h > 0.f)) continue;
-    if (layer.w > float(kMaxLayoutDim) || layer.h > float(kMaxLayoutDim))
-      throw std::invalid_argument("draw_box_shadow layer exceeds kMaxLayoutDim");
-    const auto a = static_cast<std::uint8_t>(
-        std::lround(float(color.a) / float(j + 1)));
-    if (a == 0) continue;
-    Color c{color.r, color.g, color.b, a};
-    r.fill_rect(layer, c, clamp_radius(radius + grow));
-  }
+  auto paint_layer = [&](float blur, float dy, std::uint8_t alpha) {
+    if (!std::isfinite(blur) || !std::isfinite(dy)) {
+      throw std::invalid_argument(
+          "draw_elevation_shadow layer args must be finite");
+    }
+    if (blur < 0.f) blur = 0.f;
+    if (blur > kMaxCornerRadius) blur = kMaxCornerRadius;
+    if (alpha == 0) return;
+
+    constexpr int kSteps = 4;
+    // blur==0: still paint silhouette at dy (key offset with tiny e).
+    const int steps = blur > 0.f ? kSteps : 1;
+    for (int j = steps; j >= 1; --j) {
+      const float grow = blur > 0.f ? blur * float(j) / float(kSteps) : 0.f;
+      Rect layer{
+        box.x - grow,
+        box.y - grow + dy,
+        box.w + 2.f * grow,
+        box.h + 2.f * grow};
+      if (!(layer.w > 0.f && layer.h > 0.f)) continue;
+      if (layer.w > float(kMaxLayoutDim) || layer.h > float(kMaxLayoutDim)) {
+        throw std::invalid_argument(
+            "draw_elevation_shadow layer exceeds kMaxLayoutDim");
+      }
+      const auto a = static_cast<std::uint8_t>(
+          std::lround(float(alpha) / float(j + 1)));
+      if (a == 0) continue;
+      r.fill_rect(layer, Color{0, 0, 0, a}, clamp_radius(radius + grow));
+    }
+  };
+
+  // Match painting._shadow / GPU elevation_shadow formulas.
+  const float ambient_blur = 1.f + elevation * 0.7f;
+  const float key_blur = 0.5f + elevation * 0.8f;
+  const float key_dy = elevation * 0.5f;
+  paint_layer(ambient_blur, 0.f, /*alpha=*/28);
+  paint_layer(key_blur, key_dy, /*alpha=*/40);
 }
 
 // Offset of child along cross axis inside parent cross size.
@@ -425,15 +439,12 @@ ElevatedButton::ElevatedButton(std::string label, std::function<void()> on_click
                                std::string icon, ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), std::move(icon), std::move(opt)) {}
 void ElevatedButton::paint_background(Renderer& r) {
-  // M3 elevated idle elevation=1 → Card-style BoxShadow(blur=3*e, offset=(0,e),
-  // #33000000) as stacked translucent fills (Python containers._draw_shadow).
-  // Not gaussian/FBO; frozen TextField/ListView still dominate compare_shots.
+  // M3 elevated idle elevation=1 → painting.draw_shadow (ambient+key),
+  // approximated with stacked translucent fills (no FBO). Not Card
+  // BoxShadow(blur=3*e). Frozen TextField/ListView still dominate shots.
   if (!opt_.disabled) {
     constexpr float kElevation = 1.f;
-    draw_box_shadow(r, rect_, corner_radius(),
-                    /*blur=*/kElevation * 3.f,
-                    /*ox=*/0.f, /*oy=*/kElevation,
-                    Color{0, 0, 0, 0x33});
+    draw_elevation_shadow(r, rect_, corner_radius(), kElevation);
   }
   Color bg = pressed() ? colors::kSurfaceContainerHigh : colors::kSurfaceContainerLow;
   r.fill_rect(rect_, bg, corner_radius());

@@ -97,10 +97,12 @@ Synced with group agreement (Saturn room). Update when constraints change.
   `stroke_arc`: outer > `kMaxLayoutDim` / arc pipeline unavailable / missing
   uniforms → throw (no silent empty arc). Stroke soft-capped by `kMaxStrokeWidth`.
 - Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
-- ElevatedButton idle shadow: `draw_box_shadow` stacked translucent
-  rounded fills (blur=`3*elevation`, offset=`(0,elevation)`, `#33000000`);
-  non-finite throw; blur/radius via `clamp_radius` / `kMaxCornerRadius`.
-  No blur kernel/FBO. Hover/press elevation animation deferred.
+- ElevatedButton idle shadow: `draw_elevation_shadow` ≈ Python
+  `painting.draw_shadow` — ambient (α=28, blur=`1+0.7e`, dy=0) + key
+  (α=40, blur=`0.5+0.8e`, dy=`0.5e`), each as a few translucent rounded
+  fills. Non-finite throw; blur/radius via `clamp_radius` /
+  `kMaxCornerRadius`; layer > `kMaxLayoutDim` throw. No blur kernel/FBO.
+  Not Card `BoxShadow(blur=3*e)`. Hover/press elevation animation deferred.
 - Dropdown: hint + options (≤ `kMaxDropdownOptions`); width default 180; field
   height 56 / text 16; inline popup (no overlay animation). `on_select(key)`.
   Hint / option `key`/`text` > `kMaxTextBytes` → throw (no `resize` truncate).
