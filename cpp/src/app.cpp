@@ -17,9 +17,11 @@ int App::run() {
   auto& r = impl_->window.renderer();
   impl_->page.layout(float(impl_->window.width()), float(impl_->window.height()));
   while (!impl_->window.poll_quit()) {
-    int nw = 0, nh = 0;
-    if (impl_->window.consume_resized(&nw, &nh) || impl_->page.layout_dirty()) {
+    if (impl_->window.consume_resized(nullptr, nullptr) || impl_->page.layout_dirty()) {
       impl_->page.layout(float(impl_->window.width()), float(impl_->window.height()));
+    }
+    for (const auto& pe : impl_->window.take_pointer_events()) {
+      impl_->page.dispatch_pointer(pe);
     }
     r.clear(Color{0x12, 0x12, 0x14, 0xff});
     impl_->page.paint(r);

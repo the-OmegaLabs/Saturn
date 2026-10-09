@@ -11,9 +11,9 @@ public:
   void add(std::unique_ptr<Control> child);
   void update();
   bool layout_dirty() const;
-  // Vertical column: padding + gap. Not a full flex engine.
   void layout(float width, float height, float padding = 40.f, float gap = 16.f);
   void paint(Renderer& r) override;
+  void dispatch_pointer(const PointerEvent& e);
 private:
   std::string title_;
   bool layout_dirty_ = true;

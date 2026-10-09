@@ -1,6 +1,8 @@
 #pragma once
+#include "events.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 namespace saturn {
 class Renderer;
 class Window {
@@ -10,7 +12,8 @@ public:
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
   bool poll_quit();
-  bool consume_resized(int* out_w, int* out_h); // true if size changed since last consume
+  bool consume_resized(int* out_w, int* out_h);
+  std::vector<PointerEvent> take_pointer_events();
   int width() const;
   int height() const;
   Renderer& renderer();

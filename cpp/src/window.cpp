@@ -15,6 +15,7 @@ struct Window::Impl {
   std::unique_ptr<OpenGLRenderer> renderer;
   int w = 0, h = 0;
   bool resized = false;
+  std::vector<PointerEvent> pointers;
 };
 
 Window::Window(const std::string& title, int w, int h) : impl_(std::make_unique<Impl>()) {
@@ -70,6 +71,16 @@ bool Window::poll_quit() {
         impl_->renderer->on_resize(nw, nh);
       }
     }
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+      if (e.button.button == SDL_BUTTON_LEFT) {
+        PointerEvent pe;
+        pe.x = float(e.button.x);
+        pe.y = float(e.button.y);
+        pe.down = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+        pe.up = e.type == SDL_EVENT_MOUSE_BUTTON_UP;
+        if (impl_->pointers.size() < kMaxEventQueue) impl_->pointers.push_back(pe);
+      }
+    }
   }
   return false;
 }
@@ -80,6 +91,12 @@ bool Window::consume_resized(int* out_w, int* out_h) {
   if (out_w) *out_w = impl_->w;
   if (out_h) *out_h = impl_->h;
   return true;
+}
+
+std::vector<PointerEvent> Window::take_pointer_events() {
+  std::vector<PointerEvent> out;
+  out.swap(impl_->pointers);
+  return out;
 }
 
 int Window::width() const { return impl_->w; }
