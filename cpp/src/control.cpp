@@ -48,9 +48,12 @@ float clamp_radius(float radius) {
 
 // Approximate Python painting.draw_shadow (ambient + key) with a few
 // translucent rounded fills per layer — no blur kernel / FBO.
-// At elevation e (logical px, scale=1):
-//   ambient: α=28, blur≈1+0.7e, dy=0
-//   key:     α=40, blur≈0.5+0.8e, dy≈0.5e
+// Match painting._shadow rounding (scale=1 logical):
+//   ambient_blur = max(1, round((1 + 0.7e) * scale))
+//   key_blur     = max(1, round((0.5 + 0.8e) * scale))
+//   key_dy       = round(0.5 * e * scale)
+// At e=1, scale=1: blur ambient=2, key=1, dy=1 (α=28/40).
+// Uses std::lround (half away from zero) so dy(e=1)=1.
 // Not containers._draw_shadow / BoxShadow(blur=3*e).
 void draw_elevation_shadow(Renderer& r, const Rect& box, float radius,
                            float elevation) {
@@ -93,10 +96,14 @@ void draw_elevation_shadow(Renderer& r, const Rect& box, float radius,
     }
   };
 
-  // Match painting._shadow / GPU elevation_shadow formulas.
-  const float ambient_blur = 1.f + elevation * 0.7f;
-  const float key_blur = 0.5f + elevation * 0.8f;
-  const float key_dy = elevation * 0.5f;
+  // painting._shadow with scale=1 (logical demo / golden shots).
+  constexpr float kScale = 1.f;
+  const float ambient_blur = float(std::max(
+      1L, std::lround((1.f + elevation * 0.7f) * kScale)));
+  const float key_blur = float(std::max(
+      1L, std::lround((0.5f + elevation * 0.8f) * kScale)));
+  const float key_dy =
+      float(std::lround(elevation * 0.5f * kScale));
   paint_layer(ambient_blur, 0.f, /*alpha=*/28);
   paint_layer(key_blur, key_dy, /*alpha=*/40);
 }

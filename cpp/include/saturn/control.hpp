@@ -145,7 +145,7 @@ protected:
 
 // M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg.
 // Idle elevation=1 soft shadow ≈ painting.draw_shadow ambient+key
-// (stacked translucent fills; no blur kernel/FBO).
+// (round blur/dy: e=1 → 2/1/dy=1; stacked fills; no blur kernel/FBO).
 // leading_icon is a Material PNG path (e.g. "icons/add.png"); empty = no icon.
 // Default is empty — demo passes "icons/add.png" explicitly when needed.
 class ElevatedButton final : public ButtonBase {
