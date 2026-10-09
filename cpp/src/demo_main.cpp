@@ -1,5 +1,6 @@
 #include "saturn/app.hpp"
 #include "saturn/colors.hpp"
+#include "saturn/demo_size.hpp"
 #include "saturn/control.hpp"
 #include "saturn/page.hpp"
 #include "saturn/types.hpp"
@@ -76,6 +77,8 @@ int main() {
         panels->add(make_panel("Scrollable list", std::move(right_body)));
         page.add(std::move(panels));
       },
-      // Drawable/client contract (not Python outer 960x800) — matches golden.
-      saturn::kDemoDrawableWidth, saturn::kDemoDrawableHeight);
+      // LOGICAL CLIENT size (SDL CreateWindow) — not Python outer 960x800.
+      // At 100% DPI this equals golden pixels 944x761; HiDPI diverges.
+      saturn::kDemoClientWidth, saturn::kDemoClientHeight,
+      /*demo_contract=*/true);
 }
