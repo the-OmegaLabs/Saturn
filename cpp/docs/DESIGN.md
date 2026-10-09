@@ -18,6 +18,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Explicit options + nullable size contracts written once
 - Hello before API width
 - `Window` uses SDL init refcount (safe for multi-window later)
+- `Window` size API: `client_width/height()` (logical, layout/hit) vs `drawable_width/height()` (pixels, GL/shot). No `width()`/`height()` aliases; no `requested_*` — ctor args are intent, `client_*` is live
 - `Control::attach` is protected; only `Page` (friend) and `Control::add_child` attach; attach propagates `page_` to subtree
 
 ## Phase 1 status

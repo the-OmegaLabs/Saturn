@@ -14,9 +14,8 @@ std::atomic<int> g_sdl_users{0};
 struct Window::Impl {
   SDL_Window* win = nullptr;
   std::unique_ptr<OpenGLRenderer> renderer;
-  int client_w = 0, client_h = 0;       // logical (SDL_GetWindowSize)
+  int client_w = 0, client_h = 0;       // logical (SDL_GetWindowSize); post-pin source of truth
   int drawable_w = 0, drawable_h = 0;   // pixels (GetWindowSizeInPixels)
-  int req_w = 0, req_h = 0;             // requested client at construction
   bool resized = false;
   std::vector<PointerEvent> pointers;
 };
@@ -82,8 +81,6 @@ Window::Window(const std::string& title, int w, int h) : impl_(std::make_unique<
       throw std::runtime_error(SDL_GetError());
     }
   }
-  impl_->req_w = w;
-  impl_->req_h = h;
   try {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -175,8 +172,6 @@ int Window::client_width() const { return impl_->client_w; }
 int Window::client_height() const { return impl_->client_h; }
 int Window::drawable_width() const { return impl_->drawable_w; }
 int Window::drawable_height() const { return impl_->drawable_h; }
-int Window::requested_width() const { return impl_->req_w; }
-int Window::requested_height() const { return impl_->req_h; }
 Renderer& Window::renderer() { return *impl_->renderer; }
 void Window::swap() { impl_->renderer->flip(); }
 }

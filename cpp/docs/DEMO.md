@@ -27,8 +27,9 @@ and mismatches the golden. `saturn_demo` therefore opens at
   identity). Under HiDPI, pixels = client × scale: `pin_client` can still
   pass while the shot pixel contract fails loud. That is intentional until
   scale-aware golden is handled — **do not claim「本机已对齐」**.
-- `width()`/`height()` are back-compat aliases of `drawable_*`; prefer the
-  explicit names.
+- No `Window::width()`/`height()` aliases and no `requested_*` API — call
+  `client_*` (layout) or `drawable_*` (GL/shot) explicitly. Ctor `w`,`h` is
+  the logical-client intent; after `pin_client`, `client_*` is the live size.
 
 Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
 
