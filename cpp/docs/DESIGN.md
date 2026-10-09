@@ -53,3 +53,4 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - `Text` + `FilledButton` with embedded 5x7 bitmap font (ASCII subset)
 - Page clips children to bounds (overflow cropped; no scroll yet)
 - Pointer down/up routed to buttons
+- Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).

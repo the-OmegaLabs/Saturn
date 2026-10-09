@@ -17,5 +17,6 @@ public:
 private:
   std::string title_;
   bool layout_dirty_ = true;
+  Control* pointer_capture_ = nullptr; // child owned by this page; not owning
 };
 }

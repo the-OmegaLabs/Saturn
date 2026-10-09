@@ -41,18 +41,28 @@ void Page::layout(float width, float height, float padding, float gap) {
   layout_dirty_ = false;
 }
 void Page::paint(Renderer& r) {
-  // Clip to page bounds so column overflow is cropped (not scrolled yet).
   r.clip_push(rect_);
   Control::paint(r);
   r.clip_pop();
 }
 void Page::dispatch_pointer(const PointerEvent& e) {
-  for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
-    Control* c = it->get();
-    if (!c || !c->options().visible || c->options().disabled) continue;
-    if (c->hit_test(e.x, e.y) || (e.up && true)) {
+  if (e.down) {
+    pointer_capture_ = nullptr;
+    for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+      Control* c = it->get();
+      if (!c || !c->options().visible || c->options().disabled) continue;
+      if (!c->hit_test(e.x, e.y)) continue;
+      pointer_capture_ = c;
       c->on_pointer(e);
-      if (e.down && c->hit_test(e.x, e.y)) break;
+      break;
+    }
+    return;
+  }
+  if (e.up) {
+    if (pointer_capture_) {
+      Control* c = pointer_capture_;
+      pointer_capture_ = nullptr;
+      c->on_pointer(e);
     }
   }
 }
