@@ -466,16 +466,13 @@ class BoxShadow:
 
 
 class BlurTileMode(enum.Enum):
-    """Edge sampling mode for ``Blur`` (Flet name compatibility).
+    """Edge sampling mode for ``Blur``.
 
-    Only ``CLAMP`` is implemented for software and OpenGL. ``MIRROR``,
-    ``REPEATED``, and ``DECAL`` remain on the enum so Flet-style names exist,
-    but ``as_blur`` / ``Container(blur=…)`` reject them with ``ValueError``.
+    Only ``CLAMP`` is implemented (edge samples clamp) for software and
+    OpenGL. Unimplemented Flet names (``mirror`` / ``repeated`` / ``decal``)
+    are intentionally absent — no sticker graveyard on the enum.
     """
     CLAMP = "clamp"
-    MIRROR = "mirror"  # not implemented — rejected by as_blur
-    REPEATED = "repeated"  # not implemented — rejected by as_blur
-    DECAL = "decal"  # not implemented — rejected by as_blur
 
 
 @dataclass
@@ -495,14 +492,25 @@ def _finite_blur_sigma(value) -> float:
 
 
 def _clamp_only_tile_mode(mode) -> BlurTileMode:
-    """Only CLAMP is implemented; reject other Flet tile modes explicitly."""
-    if not isinstance(mode, BlurTileMode):
-        mode = BlurTileMode(getattr(mode, "value", mode))
-    if mode is not BlurTileMode.CLAMP:
+    """Only CLAMP exists / is accepted; reject unknown tile_mode values."""
+    if mode is None or mode is BlurTileMode.CLAMP:
+        return BlurTileMode.CLAMP
+    raw = getattr(mode, "value", mode)
+    if isinstance(mode, BlurTileMode):
+        # Future-proof if more members are added later.
+        if mode is not BlurTileMode.CLAMP:
+            raise ValueError(
+                f"BlurTileMode.{mode.name} is not supported; only "
+                f"BlurTileMode.CLAMP is implemented (edge samples clamp)"
+            )
+        return mode
+    try:
+        mode = BlurTileMode(raw)
+    except ValueError as exc:
         raise ValueError(
-            f"BlurTileMode.{mode.name} is not supported; only "
+            f"unsupported blur tile_mode {raw!r}; only "
             f"BlurTileMode.CLAMP is implemented (edge samples clamp)"
-        )
+        ) from exc
     return mode
 
 

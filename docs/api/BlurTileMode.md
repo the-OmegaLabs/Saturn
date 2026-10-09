@@ -1,6 +1,6 @@
 # BlurTileMode
 
-Edge sampling mode for `Blur` (Flet name compatibility).
+Edge sampling mode for `Blur`.
 
 [← API index](./README.md)
 
@@ -11,10 +11,8 @@ Source: [`saturn/types.py`](../../saturn/types.py).
 | Name | Value | Status |
 | --- | --- | --- |
 | `CLAMP` | `clamp` | Implemented (edge samples clamp) |
-| `MIRROR` | `mirror` | Not implemented — `ValueError` |
-| `REPEATED` | `repeated` | Not implemented — `ValueError` |
-| `DECAL` | `decal` | Not implemented — `ValueError` |
 
-Only `CLAMP` is implemented for software and OpenGL. The other members exist so
-Flet-style names remain on the enum; passing them to `Blur` /
+Only `CLAMP` is implemented for software and OpenGL. Saturn does not expose
+unimplemented Flet names (`mirror` / `repeated` / `decal`) on this enum —
+passing those strings (or any non-`CLAMP` value) to `Blur` /
 `Container(blur=…)` raises `ValueError`.
