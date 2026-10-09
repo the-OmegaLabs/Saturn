@@ -1,4 +1,4 @@
-﻿# Saturn C++ (skeleton)
+# Saturn C++ (skeleton)
 
 Agent-oriented C++ core. See [docs/AGENTS.md](docs/AGENTS.md) and [docs/DESIGN.md](docs/DESIGN.md).
 

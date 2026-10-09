@@ -1,4 +1,4 @@
-﻿#include "saturn/page.hpp"
+#include "saturn/page.hpp"
 #include "saturn/limits.hpp"
 #include <stdexcept>
 namespace saturn {

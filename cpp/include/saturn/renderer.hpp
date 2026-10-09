@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "types.hpp"
 namespace saturn {
 // Owns GL context lifetime relative to Window. Caller: App.

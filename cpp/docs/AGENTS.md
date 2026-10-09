@@ -1,4 +1,4 @@
-﻿# Saturn C++ — agent notes
+# Saturn C++ — agent notes
 
 Audience: coding agents. Humans: skim constraints only.
 
@@ -39,3 +39,6 @@ cpp/
 - Comments: contracts, ownership, caps — not narration.
 - Prefer `std::optional`, `std::span`, `std::string_view`; C++20.
 - Prefer `unique_ptr` for owned impls; do not use naked `new`/`delete` for renderer impl.
+
+## Encoding
+- Sources are UTF-8 **without BOM**. Do not reintroduce BOM (MSVC CP936 temptation).
