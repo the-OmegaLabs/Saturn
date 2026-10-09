@@ -680,8 +680,10 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
   float rad = radius;
   if (rad < 0.f) rad = 0.f;
   if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
-  // Rounded path needs uRadius; without glUniform1f fall back to sharp.
-  bool rounded = rad > 0.f && impl_->gl.uniform1f && impl_->u_tex_radius >= 0;
+  // Rounded path needs uRadius + glUniform1f; missing → throw (no silent sharp).
+  if (rad > 0.f && (!impl_->gl.uniform1f || impl_->u_tex_radius < 0))
+    throw std::runtime_error("draw_textured_quads radius>0 requires uRadius uniform");
+  bool rounded = rad > 0.f;
 
   auto& g = impl_->gl;
   apply_scissor();
@@ -740,7 +742,7 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
       if (qr > half_min) qr = half_min;
       if (g.uniform4f && impl_->u_tex_rect >= 0)
         g.uniform4f(impl_->u_tex_rect, q.dst.x, q.dst.y, q.dst.w, q.dst.h);
-      if (g.uniform1f && impl_->u_tex_radius >= 0) g.uniform1f(impl_->u_tex_radius, qr);
+      g.uniform1f(impl_->u_tex_radius, qr);
       impl_->scratch.clear();
       append_textured(impl_->scratch, q.dst, q.uv);
       upload_and_draw(impl_->scratch);

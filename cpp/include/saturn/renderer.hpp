@@ -23,7 +23,8 @@ public:
   virtual void destroy_texture(void* tex);
   // uv in TexturedQuad is pixel-space of the texture. Throws if count > kMaxFillRects.
   // Optional corner radius (SDF mask, same caps as fill_rect). radius<=0 = sharp.
-  // Non-finite radius throws. When radius>0, quads are drawn one-by-one (per-dst SDF).
+  // Non-finite radius throws. When radius>0, quads are drawn one-by-one (per-dst SDF);
+  // OpenGL path throws if uRadius / glUniform1f is unavailable (no silent sharp).
   virtual void draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count,
                                    Color tint, float radius = 0);
 

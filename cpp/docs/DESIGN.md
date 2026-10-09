@@ -74,7 +74,8 @@ Synced with group agreement (Saturn room). Update when constraints change.
   file bytes capped by `kMaxImageFileBytes`. No silent `catch (...)`.
 - `border_radius`: non-finite throws; else `clamp_radius` / `kMaxCornerRadius`.
   Paint uses textured SDF mask (`draw_textured_quads` radius) matching fill_rect
-  round AA. Demo inventory Image uses 8.
+  round AA. Demo inventory Image uses 8. If radius>0 but textured shader lacks
+  `uRadius` / `glUniform1f`, OpenGL path throws (no silent sharp fallback).
 
 ## Slider
 - `divisions` must be in `[0, kMaxSliderDivisions]` (1024); ctor throws otherwise
