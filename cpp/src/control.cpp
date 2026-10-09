@@ -48,7 +48,7 @@ float clamp_radius(float radius) {
 
 // Python containers._draw_shadow: BoxShadow as stacked translucent rounded
 // fills (no blur kernel / FBO). blur_radius / radius eat clamp_radius +
-// kMaxCornerRadius; oversize layers skip via fill_rect layout caps.
+// kMaxCornerRadius; oversize layers throw (no silent drop).
 void draw_box_shadow(Renderer& r, const Rect& box, float radius,
                      float blur_radius, float offset_x, float offset_y,
                      Color color, float spread = 0.f) {
@@ -77,7 +77,8 @@ void draw_box_shadow(Renderer& r, const Rect& box, float radius,
       box.w + 2.f * grow,
       box.h + 2.f * grow};
     if (!(layer.w > 0.f && layer.h > 0.f)) continue;
-    if (layer.w > float(kMaxLayoutDim) || layer.h > float(kMaxLayoutDim)) continue;
+    if (layer.w > float(kMaxLayoutDim) || layer.h > float(kMaxLayoutDim))
+      throw std::invalid_argument("draw_box_shadow layer exceeds kMaxLayoutDim");
     const auto a = static_cast<std::uint8_t>(
         std::lround(float(color.a) / float(j + 1)));
     if (a == 0) continue;
