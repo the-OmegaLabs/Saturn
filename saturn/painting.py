@@ -270,7 +270,9 @@ def _convolve_axis(img, sigma, axis):
     """Separable convolution along ``axis`` (0=vertical, 1=horizontal).
 
     Edge samples clamp (``BlurTileMode.CLAMP``), matching the GL sampler with
-    ``repeat_x/y = False``.
+    ``repeat_x/y = False``. Tiny buffers keep a contiguous SAXPY tap pass
+    (cheaper than FFT setup); larger regions use a numpy FFT correlate so
+    the interpreter is not in the kernel loop.
     """
     import numpy as np
     if sigma < 0.5:
@@ -279,15 +281,41 @@ def _convolve_axis(img, sigma, axis):
     pad_width = [(0, 0), (0, 0), (0, 0)]
     pad_width[axis] = (radius, radius)
     padded = np.pad(img, pad_width, mode="edge")
-    out = np.zeros_like(img)
-    height, width = img.shape[:2]
+    height, width, channels = img.shape
+    # ~240x320 is where FFT reliably overtakes the tap pass on CPython.
+    if height * width < 240 * 320:
+        out = np.zeros_like(img)
+        if axis == 1:
+            for offset, weight in enumerate(ker):
+                out += padded[:, offset:offset + width, :] * weight
+        else:
+            for offset, weight in enumerate(ker):
+                out += padded[offset:offset + height, :, :] * weight
+        return out
+
+    krev = ker[::-1]
+    k_len = int(krev.shape[0])
+
+    def _fft_valid(flat, length_out):
+        n = flat.shape[-1]
+        fft_n = 1 << (n + k_len - 2).bit_length()
+        ker_pad = np.zeros(fft_n, dtype=np.float32)
+        ker_pad[:k_len] = krev
+        spectrum = np.fft.rfft(flat, n=fft_n, axis=-1) * np.fft.rfft(ker_pad)
+        full = np.fft.irfft(spectrum, n=fft_n, axis=-1)
+        return full[:, k_len - 1:k_len - 1 + length_out]
+
     if axis == 1:
-        for offset, weight in enumerate(ker):
-            out += padded[:, offset:offset + width, :] * weight
-    else:
-        for offset, weight in enumerate(ker):
-            out += padded[offset:offset + height, :, :] * weight
-    return out
+        flat = np.ascontiguousarray(
+            np.moveaxis(padded, -1, 1).reshape(height * channels, width + 2 * radius)
+        )
+        out = _fft_valid(flat, width)
+        return np.ascontiguousarray(out.reshape(height, channels, width).transpose(0, 2, 1))
+    flat = np.ascontiguousarray(
+        padded.transpose(1, 2, 0).reshape(width * channels, height + 2 * radius)
+    )
+    out = _fft_valid(flat, height)
+    return np.ascontiguousarray(out.reshape(width, channels, height).transpose(2, 0, 1))
 
 
 def _separable_gaussian_surface(work, sx, sy):

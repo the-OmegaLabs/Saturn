@@ -16,6 +16,6 @@ saturn.Blur(sigma_x: float = 0.0, sigma_y: float = 0.0, tile_mode: BlurTileMode 
 | --- | --- |
 | `sigma_x` | Horizontal Gaussian sigma (logical pixels). |
 | `sigma_y` | Vertical Gaussian sigma (logical pixels). |
-| `tile_mode` | Only `BlurTileMode.CLAMP` is implemented; other modes raise `ValueError`. |
+| `tile_mode` | Must be `BlurTileMode.CLAMP` (the only member); other values raise `ValueError`. |
 
 `Container(blur=…)` also accepts a bare number or `(sigma_x, sigma_y)`.

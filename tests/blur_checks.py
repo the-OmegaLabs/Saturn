@@ -43,14 +43,16 @@ def check_accepts_blur_api():
 
 
 def check_rejects_unsupported_tile_mode():
-    """Non-CLAMP tile modes must raise — clamp-only is honest, not a sticker API."""
-    for mode in (st.BlurTileMode.MIRROR, st.BlurTileMode.REPEATED, st.BlurTileMode.DECAL):
+    """Only CLAMP exists on the enum; unknown / Flet sticker names must raise."""
+    for name in ("MIRROR", "REPEATED", "DECAL"):
+        assert not hasattr(st.BlurTileMode, name), name
+    for raw in ("mirror", "repeated", "decal", "Mirror"):
         try:
-            st.Container(blur=st.Blur(4, 4, mode))
+            st.Container(blur=st.Blur(4, 4, raw))
         except ValueError as exc:
             assert "CLAMP" in str(exc), exc
         else:
-            raise AssertionError(f"expected ValueError for tile_mode={mode}")
+            raise AssertionError(f"expected ValueError for tile_mode={raw!r}")
     print("Container.blur tile_mode reject OK")
 
 
@@ -139,6 +141,55 @@ def check_blur_none_and_zero_skip():
     finally:
         app.close()
         app.run_until_closed()
+
+
+def check_convolve_axis_vectorized():
+    """Convolve must match the tap-loop reference; large buffers use FFT."""
+    import time
+    import numpy as np
+    from saturn.painting import _convolve_axis, _gaussian_kernel_1d
+
+    def reference(img, sigma, axis):
+        if sigma < 0.5:
+            return img
+        radius, ker = _gaussian_kernel_1d(sigma)
+        pad_width = [(0, 0), (0, 0), (0, 0)]
+        pad_width[axis] = (radius, radius)
+        padded = np.pad(img, pad_width, mode="edge")
+        out = np.zeros_like(img)
+        height, width = img.shape[:2]
+        if axis == 1:
+            for offset, weight in enumerate(ker):
+                out += padded[:, offset:offset + width, :] * weight
+        else:
+            for offset, weight in enumerate(ker):
+                out += padded[offset:offset + height, :, :] * weight
+        return out
+
+    rng = np.random.default_rng(0)
+    for shape in ((48, 64, 4), (240, 320, 4)):
+        img = rng.integers(0, 255, shape, dtype=np.uint8).astype(np.float32)
+        for axis in (0, 1):
+            for sigma in (0.25, 2.0, 8.0, 12.0):
+                got = _convolve_axis(img, sigma, axis)
+                exp = reference(img, sigma, axis)
+                max_diff = float(np.max(np.abs(got - exp)))
+                assert max_diff < 1e-3, (shape, axis, sigma, max_diff)
+    # Large-buffer path (FFT) should not regress past the tap loop.
+    big = rng.integers(0, 255, (360, 480, 4), dtype=np.uint8).astype(np.float32)
+    t0 = time.perf_counter()
+    for _ in range(4):
+        reference(big, 10.0, 1)
+        reference(big, 10.0, 0)
+    ref_s = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    for _ in range(4):
+        _convolve_axis(big, 10.0, 1)
+        _convolve_axis(big, 10.0, 0)
+    vec_s = time.perf_counter() - t0
+    assert vec_s < ref_s * 1.5 + 0.05, (vec_s, ref_s)
+    print("Container.blur convolve vectorized OK",
+          f"max_checked_diff<1e-3 vec={vec_s:.4f}s ref={ref_s:.4f}s")
 
 
 def check_software_anisotropy():
@@ -337,6 +388,7 @@ if __name__ == "__main__":
     check_plan_backdrop_blur_pingpong()
     check_blur_result_cache()
     check_blur_source_digest_detects_sparse_change()
+    check_convolve_axis_vectorized()
     check_software_anisotropy()
     check_blur_none_and_zero_skip()
     check_software_screenshot()
