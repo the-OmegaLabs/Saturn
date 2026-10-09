@@ -22,6 +22,7 @@ namespace {
 using PFNGLGENBUFFERSPROC = void (*)(int, unsigned*);
 using PFNGLBINDBUFFERPROC = void (*)(unsigned, unsigned);
 using PFNGLBUFFERDATAPROC = void (*)(unsigned, ptrdiff_t, const void*, unsigned);
+using PFNGLBUFFERSUBDATAPROC = void (*)(unsigned, ptrdiff_t, ptrdiff_t, const void*);
 using PFNGLCREATESHADERPROC = unsigned (*)(unsigned);
 using PFNGLSHADERSOURCEPROC = void (*)(unsigned, int, const char* const*, const int*);
 using PFNGLCOMPILESHADERPROC = void (*)(unsigned);
@@ -34,6 +35,8 @@ using PFNGLUNIFORM4FPROC = void (*)(int, float, float, float, float);
 using PFNGLUNIFORM2FPROC = void (*)(int, float, float);
 using PFNGLGENVERTEXARRAYSPROC = void (*)(int, unsigned*);
 using PFNGLBINDVERTEXARRAYPROC = void (*)(unsigned);
+using PFNGLENABLEVERTEXATTRIBARRAYPROC = void (*)(unsigned);
+using PFNGLVERTEXATTRIBPOINTERPROC = void (*)(unsigned, int, unsigned, unsigned char, int, const void*);
 using PFNGLDRAWARRAYSPROC = void (*)(unsigned, int, int);
 using PFNGLDELETEBUFFERSPROC = void (*)(int, const unsigned*);
 using PFNGLDELETEVERTEXARRAYSPROC = void (*)(int, const unsigned*);
@@ -46,17 +49,20 @@ using PFNGLDISABLEPROC = void (*)(unsigned);
 using PFNGLSCISSORPROC = void (*)(int, int, int, int);
 
 constexpr unsigned kArrBuf = 0x8892;
-constexpr unsigned kStaticDraw = 0x88E4;
+constexpr unsigned kDynamicDraw = 0x88E8;
 constexpr unsigned kFragShader = 0x8B30;
 constexpr unsigned kVertShader = 0x8B31;
 constexpr unsigned kCompileStatus = 0x8B81;
 constexpr unsigned kLinkStatus = 0x8B82;
 constexpr unsigned kScissorTest = 0x0C11;
+constexpr unsigned kFloat = 0x1406;
+constexpr unsigned kFalse = 0;
 
 struct GlApi {
   PFNGLGENBUFFERSPROC genBuffers = nullptr;
   PFNGLBINDBUFFERPROC bindBuffer = nullptr;
   PFNGLBUFFERDATAPROC bufferData = nullptr;
+  PFNGLBUFFERSUBDATAPROC bufferSubData = nullptr;
   PFNGLCREATESHADERPROC createShader = nullptr;
   PFNGLSHADERSOURCEPROC shaderSource = nullptr;
   PFNGLCOMPILESHADERPROC compileShader = nullptr;
@@ -69,6 +75,8 @@ struct GlApi {
   PFNGLUNIFORM2FPROC uniform2f = nullptr;
   PFNGLGENVERTEXARRAYSPROC genVertexArrays = nullptr;
   PFNGLBINDVERTEXARRAYPROC bindVertexArray = nullptr;
+  PFNGLENABLEVERTEXATTRIBARRAYPROC enableVertexAttribArray = nullptr;
+  PFNGLVERTEXATTRIBPOINTERPROC vertexAttribPointer = nullptr;
   PFNGLDRAWARRAYSPROC drawArrays = nullptr;
   PFNGLDELETEBUFFERSPROC deleteBuffers = nullptr;
   PFNGLDELETEVERTEXARRAYSPROC deleteVertexArrays = nullptr;
@@ -87,6 +95,7 @@ struct GlApi {
     genBuffers = reinterpret_cast<PFNGLGENBUFFERSPROC>(L("glGenBuffers"));
     bindBuffer = reinterpret_cast<PFNGLBINDBUFFERPROC>(L("glBindBuffer"));
     bufferData = reinterpret_cast<PFNGLBUFFERDATAPROC>(L("glBufferData"));
+    bufferSubData = reinterpret_cast<PFNGLBUFFERSUBDATAPROC>(L("glBufferSubData"));
     createShader = reinterpret_cast<PFNGLCREATESHADERPROC>(L("glCreateShader"));
     shaderSource = reinterpret_cast<PFNGLSHADERSOURCEPROC>(L("glShaderSource"));
     compileShader = reinterpret_cast<PFNGLCOMPILESHADERPROC>(L("glCompileShader"));
@@ -99,6 +108,8 @@ struct GlApi {
     uniform2f = reinterpret_cast<PFNGLUNIFORM2FPROC>(L("glUniform2f"));
     genVertexArrays = reinterpret_cast<PFNGLGENVERTEXARRAYSPROC>(L("glGenVertexArrays"));
     bindVertexArray = reinterpret_cast<PFNGLBINDVERTEXARRAYPROC>(L("glBindVertexArray"));
+    enableVertexAttribArray = reinterpret_cast<PFNGLENABLEVERTEXATTRIBARRAYPROC>(L("glEnableVertexAttribArray"));
+    vertexAttribPointer = reinterpret_cast<PFNGLVERTEXATTRIBPOINTERPROC>(L("glVertexAttribPointer"));
     drawArrays = reinterpret_cast<PFNGLDRAWARRAYSPROC>(L("glDrawArrays"));
     deleteBuffers = reinterpret_cast<PFNGLDELETEBUFFERSPROC>(L("glDeleteBuffers"));
     deleteVertexArrays = reinterpret_cast<PFNGLDELETEVERTEXARRAYSPROC>(L("glDeleteVertexArrays"));
@@ -110,6 +121,7 @@ struct GlApi {
     disable = reinterpret_cast<PFNGLDISABLEPROC>(L("glDisable"));
     scissor = reinterpret_cast<PFNGLSCISSORPROC>(L("glScissor"));
     loaded = genVertexArrays && createShader && createProgram && drawArrays &&
+             enableVertexAttribArray && vertexAttribPointer &&
              enable && disable && scissor;
   }
 };
@@ -120,23 +132,20 @@ struct OpenGLRenderer::Impl {
   SDL_GLContext ctx = nullptr;
   int w = 0, h = 0;
   unsigned vao = 0, vbo = 0, prog = 0;
-  int u_color = -1, u_rect = -1, u_viewport = -1;
+  int u_color = -1, u_viewport = -1;
   bool pipeline = false;
+  std::size_t vbo_capacity = 0; // floats
   std::vector<Rect> clips;
+  std::vector<float> scratch; // x,y pairs
   GlApi gl;
 };
 
 static const char* kVert = R"(#version 330 core
-uniform vec4 uRect;
+layout(location = 0) in vec2 aPos;
 uniform vec2 uViewport;
 void main() {
-  vec2 corners[6] = vec2[](
-    vec2(0,0), vec2(1,0), vec2(1,1),
-    vec2(0,0), vec2(1,1), vec2(0,1));
-  vec2 p = corners[gl_VertexID];
-  vec2 px = vec2(uRect.x + p.x * uRect.z, uRect.y + p.y * uRect.w);
-  vec2 ndc = vec2(px.x / uViewport.x * 2.0 - 1.0,
-                  1.0 - px.y / uViewport.y * 2.0);
+  vec2 ndc = vec2(aPos.x / uViewport.x * 2.0 - 1.0,
+                  1.0 - aPos.y / uViewport.y * 2.0);
   gl_Position = vec4(ndc, 0.0, 1.0);
 }
 )";
@@ -215,10 +224,11 @@ void OpenGLRenderer::ensure_quad_pipeline() {
     g.bindVertexArray(impl_->vao);
     g.genBuffers(1, &impl_->vbo);
     g.bindBuffer(kArrBuf, impl_->vbo);
-    float dummy = 0.f;
-    g.bufferData(kArrBuf, sizeof(dummy), &dummy, kStaticDraw);
+    impl_->vbo_capacity = 64;
+    g.bufferData(kArrBuf, ptrdiff_t(impl_->vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
+    g.enableVertexAttribArray(0);
+    g.vertexAttribPointer(0, 2, kFloat, kFalse, 0, nullptr);
     impl_->u_color = g.getUniformLocation(impl_->prog, "uColor");
-    impl_->u_rect = g.getUniformLocation(impl_->prog, "uRect");
     impl_->u_viewport = g.getUniformLocation(impl_->prog, "uViewport");
     g.useProgram(0);
     impl_->pipeline = true;
@@ -247,7 +257,6 @@ void OpenGLRenderer::apply_scissor() {
     r.w = (std::max)(0.f, x2 - r.x);
     r.h = (std::max)(0.f, y2 - r.y);
   }
-  // GL scissor origin bottom-left
   int sx = int(std::floor(r.x));
   int sy = int(std::floor(impl_->h - (r.y + r.h)));
   int sw = int(std::ceil(r.w));
@@ -271,22 +280,46 @@ void OpenGLRenderer::clear(Color c) {
   apply_scissor();
 }
 
+static void append_rect(std::vector<float>& out, const Rect& r) {
+  float x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
+  out.insert(out.end(), {x0,y0, x1,y0, x1,y1, x0,y0, x1,y1, x0,y1});
+}
+
 void OpenGLRenderer::fill_rect(Rect r, Color c, float /*radius*/) {
-  if (!impl_ || !impl_->ctx) return;
-  if (!(r.w > 0 && r.h > 0)) return;
-  if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h)) return;
-  if (r.w > kMaxLayoutDim || r.h > kMaxLayoutDim) return;
+  fill_rects(&r, 1, c);
+}
+
+void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
+  if (!impl_ || !impl_->ctx || !rects || count == 0) return;
   SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
   ensure_quad_pipeline();
   if (!impl_->pipeline) return;
+
+  impl_->scratch.clear();
+  impl_->scratch.reserve(count * 12);
+  for (std::size_t i = 0; i < count; ++i) {
+    const Rect& r = rects[i];
+    if (!(r.w > 0 && r.h > 0)) continue;
+    if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h)) continue;
+    if (r.w > kMaxLayoutDim || r.h > kMaxLayoutDim) continue;
+    append_rect(impl_->scratch, r);
+  }
+  if (impl_->scratch.empty()) return;
+
   auto& g = impl_->gl;
   apply_scissor();
-  g.useProgram(impl_->prog);
   g.bindVertexArray(impl_->vao);
-  g.uniform4f(impl_->u_rect, r.x, r.y, r.w, r.h);
+  g.bindBuffer(kArrBuf, impl_->vbo);
+  const std::size_t floats = impl_->scratch.size();
+  if (floats > impl_->vbo_capacity) {
+    impl_->vbo_capacity = floats * 2;
+    g.bufferData(kArrBuf, ptrdiff_t(impl_->vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
+  }
+  g.bufferSubData(kArrBuf, 0, ptrdiff_t(floats * sizeof(float)), impl_->scratch.data());
+  g.useProgram(impl_->prog);
   g.uniform2f(impl_->u_viewport, float(impl_->w), float(impl_->h));
   g.uniform4f(impl_->u_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
-  g.drawArrays(GL_TRIANGLES, 0, 6);
+  g.drawArrays(GL_TRIANGLES, 0, int(floats / 2));
   g.useProgram(0);
 }
 

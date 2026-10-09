@@ -54,3 +54,4 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Page clips children to bounds (overflow cropped; no scroll yet)
 - Pointer down/up routed to buttons
 - Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).
+- Text glyphs batch into one `Renderer::fill_rects` draw (not per-pixel fill_rect).

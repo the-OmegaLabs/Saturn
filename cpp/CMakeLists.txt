@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(SDL3 REQUIRED CONFIG)
 
 add_library(saturn
-  src/app.cpp src/window.cpp src/page.cpp src/control.cpp src/opengl_renderer.cpp)
+  src/app.cpp src/window.cpp src/page.cpp src/control.cpp src/opengl_renderer.cpp src/renderer_default.cpp)
 target_include_directories(saturn PUBLIC include PRIVATE src)
 target_link_libraries(saturn PUBLIC SDL3::SDL3)
 if (WIN32)

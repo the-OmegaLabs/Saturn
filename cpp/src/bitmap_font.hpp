@@ -3,17 +3,16 @@
 #include "saturn/types.hpp"
 #include <string_view>
 #include <cstdint>
+#include <vector>
 namespace saturn {
 namespace bitmap_font {
 inline constexpr int kGlyphW = 5;
 inline constexpr int kGlyphH = 7;
-inline constexpr int kCellW = 6; // +1 gap
+inline constexpr int kCellW = 6;
 inline constexpr int kCellH = 8;
 inline constexpr int kScale = 2;
 
 inline const std::uint8_t* glyph(char c) {
-  // 7 rows, low 5 bits used
-  static const std::uint8_t blank[7] = {0,0,0,0,0,0,0};
   static const std::uint8_t box[7] = {0x1f,0x11,0x11,0x11,0x11,0x1f,0};
   switch (c) {
     case ' ': { static const std::uint8_t g[7]={0,0,0,0,0,0,0}; return g; }
@@ -47,6 +46,8 @@ inline Size measure(std::string_view text, float scale = float(kScale)) {
 }
 
 inline void draw(Renderer& r, float x, float y, std::string_view text, Color color, float scale = float(kScale)) {
+  std::vector<Rect> rects;
+  rects.reserve(text.size() * kGlyphW * kGlyphH / 2);
   float cx = x;
   for (char ch : text) {
     const std::uint8_t* rows = glyph(ch);
@@ -54,12 +55,13 @@ inline void draw(Renderer& r, float x, float y, std::string_view text, Color col
       std::uint8_t bits = rows[row];
       for (int col = 0; col < kGlyphW; ++col) {
         if (bits & (1u << (kGlyphW - 1 - col))) {
-          r.fill_rect(Rect{cx + col * scale, y + row * scale, scale, scale}, color, 0);
+          rects.push_back(Rect{cx + col * scale, y + row * scale, scale, scale});
         }
       }
     }
     cx += kCellW * scale;
   }
+  if (!rects.empty()) r.fill_rects(rects.data(), rects.size(), color);
 }
 }  // namespace bitmap_font
 }  // namespace saturn
