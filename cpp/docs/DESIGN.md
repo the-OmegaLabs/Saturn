@@ -53,6 +53,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## Phase 4 status
 - `Text` + `FilledButton` with embedded 5x7 bitmap font (ASCII subset)
+- `FilledButton` paints SDF rounded fill + 1px inside stroke (default radius 8; `set_corner_radius`)
 - Page clips children to bounds (overflow cropped; no scroll yet)
 - Pointer down/up routed to buttons
 - Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).
