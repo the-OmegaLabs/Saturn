@@ -427,7 +427,12 @@ bool IconButton::hit_test(float x, float y) const {
 
 Checkbox::Checkbox(std::string label, bool value,
                    std::function<void(bool)> on_change, ControlOptions opt)
-  : Control(std::move(opt)), label_(std::move(label)), value_(value),
+  : Pressable([this]() {
+      value_ = !value_;
+      if (page_) page_->update();
+      if (on_change_) on_change_(value_);
+    }, std::move(opt)),
+    label_(std::move(label)), value_(value),
     on_change_(std::move(on_change)), check_icon_("icons/check.png") {
   if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
 }
@@ -476,20 +481,6 @@ void Checkbox::paint(Renderer& r) {
     default_font().draw(r, tx, ty, label_, colors::kOnSurface, kLabelPx);
   }
 }
-void Checkbox::on_pointer(const PointerEvent& e) {
-  if (!opt_.visible || opt_.disabled) return;
-  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
-  if (e.up) {
-    bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside) {
-      value_ = !value_;
-      if (page_) page_->update();
-      if (on_change_) on_change_(value_);
-    }
-    pressed_ = false;
-  }
-}
-
 Slider::Slider(float min_v, float max_v, int divisions,
                std::function<void(float)> on_change, ControlOptions opt)
   : Control(std::move(opt)), min_(min_v), max_(max_v), divisions_(divisions),
@@ -650,7 +641,12 @@ void Image::paint(Renderer& r) {
 }
 
 Switch::Switch(bool value, std::function<void(bool)> on_change, ControlOptions opt)
-  : Control(std::move(opt)), value_(value), on_change_(std::move(on_change)) {
+  : Pressable([this]() {
+      value_ = !value_;
+      if (page_) page_->update();
+      if (on_change_) on_change_(value_);
+    }, std::move(opt)),
+    value_(value), on_change_(std::move(on_change)) {
   if (!opt_.width) opt_.width = kTrackW;
   if (!opt_.height) opt_.height = kHeight;
 }
@@ -689,39 +685,31 @@ void Switch::paint(Renderer& r) {
   r.fill_rect(Rect{tx - thumb_r, ty - thumb_r, thumb_r * 2.f, thumb_r * 2.f},
               thumb, thumb_r);
 }
-void Switch::on_pointer(const PointerEvent& e) {
-  if (!opt_.visible || opt_.disabled) return;
-  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
-  if (e.up) {
-    bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside) {
-      value_ = !value_;
-      if (page_) page_->update();
-      if (on_change_) on_change_(value_);
-    }
-    pressed_ = false;
-  }
-}
-
 namespace {
+// Pixel debt: no angular SDF / line-strip in Renderer yet — approximate the
+// stroked arc with overlapping discs along the centerline (batched). Cap 180.
 void paint_ring_arc(Renderer& r, float cx, float cy, float outer_r, float stroke,
                     float start_rad, float sweep_rad, Color c) {
   if (!(stroke > 0.f) || !(outer_r > 0.f) || !(std::fabs(sweep_rad) > 1e-6f))
     return;
   const float centerline = std::max(0.f, outer_r - stroke * 0.5f);
   const float abs_sweep = std::fabs(sweep_rad);
-  // ~1.5° per segment; cap so we stay well under kMaxFillRects.
+  // ~1.5° per segment; hard cap keeps us under kMaxFillRects.
   int segs = static_cast<int>(abs_sweep / 0.026f);
   if (segs < 8) segs = 8;
   if (segs > 180) segs = 180;
   const float step = sweep_rad / float(segs);
+  const float half = stroke * 0.5f;
+  std::vector<Rect> discs;
+  discs.reserve(static_cast<std::size_t>(segs));
   for (int i = 0; i < segs; ++i) {
     const float a = start_rad + step * (float(i) + 0.5f);
     const float x = cx + std::cos(a) * centerline;
     const float y = cy + std::sin(a) * centerline;
-    r.fill_rect(Rect{x - stroke * 0.5f, y - stroke * 0.5f, stroke, stroke},
-                c, stroke * 0.5f);
+    discs.push_back(Rect{x - half, y - half, stroke, stroke});
   }
+  // fill_rects is axis-aligned only; round each disc via fill_rect radius.
+  for (const Rect& d : discs) r.fill_rect(d, c, half);
 }
 } // namespace
 
@@ -767,6 +755,186 @@ void ProgressRing::paint(Renderer& r) {
   const float start = -0.5f * kPi;
   const float sweep = 2.f * kPi * value_;
   paint_ring_arc(r, cx, cy, side * 0.5f, stroke, start, sweep, colors::kPrimary);
+}
+
+
+Dropdown::Dropdown(std::string hint, std::vector<DropdownOption> options,
+                   std::function<void(const std::string& key)> on_select,
+                   ControlOptions opt)
+  : Control(std::move(opt)), hint_(std::move(hint)),
+    options_(std::move(options)), on_select_(std::move(on_select)) {
+  if (hint_.size() > kMaxTextBytes) hint_.resize(kMaxTextBytes);
+  if (options_.size() > kMaxDropdownOptions)
+    throw std::invalid_argument("Dropdown options exceed kMaxDropdownOptions");
+  for (auto& o : options_) {
+    if (o.key.size() > kMaxTextBytes) o.key.resize(kMaxTextBytes);
+    if (o.text.size() > kMaxTextBytes) o.text.resize(kMaxTextBytes);
+    if (o.key.empty())
+      throw std::invalid_argument("Dropdown option key must be non-empty");
+  }
+  if (!opt_.width) opt_.width = kDefaultWidth;
+}
+
+bool Dropdown::is_open() const { return open_; }
+const std::string& Dropdown::value() const { return value_; }
+const std::string& Dropdown::selected_text() const { return selected_text_; }
+
+void Dropdown::set_value(std::string key) {
+  if (key.empty()) {
+    if (value_.empty()) return;
+    value_.clear();
+    selected_text_.clear();
+    if (page_) page_->update();
+    return;
+  }
+  for (const auto& o : options_) {
+    if (o.key == key) {
+      if (value_ == key) return;
+      value_ = o.key;
+      selected_text_ = o.text.empty() ? o.key : o.text;
+      if (page_) page_->update();
+      return;
+    }
+  }
+  throw std::invalid_argument("Dropdown set_value: unknown key");
+}
+
+void Dropdown::set_open(bool open) {
+  if (open_ == open) return;
+  open_ = open;
+  if (page_) page_->update();
+}
+
+Rect Dropdown::field_rect() const {
+  return Rect{rect_.x, rect_.y, rect_.w, kFieldHeight};
+}
+
+Rect Dropdown::menu_rect() const {
+  const float h = kItemHeight * float(options_.size());
+  return Rect{rect_.x, rect_.y + kFieldHeight, rect_.w, h};
+}
+
+int Dropdown::hit_option(float x, float y) const {
+  if (!open_ || options_.empty()) return -1;
+  const Rect m = menu_rect();
+  if (!(x >= m.x && y >= m.y && x < m.x + m.w && y < m.y + m.h)) return -1;
+  const int idx = static_cast<int>((y - m.y) / kItemHeight);
+  if (idx < 0 || idx >= static_cast<int>(options_.size())) return -1;
+  return idx;
+}
+
+Size Dropdown::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  float w = opt_.width.value_or(kDefaultWidth);
+  float h = kFieldHeight;
+  if (open_ && !options_.empty())
+    h += kItemHeight * float(options_.size());
+  if (opt_.height) h = *opt_.height;
+  if (max_w && w > *max_w) w = *max_w;
+  if (max_h && h > *max_h) h = *max_h;
+  if (w > float(kMaxLayoutDim)) w = float(kMaxLayoutDim);
+  if (h > float(kMaxLayoutDim)) h = float(kMaxLayoutDim);
+  if (w < 0) w = 0;
+  if (h < 0) h = 0;
+  return {w, h};
+}
+
+void Dropdown::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  const Rect field = field_rect();
+  // Closed field: SURFACE_CONTAINER_HIGHEST fill, OUTLINE_VARIANT stroke (M3-ish).
+  Color fill = pressed_ && press_option_ == -2
+                   ? colors::kSurfaceContainerHigh
+                   : colors::kSurfaceContainerHighest;
+  r.fill_rect(field, fill, kRadius);
+  r.stroke_rect(field, open_ ? colors::kPrimary : colors::kOutlineVariant,
+                open_ ? 2.f : 1.f, kRadius);
+
+  const std::string& shown =
+      selected_text_.empty() ? hint_ : selected_text_;
+  Color fg = selected_text_.empty() ? colors::kOnSurfaceVariant
+                                    : colors::kOnSurface;
+  Size t = default_font().measure(shown, kTextPx);
+  float tx = field.x + kPadH;
+  float ty = field.y + (field.h - t.h) * 0.5f;
+  default_font().draw(r, tx, ty, shown, fg, kTextPx);
+
+  // Trailing chevron affordance (text, not Material icon — simple popup).
+  const char* chev = open_ ? "^" : "v";
+  Size cv = default_font().measure(chev, kTextPx);
+  default_font().draw(r, field.x + field.w - kPadH - cv.w,
+                      field.y + (field.h - cv.h) * 0.5f, chev,
+                      colors::kOnSurfaceVariant, kTextPx);
+
+  if (!open_ || options_.empty()) return;
+  const Rect menu = menu_rect();
+  r.fill_rect(menu, colors::kSurfaceContainer, kRadius);
+  r.stroke_rect(menu, colors::kOutlineVariant, 1.f, kRadius);
+  for (std::size_t i = 0; i < options_.size(); ++i) {
+    const Rect row{menu.x, menu.y + kItemHeight * float(i), menu.w, kItemHeight};
+    if (press_option_ == static_cast<int>(i)) {
+      r.fill_rect(row, colors::kSurfaceContainerHigh, 0.f);
+    }
+    const std::string& label =
+        options_[i].text.empty() ? options_[i].key : options_[i].text;
+    Size lt = default_font().measure(label, kTextPx);
+    Color lfg = (options_[i].key == value_) ? colors::kPrimary
+                                            : colors::kOnSurface;
+    default_font().draw(r, row.x + kPadH,
+                        row.y + (row.h - lt.h) * 0.5f, label, lfg, kTextPx);
+  }
+}
+
+bool Dropdown::hit_test(float x, float y) const {
+  if (!opt_.visible) return false;
+  if (hit_round_rect(x, y, field_rect(), kRadius)) return true;
+  if (open_ && !options_.empty()) {
+    const Rect m = menu_rect();
+    return x >= m.x && y >= m.y && x < m.x + m.w && y < m.y + m.h;
+  }
+  return false;
+}
+
+void Dropdown::on_pointer(const PointerEvent& e) {
+  if (!opt_.visible || opt_.disabled) return;
+  if (e.down) {
+    const int opt_i = hit_option(e.x, e.y);
+    if (opt_i >= 0) {
+      pressed_ = true;
+      press_option_ = opt_i;
+      if (page_) page_->update();
+      return;
+    }
+    if (hit_round_rect(e.x, e.y, field_rect(), kRadius)) {
+      pressed_ = true;
+      press_option_ = -2;
+      if (page_) page_->update();
+    }
+    return;
+  }
+  if (e.up) {
+    if (!pressed_) return;
+    const int was = press_option_;
+    pressed_ = false;
+    press_option_ = -1;
+    if (was == -2 && hit_round_rect(e.x, e.y, field_rect(), kRadius)) {
+      open_ = !open_;
+      if (page_) page_->update();
+      return;
+    }
+    if (was >= 0) {
+      const int now = hit_option(e.x, e.y);
+      if (now == was) {
+        const auto& o = options_[static_cast<std::size_t>(was)];
+        value_ = o.key;
+        selected_text_ = o.text.empty() ? o.key : o.text;
+        open_ = false;
+        if (page_) page_->update();
+        if (on_select_) on_select_(value_);
+        return;
+      }
+    }
+    if (page_) page_->update();
+  }
 }
 
 Column::Column(float spacing, ControlOptions opt)

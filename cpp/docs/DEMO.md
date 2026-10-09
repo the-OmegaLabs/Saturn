@@ -48,25 +48,37 @@ Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
 Layout register cut toward `examples/demo.py` — **not** pixel parity.
 Has: SURFACE page, brand header (logo `Image` 52×40 CONTAIN + PRIMARY tint +
 title 28 + `v0.1.0` 12), status 13, two 440px panels (pad 20 / radius 16),
-button row spacing 8: `ElevatedButton` (**Material ADD PNG** `icons/add.png`) /
+button row spacing 8: `ElevatedButton` (demo passes **Material ADD**
+`icons/add.png`; ctor default icon path is **empty**) /
 `FilledButton` / `OutlinedButton` / `IconButton` (**Material FAVORITE PNG**
 `icons/favorite.png` / embedded `icon_assets.hpp`). Pressed fills use theme tokens.
 Checkbox row spacing 12: `Checkbox("agree")` (18×18 / radius 2 / PRIMARY;
-check mark = `icons/check.png`, not geometry).
-Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48) + `Switch` (52×40,
-no label) + `ProgressRing(0.6)` (40×40 / stroke 4 / PRIMARY). Right panel:
+check mark = `icons/check.png`; press via `Pressable`).
+Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48) + `Switch`
+(`Pressable`, 52×40, no label) + `ProgressRing(0.6)` (40×40 / stroke 4 /
+PRIMARY). Dropdown row spacing 12: `Dropdown` hint `"dropdown..."` options
+Alpha/Beta/Gamma width 180 + `Image(test_img.png)` 140×70. Right panel:
 `ListView TBD` until scroll caps land with security review.
+
+**ProgressRing pixel debt:** track is a real SDF annulus (`stroke_rect`);
+progress is still **segmented discs** along the centerline (no angular SDF /
+rotated stroke / line-strip in `Renderer` yet). Safety caps (segs ≤ 180,
+finite value clamp) stay. Do **not** claim ProgressRing matches golden.
 
 **TextureImage:** shared PNG decode + GPU upload + destroy used by `Image`,
 `IconButton`, Checkbox check, Elevated leading — one lifetime, fail-loud caps.
 
 **Button factoring:** `Pressable` → `ButtonBase` (optional leading PNG via
-`TextureImage`) → `Elevated` / `Filled` / `Outlined`. `IconButton` is
-`Pressable` + `TextureImage` tint.
+`TextureImage`) → `Elevated` / `Filled` / `Outlined`. `IconButton` /
+`Checkbox` / `Switch` are `Pressable` (or `Pressable` + `TextureImage`).
 
-**Still deferred** (expect `compare_shots` FAIL): TextField, Dropdown,
+**Dropdown:** simple inline popup (expands intrinsic height when open; no
+animation / no page overlay). Options capped by `kMaxDropdownOptions`.
+
+**Still deferred** (expect `compare_shots` FAIL): TextField,
 Dialog/SnackBar, ListView scroll, variable Inter weight / Noto SC,
-flex weights / MainAxisAlignment, HiDPI scale-aware golden.
+flex weights / MainAxisAlignment, HiDPI scale-aware golden, ProgressRing
+true stroked arc, Dropdown outside-click dismiss.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
@@ -107,7 +119,8 @@ python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png pat
 See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
 `kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`,
 `kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`),
-`kMaxSliderDivisions` (ctor throw if out of range; `set_value` rejects non-finite).
+`kMaxSliderDivisions` (ctor throw if out of range; `set_value` rejects non-finite),
+`kMaxDropdownOptions` (ctor throw if options oversize).
 Screenshot / image / icon path length capped by `kMaxPathBytes` — oversize paths
 **throw**, never truncate. `Image` / `IconButton` fail loud on bad/oversize
 decode (no silent empty paint). ListView scroll caches must honor these —

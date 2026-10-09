@@ -55,5 +55,8 @@ foreach(_tgt saturn_hello saturn_demo)
       "$<TARGET_FILE_DIR:${_tgt}>/assets/icons/check.png"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/assets/icons/add.png"
-      "$<TARGET_FILE_DIR:${_tgt}>/assets/icons/add.png")
+      "$<TARGET_FILE_DIR:${_tgt}>/assets/icons/add.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/assets/test_img.png"
+      "$<TARGET_FILE_DIR:${_tgt}>/assets/test_img.png")
 endforeach()

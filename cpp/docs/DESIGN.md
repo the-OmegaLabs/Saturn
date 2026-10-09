@@ -80,14 +80,19 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## TextureImage / icons
 - `TextureImage` is the single decode+upload+destroy helper for `Image`,
-  `IconButton`, Checkbox `check.png`, Elevated leading `add.png`.
+  `IconButton`, Checkbox `check.png`, Elevated leading (when path set).
 - Embedded fallbacks in `icon_assets.hpp` (favorite/check/add); same path/file/dim
   fail-loud caps as Image (`kMaxPathBytes` / `kMaxImageFileBytes` / `kMaxImageDecodeDim`).
 
-## Switch / ProgressRing
-- Switch: track 52×32 in 52×40 hit box; click toggle; no animation yet.
-- ProgressRing: value ∈ [0,1] (non-finite throw); track = SDF annulus, progress =
-  stroked arc approx (segmented discs). Default 40×40 / stroke 4 / PRIMARY.
+## Switch / Checkbox / ProgressRing / Dropdown
+- Switch + Checkbox: inherit `Pressable` for press/click (no hand-rolled pointer).
+- Switch: track 52×32 in 52×40 hit box; no animation yet.
+- ProgressRing: value ∈ [0,1] (non-finite throw); track = SDF annulus; progress =
+  segmented discs (pixel debt — no angular SDF yet; segs capped 180). Default
+  40×40 / stroke 4 / PRIMARY.
+- Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
+- Dropdown: hint + options (≤ `kMaxDropdownOptions`); width default 180; field
+  height 56 / text 16; inline popup (no overlay animation). `on_select(key)`.
 
 ## Font (TTF metrics)
 - `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
