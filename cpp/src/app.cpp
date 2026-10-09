@@ -5,7 +5,7 @@
 #include "saturn/types.hpp"
 #include "saturn/font.hpp"
 #include "saturn/limits.hpp"
-#include "saturn/colors.hpp"
+#include "saturn/demo_size.hpp"
 #include <SDL3/SDL.h>
 #include <cstdlib>
 #include <cstring>
@@ -30,16 +30,21 @@ bool write_png_rgba(const char* path, int w, int h, const std::uint8_t* rgba) {
 struct App::Impl {
   Window window;
   Page page;
-  explicit Impl(int w, int h) : window("Saturn", w, h) {}
+  bool demo_contract = false;
+  Impl(int w, int h, bool contract) : window("Saturn", w, h), demo_contract(contract) {}
 };
-App::App(int w, int h) : impl_(std::make_unique<Impl>(w, h)) {}
+App::App(int w, int h, bool demo_contract)
+    : impl_(std::make_unique<Impl>(w, h, demo_contract)) {}
 App::~App() = default;
 Page& App::page() { return impl_->page; }
 int App::run() {
   auto& r = impl_->window.renderer();
   if (!impl_->page.title().empty())
     impl_->window.set_title(impl_->page.title());
-  impl_->page.layout(float(impl_->window.width()), float(impl_->window.height()));
+  // Layout uses LOGICAL client (matches pointer coords). At 100% DPI this
+  // equals drawable pixels; under HiDPI they diverge.
+  impl_->page.layout(float(impl_->window.client_width()),
+                     float(impl_->window.client_height()));
 
   const char* shot = std::getenv("SATURN_SHOT");
   int shot_after = 3;
@@ -51,7 +56,8 @@ int App::run() {
 
   while (!impl_->window.poll_quit()) {
     if (impl_->window.consume_resized(nullptr, nullptr) || impl_->page.layout_dirty()) {
-      impl_->page.layout(float(impl_->window.width()), float(impl_->window.height()));
+      impl_->page.layout(float(impl_->window.client_width()),
+                         float(impl_->window.client_height()));
     }
     for (const auto& pe : impl_->window.take_pointer_events()) {
       impl_->page.dispatch_pointer(pe);
@@ -64,22 +70,31 @@ int App::run() {
       int sw = 0, sh = 0;
       if (!r.read_pixels_rgba(&rgba, &sw, &sh))
         throw std::runtime_error("screenshot readback unsupported");
-      // Always record actual framebuffer pixels. Demo mode must match the
-      // Windows true-GL golden drawable (944x761), not Python outer 960x800.
-      const int req_w = impl_->window.requested_width();
-      const int req_h = impl_->window.requested_height();
+      // Contract arms ONLY via saturn_demo (explicit flag) or SATURN_DEMO_CONTRACT.
+      // Never auto-arm from outer 960x800 or any coincidental size match.
       const bool demo_contract =
-          (req_w == kDemoDrawableWidth && req_h == kDemoDrawableHeight) ||
-          (req_w == kDemoWindowWidth && req_h == kDemoWindowHeight) ||
-          (std::getenv("SATURN_DEMO_CONTRACT") != nullptr);
-      if (demo_contract &&
-          (sw != kDemoDrawableWidth || sh != kDemoDrawableHeight)) {
-        throw std::runtime_error(
-            "SATURN_SHOT demo contract mismatch: framebuffer " +
-            std::to_string(sw) + "x" + std::to_string(sh) +
-            " != drawable " + std::to_string(kDemoDrawableWidth) + "x" +
-            std::to_string(kDemoDrawableHeight) +
-            " (Python DEMO_WIDTH/HEIGHT are outer; golden is client 944x761)");
+          impl_->demo_contract || (std::getenv("SATURN_DEMO_CONTRACT") != nullptr);
+      if (demo_contract) {
+        const int cw = impl_->window.client_width();
+        const int ch = impl_->window.client_height();
+        if (cw != kDemoClientWidth || ch != kDemoClientHeight) {
+          throw std::runtime_error(
+              "SATURN_SHOT demo contract mismatch: logical client " +
+              std::to_string(cw) + "x" + std::to_string(ch) +
+              " != kDemoClient " + std::to_string(kDemoClientWidth) + "x" +
+              std::to_string(kDemoClientHeight) +
+              " (SDL CreateWindow sizes client; Python DEMO_* are outer)");
+        }
+        // Pixel golden is 944x761 at scale=1. HiDPI (pixels != client) fails
+        // loud until scale-aware golden is handled — not silently ignored.
+        if (sw != kDemoGoldenPixelWidth || sh != kDemoGoldenPixelHeight) {
+          throw std::runtime_error(
+              "SATURN_SHOT demo contract mismatch: framebuffer pixels " +
+              std::to_string(sw) + "x" + std::to_string(sh) +
+              " != golden pixels " + std::to_string(kDemoGoldenPixelWidth) + "x" +
+              std::to_string(kDemoGoldenPixelHeight) +
+              " (at 100% DPI pixels==client 944x761; HiDPI needs scale handling)");
+        }
       }
       if (!write_png_rgba(shot, sw, sh, rgba.data()))
         throw std::runtime_error("failed to write SATURN_SHOT png");
@@ -91,10 +106,10 @@ int App::run() {
   }
   return 0;
 }
-int run(MainFn main_fn, int w, int h) {
+int run(MainFn main_fn, int w, int h, bool demo_contract) {
   // Fail loud: demo/hello need TTF metrics (not 5x7 bitmap).
   set_default_font(Font::load_default());
-  App app(w, h);
+  App app(w, h, demo_contract);
   if (main_fn) main_fn(app.page());
   return app.run();
 }
