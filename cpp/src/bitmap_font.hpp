@@ -1,4 +1,7 @@
 #pragma once
+// DEPRECATED for pixel parity: 5x7 bitmap cannot match Inter.
+// Kept as emergency reference only. Text/FilledButton use saturn::Font (TTF).
+// Define SATURN_USE_BITMAP_FONT only for experiments - not the demo path.
 #include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
 #include "saturn/types.hpp"

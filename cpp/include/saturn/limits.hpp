@@ -16,4 +16,9 @@ inline constexpr float kMaxStrokeWidth = 4096.f;
 inline constexpr std::size_t kMaxListItems = 4096;
 inline constexpr std::size_t kMaxScrollBackBytes = 1u << 22; // 4 MiB
 inline constexpr std::size_t kMaxScreenshotPixels = 1u << 24; // ~16M px compare cap
+// Font / TTF
+inline constexpr float kMinFontPx = 1.f;
+inline constexpr float kMaxFontPx = 512.f;
+inline constexpr std::size_t kMaxFontFileBytes = 32u << 20; // 32 MiB
+inline constexpr int kFontAtlasDim = 1024; // square atlas edge (<= kMaxLayoutDim)
 } // namespace saturn

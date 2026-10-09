@@ -29,10 +29,14 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 ```
 cpp/
   CMakeLists.txt
-  include/saturn/   public headers
+  include/saturn/   public headers (incl. font.hpp)
   src/              implementations
+  assets/           Inter-Regular.ttf (OFL) + license
+  third_party/      stb_truetype.h
   docs/             agent + design notes (this file)
 ```
+- Pixel parity needs TTF (`saturn::Font`), not `bitmap_font`. Set `SATURN_FONT_PATH` if the
+  bundled file is not copied next to the exe.
 
 ## Code style for agents
 - Headers declare intent; `.cpp` stay dense OK.

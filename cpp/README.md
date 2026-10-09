@@ -14,4 +14,5 @@ copy C:\path\to\SDL3-3.x.y\lib\x64\SDL3.dll build\Release\
 build\Release\saturn_hello.exe
 ```
 
-Phase 1: dark cleared GL window until close. Phase 4 will add Text/FilledButton.
+Hello uses bundled `assets/Inter-Regular.ttf` (copied next to the exe on build).
+Override with env `SATURN_FONT_PATH`. Missing font → `run()` throws (no silent bitmap fallback).

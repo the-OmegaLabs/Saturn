@@ -2,24 +2,18 @@
 #include "saturn/page.hpp"
 #include "saturn/limits.hpp"
 #include "saturn/renderer.hpp"
-#include "bitmap_font.hpp"
+#include "saturn/font.hpp"
+#include "saturn/geometry.hpp"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 namespace saturn {
 namespace {
+constexpr float kUiFontPx = 16.f;
 float clamp_spacing(float spacing) {
   if (!std::isfinite(spacing) || spacing < 0.f) return 0.f;
   if (spacing > float(kMaxLayoutDim)) return float(kMaxLayoutDim);
   return spacing;
-}
-float effective_corner_radius(float radius, float w, float h) {
-  float rad = radius;
-  if (!std::isfinite(rad) || rad < 0.f) rad = 0.f;
-  if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
-  float half_min = 0.5f * (std::min)(w, h);
-  if (rad > half_min) rad = half_min;
-  return rad;
 }
 } // namespace
 
@@ -93,13 +87,13 @@ void Text::set_value(std::string value) {
 const std::string& Text::value() const { return value_; }
 Size Text::intrinsic(OptionalSize max_w, OptionalSize) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  Size s = bitmap_font::measure(value_);
+  Size s = default_font().measure(value_, kUiFontPx);
   if (max_w && s.w > *max_w) s.w = *max_w;
   return s;
 }
 void Text::paint(Renderer& r) {
   if (!opt_.visible) return;
-  bitmap_font::draw(r, rect_.x, rect_.y, value_, color_);
+  default_font().draw(r, rect_.x, rect_.y, value_, color_, kUiFontPx);
 }
 
 FilledButton::FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt)
@@ -115,7 +109,7 @@ void FilledButton::set_corner_radius(float radius) {
 float FilledButton::corner_radius() const { return corner_radius_; }
 Size FilledButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  Size text = bitmap_font::measure(label_);
+  Size text = default_font().measure(label_, kUiFontPx);
   Size s{text.w + 32.f, text.h + 24.f};
   if (max_w && s.w > *max_w) s.w = *max_w;
   if (max_h && s.h > *max_h) s.h = *max_h;
@@ -128,28 +122,13 @@ void FilledButton::paint(Renderer& r) {
   // Subtle inside stroke; same radius so SDF fill/stroke share corners.
   Color border = pressed_ ? Color{0x2e, 0x28, 0x8a, 0xff} : Color{0x63, 0x5b, 0xff, 0xff};
   r.stroke_rect(rect_, border, 1.f, corner_radius_);
-  Size text = bitmap_font::measure(label_);
+  Size text = default_font().measure(label_, kUiFontPx);
   float tx = rect_.x + (rect_.w - text.w) * 0.5f;
   float ty = rect_.y + (rect_.h - text.h) * 0.5f;
-  bitmap_font::draw(r, tx, ty, label_, Color{0xff, 0xff, 0xff, 0xff});
+  default_font().draw(r, tx, ty, label_, Color{0xff, 0xff, 0xff, 0xff}, kUiFontPx);
 }
 bool FilledButton::hit_test(float x, float y) const {
-  if (!(x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h))
-    return false;
-  float rad = effective_corner_radius(corner_radius_, rect_.w, rect_.h);
-  if (rad <= 0.f) return true;
-  float lx = x - rect_.x;
-  float ly = y - rect_.y;
-  float rw = rect_.w;
-  float rh = rect_.h;
-  // Center strips (not in a corner pocket) are inside.
-  if (lx >= rad && lx <= rw - rad) return true;
-  if (ly >= rad && ly <= rh - rad) return true;
-  float cx = (lx < rad) ? rad : (rw - rad);
-  float cy = (ly < rad) ? rad : (rh - rad);
-  float dx = lx - cx;
-  float dy = ly - cy;
-  return dx * dx + dy * dy <= rad * rad;
+  return hit_round_rect(x, y, rect_, corner_radius_);
 }
 void FilledButton::on_pointer(const PointerEvent& e) {
   if (!opt_.visible || opt_.disabled) return;
@@ -300,16 +279,6 @@ void Container::paint(Renderer& r) {
   r.clip_pop();
 }
 bool Container::hit_test(float x, float y) const {
-  float rad = effective_corner_radius(corner_radius_, rect_.w, rect_.h);
-  if (!(x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h))
-    return false;
-  if (rad <= 0.f) return true;
-  float lx = x - rect_.x, ly = y - rect_.y, rw = rect_.w, rh = rect_.h;
-  if (lx >= rad && lx <= rw - rad) return true;
-  if (ly >= rad && ly <= rh - rad) return true;
-  float cx = (lx < rad) ? rad : (rw - rad);
-  float cy = (ly < rad) ? rad : (rh - rad);
-  float dx = lx - cx, dy = ly - cy;
-  return dx * dx + dy * dy <= rad * rad;
+  return hit_round_rect(x, y, rect_, corner_radius_);
 }
 }
