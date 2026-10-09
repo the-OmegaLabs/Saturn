@@ -140,7 +140,8 @@ private:
 };
 
 // PNG Image via stb_image. Optional tint (multiply). BoxFit.CONTAIN when both
-// width and height are set on ControlOptions.
+// width and height are set on ControlOptions. Path/decode/dim failures throw
+// (no silent empty paint); see kMaxImageDecodeDim / kMaxImageFileBytes.
 class Image final : public Control {
 public:
   explicit Image(std::string path, ControlOptions opt = {});

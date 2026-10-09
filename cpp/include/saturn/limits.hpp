@@ -21,7 +21,14 @@ inline constexpr float kMinFontPx = 1.f;
 inline constexpr float kMaxFontPx = 512.f;
 inline constexpr std::size_t kMaxFontFileBytes = 32u << 20; // 32 MiB
 inline constexpr int kFontAtlasDim = 1024; // square atlas edge (<= kMaxLayoutDim)
-// Image decode (stb_image): path length uses kMaxPathBytes; dims <= kMaxLayoutDim;
-// pixels <= kMaxScreenshotPixels; file bytes capped separately.
+// Image decode (stb_image): path length uses kMaxPathBytes; file bytes capped
+// separately. Per-axis decode dim is tighter than kMaxLayoutDim so a square RGBA
+// buffer cannot exceed kMaxScreenshotPixels (wired to STBI_MAX_DIMENSIONS).
 inline constexpr std::size_t kMaxImageFileBytes = 32u << 20; // 32 MiB
+inline constexpr int kMaxImageDecodeDim = 4096;
+static_assert(kMaxImageDecodeDim > 0);
+static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) <= kMaxLayoutDim);
+static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) *
+                  static_cast<std::size_t>(kMaxImageDecodeDim) <=
+              kMaxScreenshotPixels);
 } // namespace saturn
