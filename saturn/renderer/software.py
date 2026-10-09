@@ -333,12 +333,14 @@ class SoftwareRenderer(Renderer):
         """Blur the already-drawn buffer under this logical rect in place."""
         from ..painting import (BlurResultCache, backdrop_blur_surface,
                                 blur_source_digest, corners,
-                                normalize_blur_sigmas, shape_mask)
+                                normalize_blur_radius, normalize_blur_sigmas,
+                                shape_mask)
         if w <= 0 or h <= 0:
             return
         sx, sy = normalize_blur_sigmas(sigma_x, sigma_y, self.scale)
         if sx < 0.5 and sy < 0.5:
             return
+        radius = normalize_blur_radius(radius)
         x, y = self._translate(x, y)
         # Expand slightly so the blur kernel can sample edge neighbors.
         pad = math.ceil(3 * max(sx, sy))
@@ -351,9 +353,12 @@ class SoftwareRenderer(Renderer):
             return
         region = self._buf.subsurface((x0, y0, rw, rh)).copy()
         qx, qy = round(sx * 4) / 4, round(sy * 4) / 4
-        rad_key = round(float(radius) * self.scale * 4) / 4
+        if isinstance(radius, (tuple, list)):
+            rad_key = tuple(round(float(v) * self.scale * 4) / 4 for v in radius)
+        else:
+            rad_key = round(float(radius) * self.scale * 4) / 4
         cache_key = (x0, y0, rw, rh, qx, qy, rad_key)
-        digest = blur_source_digest(region.get_buffer().raw)
+        digest = blur_source_digest(region.get_buffer().raw, width=rw, height=rh)
         if not hasattr(self, "_blur_cache"):
             self._blur_cache = BlurResultCache()
         blurred = self._blur_cache.get(cache_key, digest)

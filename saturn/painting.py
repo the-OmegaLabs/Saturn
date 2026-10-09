@@ -181,12 +181,37 @@ def plan_backdrop_blur(sigma_x, sigma_y, scale, region_w, region_h):
     }
 
 
-def blur_source_digest(raw: bytes) -> bytes:
-    """Stable fingerprint of backdrop pixels for blur-result caching."""
-    if not raw:
-        return b"\0" * 16
-    step = max(1, len(raw) // 1024)
-    return hashlib.blake2b(raw[::step], digest_size=16).digest()
+def normalize_blur_radius(radius):
+    """Corner radius for blur compose; non-finite / negative become 0.
+
+    Mirrors ``normalize_blur_sigmas`` so NaN/Inf never reach GL uniforms or
+    software mask construction (``bool(nan)`` is True).
+    """
+    if isinstance(radius, (tuple, list)):
+        return tuple(normalize_blur_radius(v) for v in radius)
+    try:
+        value = float(radius)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(value) or value <= 0.0:
+        return 0.0
+    return value
+
+
+def blur_source_digest(raw: bytes, *, width: int = 0, height: int = 0) -> bytes:
+    """Stable fingerprint of backdrop pixels for blur-result caching.
+
+    Hashes length + optional geometry + the full pixel buffer. The previous
+    stepped subsample could collide when only a few bytes changed between
+    frames (false cache hits on dirty backdrops).
+    """
+    hasher = hashlib.blake2b(digest_size=16)
+    hasher.update(len(raw).to_bytes(8, "little"))
+    hasher.update(max(0, int(width)).to_bytes(4, "little"))
+    hasher.update(max(0, int(height)).to_bytes(4, "little"))
+    if raw:
+        hasher.update(raw)
+    return hasher.digest()
 
 
 class BlurResultCache:
@@ -230,54 +255,78 @@ class BlurResultCache:
         return len(self._entries)
 
 
-def _separable_gaussian_surface(work, sx, sy):
-    """Apply per-axis Gaussian blur so software matches the GL path.
+def _gaussian_kernel_1d(sigma):
+    """1D Gaussian weights matching OpenGL ``BLUR_FS`` (radius cap 24)."""
+    import numpy as np
+    sigma = max(float(sigma), 0.001)
+    radius = int(min(24, max(1, math.ceil(sigma * 3.0))))
+    idx = np.arange(-radius, radius + 1, dtype=np.float64)
+    weights = np.exp(-0.5 * (idx * idx) / (sigma * sigma))
+    weights /= weights.sum()
+    return radius, weights.astype(np.float32)
 
-    pygame only exposes isotropic ``gaussian_blur``. When both axes are active
-    we pre-scale so an isotropic radius maps back to (sx, sy). A near-zero
-    axis is skipped (same threshold as GL: sigma < 0.5).
+
+def _convolve_axis(img, sigma, axis):
+    """Separable convolution along ``axis`` (0=vertical, 1=horizontal).
+
+    Edge samples clamp (``BlurTileMode.CLAMP``), matching the GL sampler with
+    ``repeat_x/y = False``.
     """
+    import numpy as np
+    if sigma < 0.5:
+        return img
+    radius, ker = _gaussian_kernel_1d(sigma)
+    pad_width = [(0, 0), (0, 0), (0, 0)]
+    pad_width[axis] = (radius, radius)
+    padded = np.pad(img, pad_width, mode="edge")
+    out = np.zeros_like(img)
+    height, width = img.shape[:2]
+    if axis == 1:
+        for offset, weight in enumerate(ker):
+            out += padded[:, offset:offset + width, :] * weight
+    else:
+        for offset, weight in enumerate(ker):
+            out += padded[offset:offset + height, :, :] * weight
+    return out
+
+
+def _separable_gaussian_surface(work, sx, sy):
+    """True H-then-V Gaussian blur matching the OpenGL ping-pong kernels.
+
+    Near-zero axes are skipped (same threshold as GL: sigma < 0.5). Uses
+    numpy for the convolution so large downsampled regions stay cheap.
+    """
+    import numpy as np
     import pygame
     do_x = sx >= 0.5
     do_y = sy >= 0.5
     if not do_x and not do_y:
         return work
-    w, h = work.get_size()
-    if do_x and do_y:
-        ref = min(sx, sy)
-        bw = max(1, round(w * ref / sx))
-        bh = max(1, round(h * ref / sy))
-        scaled = work if (bw, bh) == (w, h) else pygame.transform.smoothscale(work, (bw, bh))
-        blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
-        if blurred.get_size() != (w, h):
-            blurred = pygame.transform.smoothscale(blurred, (w, h))
-        return blurred
-    # Single-axis: stretch the inactive axis so isotropic blur barely affects it,
-    # then restore. Cap stretch to keep cost bounded.
+    width, height = work.get_size()
+    img = (np.frombuffer(pygame.image.tobytes(work, "RGBA"), dtype=np.uint8)
+             .reshape(height, width, 4)
+             .astype(np.float32))
     if do_x:
-        ref = sx
-        stretch = min(8, max(2, round(ref / 0.25)))
-        bh = max(1, min(h * stretch, h * 8))
-        scaled = pygame.transform.smoothscale(work, (w, bh))
-        blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
-        return pygame.transform.smoothscale(blurred, (w, h))
-    ref = sy
-    stretch = min(8, max(2, round(ref / 0.25)))
-    bw = max(1, min(w * stretch, w * 8))
-    scaled = pygame.transform.smoothscale(work, (bw, h))
-    blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
-    return pygame.transform.smoothscale(blurred, (w, h))
+        img = _convolve_axis(img, sx, 1)
+    if do_y:
+        img = _convolve_axis(img, sy, 0)
+    out = np.clip(np.rint(img), 0, 255).astype(np.uint8)
+    return pygame.image.frombytes(out.tobytes(), (width, height), "RGBA")
 
 
 def backdrop_blur_surface(surface, sigma_x, sigma_y):
     """Separable Gaussian blur; downscale for large sigmas then upscale.
 
-    Honors distinct ``sigma_x`` / ``sigma_y`` (matching OpenGL) instead of
-    collapsing to ``max(sx, sy)``.
+    Runs a real horizontal pass then vertical pass (per-axis sigma), matching
+    OpenGL ``plan_backdrop_blur`` / ping-pong — not a scale+isotropic cheat.
     """
     import pygame
     sx = max(0.0, float(sigma_x))
     sy = max(0.0, float(sigma_y))
+    if not math.isfinite(sx):
+        sx = 0.0
+    if not math.isfinite(sy):
+        sy = 0.0
     if (sx < 0.5 and sy < 0.5) or surface.get_width() <= 0 or surface.get_height() <= 0:
         return surface
     # Factor from active axes only so a near-zero axis is not "helped" into a

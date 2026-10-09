@@ -926,9 +926,10 @@ class GLRenderer(Renderer):
     def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
         """Separable Gaussian backdrop blur on the supersampled frame target."""
         from ..painting import (BlurResultCache, blur_source_digest,
-                                plan_backdrop_blur)
+                                normalize_blur_radius, plan_backdrop_blur)
         if w <= 0 or h <= 0:
             return
+        radius = normalize_blur_radius(radius)
         self._flush_rects()
         x, y = self._translate(x, y)
         tw = max(1, int(self._pixel_size[0]) * self._ssaa)
@@ -963,7 +964,8 @@ class GLRenderer(Renderer):
             self._blur_draw_quad(self._blur_vao, u0, v_bottom, u1, v_top)
             # Fingerprint the downsampled source so static stacked blurs reuse
             # prior ping-pong results across frames.
-            digest = blur_source_digest(self._blur_tex_a.read())
+            digest = blur_source_digest(
+                self._blur_tex_a.read(), width=bw, height=bh)
             qx, qy = round(sx * 4) / 4, round(sy * 4) / 4
             rad_key = round(float(radius) * 4) / 4
             cache_key = (x0, y0, x1, y1, qx, qy, rad_key, bw, bh)
@@ -1002,7 +1004,7 @@ class GLRenderer(Renderer):
             logical_h = (y1 - y0) / self.scale
             self._prog_blur_compose["u_rect_size"].value = (
                 float(logical_w), float(logical_h))
-            self._prog_blur_compose["u_radius"].value = float(max(0.0, radius))
+            self._prog_blur_compose["u_radius"].value = float(radius)
             nx0, nx1 = x0 / tw, x1 / tw
             ny0, ny1 = 1.0 - y1 / th, 1.0 - y0 / th
             data = struct.pack(
