@@ -28,6 +28,8 @@ inline constexpr std::size_t kMaxImageFileBytes = 32u << 20; // 32 MiB
 inline constexpr int kMaxImageDecodeDim = 4096;
 // Slider tick count: paint loops `divisions-1` times; reject unbounded.
 inline constexpr int kMaxSliderDivisions = 1024;
+// Dropdown menu rows; paint/hit loop options — reject unbounded.
+inline constexpr std::size_t kMaxDropdownOptions = 256;
 static_assert(kMaxImageDecodeDim > 0);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) <= kMaxLayoutDim);
 static_assert(static_cast<std::size_t>(kMaxImageDecodeDim) *

@@ -142,11 +142,12 @@ protected:
 };
 
 // M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg.
-// leading_icon is a Material PNG path (e.g. "icons/add.png"); empty skips.
+// leading_icon is a Material PNG path (e.g. "icons/add.png"); empty = no icon.
+// Default is empty — demo passes "icons/add.png" explicitly when needed.
 class ElevatedButton final : public ButtonBase {
 public:
   ElevatedButton(std::string label, std::function<void()> on_click,
-                 std::string icon_path = "icons/add.png", ControlOptions opt = {});
+                 std::string icon_path = "", ControlOptions opt = {});
 protected:
   void paint_background(Renderer& r) override;
   Color content_color() const override;
@@ -196,7 +197,8 @@ private:
 
 // M3 Checkbox: 18×18 box radius 2, active PRIMARY, optional label.
 // Check mark is Material check.png (TextureImage), not a geometric scribble.
-class Checkbox final : public Control {
+// Press/click via Pressable (no hand-rolled pointer).
+class Checkbox final : public Pressable {
 public:
   static constexpr float kBox = 18.f;
   static constexpr float kBoxRadius = 2.f;
@@ -209,12 +211,10 @@ public:
   void set_value(bool v);
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
-  void on_pointer(const PointerEvent& e) override;
 private:
   std::string label_;
   bool value_ = false;
   std::function<void(bool)> on_change_;
-  bool pressed_ = false;
   TextureImage check_icon_;
 };
 
@@ -247,8 +247,8 @@ private:
 };
 
 // M3 Switch: track 52×32 inside 52×40 hit box; no label required.
-// Toggle on click; active track PRIMARY, inactive SURFACE_CONTAINER_HIGHEST.
-class Switch final : public Control {
+// Toggle via Pressable; active track PRIMARY, inactive SURFACE_CONTAINER_HIGHEST.
+class Switch final : public Pressable {
 public:
   static constexpr float kTrackW = 52.f;
   static constexpr float kTrackH = 32.f;
@@ -259,15 +259,15 @@ public:
   void set_value(bool v);
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
-  void on_pointer(const PointerEvent& e) override;
 private:
   bool value_ = false;
   std::function<void(bool)> on_change_;
-  bool pressed_ = false;
 };
 
 // M3 ProgressRing: default 40×40, stroke 4, color PRIMARY. value in [0,1].
-// Track = full annulus (SECONDARY_CONTAINER); progress = stroked arc approx.
+// Track = SDF annulus (SECONDARY_CONTAINER). Progress arc is segmented discs
+// along the centerline (no rotated stroke / angular SDF yet) — pixel debt vs
+// Python; see DEMO.md. Safety: segs capped at 180; value finite + clamped.
 class ProgressRing final : public Control {
 public:
   static constexpr float kSide = 40.f;
@@ -279,6 +279,50 @@ public:
   void paint(Renderer& r) override;
 private:
   float value_ = 0.f;
+};
+
+
+// Dropdown option row (key + display text). Used by Dropdown.
+struct DropdownOption {
+  std::string key;
+  std::string text;
+};
+
+// Simple M3-ish dropdown: closed field (hint or selected text) + inline popup
+// list when open (no animation / no page overlay). options capped by
+// kMaxDropdownOptions. TextField/ListView still frozen elsewhere.
+class Dropdown final : public Control {
+public:
+  static constexpr float kDefaultWidth = 180.f;
+  static constexpr float kFieldHeight = 56.f;
+  static constexpr float kTextPx = 16.f;
+  static constexpr float kItemHeight = 48.f;
+  static constexpr float kPadH = 16.f;
+  static constexpr float kRadius = 4.f;
+  Dropdown(std::string hint, std::vector<DropdownOption> options,
+           std::function<void(const std::string& key)> on_select = {},
+           ControlOptions opt = {});
+  bool is_open() const;
+  const std::string& value() const; // selected key; empty if none
+  const std::string& selected_text() const;
+  void set_value(std::string key); // empty clears; unknown key throws
+  void set_open(bool open);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  Rect field_rect() const;
+  Rect menu_rect() const;
+  int hit_option(float x, float y) const; // -1 none
+  std::string hint_;
+  std::vector<DropdownOption> options_;
+  std::function<void(const std::string& key)> on_select_;
+  std::string value_;
+  std::string selected_text_;
+  bool open_ = false;
+  bool pressed_ = false;
+  int press_option_ = -1; // -2 = field, -1 = none, >=0 = option index
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.

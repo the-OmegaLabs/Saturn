@@ -6,6 +6,7 @@
 #include "saturn/types.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -69,8 +70,9 @@ int main() {
         // Inventory: Row spacing=8 — Elevated | Filled | Outlined | IconButton.
         auto btn_row = std::make_unique<saturn::Row>(8.f);
         btn_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
+        // Elevated default icon path is empty; pass ADD explicitly for demo.
         btn_row->add(std::make_unique<saturn::ElevatedButton>(
-            "Elevated", on_click));  // default leading icons/add.png
+            "Elevated", on_click, "icons/add.png"));
         btn_row->add(std::make_unique<saturn::FilledButton>(
             "Filled", on_click));
         btn_row->add(std::make_unique<saturn::OutlinedButton>(
@@ -103,13 +105,33 @@ int main() {
             }));
         slider_row->add(std::make_unique<saturn::ProgressRing>(0.6f));
 
+        // Inventory: Row spacing=12 — Dropdown + Image (140×70).
+        auto drop_row = std::make_unique<saturn::Row>(12.f);
+        drop_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
+        saturn::ControlOptions drop_opt;
+        drop_opt.width = 180.f;
+        std::vector<saturn::DropdownOption> opts = {
+            {"a", "Alpha"}, {"b", "Beta"}, {"g", "Gamma"},
+        };
+        drop_row->add(std::make_unique<saturn::Dropdown>(
+            "dropdown...", std::move(opts),
+            [status_ptr](const std::string& key) {
+              status_ptr->set_value("last event: select " + key);
+            },
+            drop_opt));
+        saturn::ControlOptions img_opt;
+        img_opt.width = 140.f;
+        img_opt.height = 70.f;
+        drop_row->add(std::make_unique<saturn::Image>("test_img.png", img_opt));
+
         auto left_body = std::make_unique<saturn::Column>(16.f);
         left_body->add(std::move(btn_row));
         left_body->add(std::move(check_row));
         left_body->add(std::move(slider_row));
-        // Deferred: TextField, Dropdown, Dialog/SnackBar.
+        left_body->add(std::move(drop_row));
+        // Deferred: TextField, Dialog/SnackBar.
         left_body->add(std::make_unique<saturn::Text>(
-            "TextField/Dropdown TBD", saturn::colors::kOnSurfaceVariant, 13.f));
+            "TextField TBD", saturn::colors::kOnSurfaceVariant, 13.f));
 
         // ListView deferred until scroll buffer caps with reviewer.
         auto right_body = std::make_unique<saturn::Column>(4.f);

@@ -16,3 +16,5 @@ White+alpha 48×48 PNGs rasterized from Material Symbols Filled
 
 Full MaterialSymbols TTF is not shipped under `cpp/assets` (multi-MB). Rebuild
 bitmaps with Pillow if glyphs change. See `assets/icons/README.md`.
+
+- `test_img.png` — copy of `examples/assets/test_img.png` for C++ demo Image row.
