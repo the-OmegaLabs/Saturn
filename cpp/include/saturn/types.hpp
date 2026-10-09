@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -13,7 +13,7 @@ struct ControlOptions {
   float opacity = 1.f;
   OptionalSize width;
   OptionalSize height;
-  // open fields: typed/opaque only — no untyped dump
+  // open fields: typed/opaque only - no untyped dump
   std::optional<std::int64_t> data_i64;
   std::optional<std::string> data_str;
 };

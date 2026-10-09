@@ -1,4 +1,4 @@
-﻿#include "saturn/control.hpp"
+#include "saturn/control.hpp"
 #include "saturn/limits.hpp"
 namespace saturn {
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}

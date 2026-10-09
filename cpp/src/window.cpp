@@ -1,4 +1,4 @@
-﻿#include "saturn/window.hpp"
+#include "saturn/window.hpp"
 #include "opengl_renderer.hpp"
 #include "saturn/limits.hpp"
 #include <SDL3/SDL.h>

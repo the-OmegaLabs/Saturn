@@ -1,4 +1,4 @@
-﻿# Design snapshot
+# Design snapshot
 
 Synced with group agreement (Saturn room). Update when constraints change.
 
@@ -33,3 +33,8 @@ Synced with group agreement (Saturn room). Update when constraints change.
 | `saturn.control.Control` | `saturn::Control` |
 | `saturn.renderer.*` | `saturn::Renderer` + `OpenGLRenderer` |
 | SDL via pygame-ce | SDL3 directly |
+
+## Phase 2 status
+- `fill_rect` via GL 3.3 core shader + gl_VertexID quad (radius still ignored)
+- `stroke_rect` / clip / blit still stubs
+- UTF-8 without BOM

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "saturn/renderer.hpp"
 #include <memory>
 namespace saturn {
@@ -16,5 +16,6 @@ public:
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
+  void ensure_quad_pipeline();
 };
 }
