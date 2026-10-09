@@ -293,8 +293,10 @@ void OpenGLRenderer::fill_rect(Rect r, Color c, float /*radius*/) {
 void OpenGLRenderer::stroke_rect(Rect, Color, float, float) {}
 
 void OpenGLRenderer::clip_push(Rect r) {
-  if (impl_->clips.size() >= kMaxClipDepth) return;
-  if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h)) return;
+  if (impl_->clips.size() >= kMaxClipDepth)
+    throw std::runtime_error("clip stack exceeds kMaxClipDepth");
+  if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h))
+    throw std::invalid_argument("clip rect must be finite");
   impl_->clips.push_back(r);
   if (impl_->ctx) {
     SDL_GL_MakeCurrent(impl_->window, impl_->ctx);

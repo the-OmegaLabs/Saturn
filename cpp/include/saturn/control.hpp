@@ -27,7 +27,7 @@ protected:
   std::vector<std::unique_ptr<Control>> children_;
 };
 
-// Phase-3 demo control: solid fill from options width/height + bgcolor via data? use explicit color.
+// Demo solid-color box. Size from ControlOptions width/height.
 class ColorBox final : public Control {
 public:
   ColorBox(Color color, ControlOptions opt = {});

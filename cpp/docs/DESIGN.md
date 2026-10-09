@@ -43,3 +43,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - GL entry points cached once; shader compile/link failures roll back GL objects
 - `clip_push`/`clip_pop` drive real scissor with `kMaxClipDepth`
 - Demo `ColorBox` added via `Page::add` (no hard-coded rect in `App::run`)
+
+## Layout note
+- `Page::layout` is a vertical column (padding/gap), not flex. Resize via `Window::consume_resized` triggers relayout.
+- `clip_push` throws if stack exceeds `kMaxClipDepth` (no silent drop).
