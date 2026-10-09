@@ -24,15 +24,21 @@ Window::Window(const std::string& title, int w, int h) : impl_(std::make_unique<
       throw std::runtime_error(SDL_GetError());
     }
   }
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-  impl_->win = SDL_CreateWindow(title.c_str(), w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-  if (!impl_->win) {
+  try {
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    impl_->win = SDL_CreateWindow(title.c_str(), w, h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    if (!impl_->win) throw std::runtime_error(SDL_GetError());
+    impl_->renderer = std::make_unique<OpenGLRenderer>(impl_->win);
+  } catch (...) {
+    if (impl_->win) {
+      SDL_DestroyWindow(impl_->win);
+      impl_->win = nullptr;
+    }
     if (g_sdl_users.fetch_sub(1) == 1) SDL_Quit();
-    throw std::runtime_error(SDL_GetError());
+    throw;
   }
-  impl_->renderer = std::make_unique<OpenGLRenderer>(impl_->win);
 }
 
 Window::~Window() {

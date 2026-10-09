@@ -22,8 +22,11 @@ OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>(
   impl_->window = static_cast<SDL_Window*>(sdl_window);
   impl_->ctx = SDL_GL_CreateContext(impl_->window);
   if (!impl_->ctx) throw std::runtime_error(SDL_GetError());
-  if (!SDL_GL_MakeCurrent(impl_->window, impl_->ctx))
+  if (!SDL_GL_MakeCurrent(impl_->window, impl_->ctx)) {
+    SDL_GL_DestroyContext(impl_->ctx);
+    impl_->ctx = nullptr;
     throw std::runtime_error(SDL_GetError());
+  }
   SDL_GetWindowSizeInPixels(impl_->window, &impl_->w, &impl_->h);
   glViewport(0, 0, impl_->w, impl_->h);
 }
