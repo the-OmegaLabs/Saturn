@@ -50,7 +50,7 @@ SDL3 + OpenGL 的 Control 树已能跑 `saturn_demo`；多数 inventory 控件�
 
 | 项 | 说明 |
 |----|------|
-| **TextField / ListView** | 仍冻；demo 里 TBD。inventory：`/workspace/saturn-demo-inventory.md`（TextField h56/pad16/r4/text16；ListView 400×260、spacing4、30 项、item pad8/r6） |
+| **TextField / ListView** | 仍冻；demo 里 TBD。inventory：`cpp/docs/demo-inventory.md`（TextField h56/pad16/r4/text16；ListView 400×260、spacing4、30 项、item pad8/r6） |
 | Dropdown **overlay** | 菜单弹出层；闭合黄金几乎不动 headline；要做为**交互正确** |
 | Elevated 阴影保真 | 合同路径对了，仍是 fill 近似 ≠ silhouette 高斯；勿为 Δ0.01 拧色阶 |
 | Dialog 长文 | 单行 measure/draw，多行是像素/排版债 |
@@ -75,7 +75,7 @@ cd cpp\build\Release
 
 截图对照：设 `SATURN_SHOT` + `SATURN_SHOT_FRAMES=5`，工具 `cpp/tools/compare_shots.py`。Mesa/Linux 截图 **不是** 黄金。桌面 push 用过 `HTTPS_PROXY=http://127.0.0.1:7897` + `gh`。
 
-对照报告样例：`/workspace/compare-post42/REPORT.md`。
+对照报告：本地跑 `cpp/tools/compare_shots.py` 产出即可，勿依赖 agent 机器路径。
 
 ---
 
@@ -84,13 +84,14 @@ cd cpp\build\Release
 - `cpp/docs/AGENTS.md` — agent 约束  
 - `cpp/docs/DESIGN.md` — 设计  
 - `cpp/docs/DEMO.md` — demo / 截图合同  
-- `/workspace/saturn-demo-inventory.md` — 与 `examples/demo.py` 的控件清单  
+- `cpp/docs/demo-inventory.md` — 与 `examples/demo.py` 的控件清单  
+- `cpp/docs/ANIMATION-CONTRACT.md` — Python 动画/时钟合同（骨架）  
 
 ---
 
 ## 建议后续（按新目标排序）
 
-1. **盘点 Python 动画 + 布局 + 事件模型**（入口、时钟、implicit animation、focus），写一页「合同表」再动刀。  
+1. **按 `ANIMATION-CONTRACT.md` 填满动画/时钟/implicit 合同**（骨架已落，缺项补齐后再动刀）。  
 2. **排版/测量语义对齐**（含 Text 换行），再谈 TextField。  
 3. **TextField / ListView** — 按已拍 cap + inventory，为逻辑与布局服务，不为刷分。  
 4. **Dropdown overlay / 焦点 / 对话框栈** — 交互正确性。  
