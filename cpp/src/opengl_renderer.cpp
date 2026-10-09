@@ -10,6 +10,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 #include <GL/gl.h>
@@ -237,12 +240,12 @@ void OpenGLRenderer::apply_scissor() {
   Rect r = impl_->clips.front();
   for (std::size_t i = 1; i < impl_->clips.size(); ++i) {
     const Rect& c = impl_->clips[i];
-    float x2 = std::min(r.x + r.w, c.x + c.w);
-    float y2 = std::min(r.y + r.h, c.y + c.h);
-    r.x = std::max(r.x, c.x);
-    r.y = std::max(r.y, c.y);
-    r.w = std::max(0.f, x2 - r.x);
-    r.h = std::max(0.f, y2 - r.y);
+    float x2 = (std::min)(r.x + r.w, c.x + c.w);
+    float y2 = (std::min)(r.y + r.h, c.y + c.h);
+    r.x = (std::max)(r.x, c.x);
+    r.y = (std::max)(r.y, c.y);
+    r.w = (std::max)(0.f, x2 - r.x);
+    r.h = (std::max)(0.f, y2 - r.y);
   }
   // GL scissor origin bottom-left
   int sx = int(std::floor(r.x));
