@@ -124,12 +124,40 @@ int main() {
         img_opt.height = 70.f;
         drop_row->add(std::make_unique<saturn::Image>("test_img.png", img_opt));
 
+        // Inventory: Row spacing=8 — Dialog + SnackBar (Elevated = Python Button).
+        auto dlg_row = std::make_unique<saturn::Row>(8.f);
+        dlg_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
+        saturn::Page* page_ptr = &page;
+        dlg_row->add(std::make_unique<saturn::ElevatedButton>(
+            "Dialog", [page_ptr, status_ptr]() {
+              std::vector<std::unique_ptr<saturn::Control>> actions;
+              actions.push_back(std::make_unique<saturn::TextButton>(
+                  "Cancel", [page_ptr]() { page_ptr->pop_dialog(); }));
+              actions.push_back(std::make_unique<saturn::FilledButton>(
+                  "Delete", [page_ptr]() { page_ptr->pop_dialog(); }));
+              page_ptr->show_dialog(std::make_unique<saturn::AlertDialog>(
+                  "Confirm", "Delete this item permanently?",
+                  std::move(actions)));
+              status_ptr->set_value("last event: dialog");
+            }));
+        dlg_row->add(std::make_unique<saturn::ElevatedButton>(
+            "SnackBar", [page_ptr, status_ptr]() {
+              page_ptr->show_dialog(std::make_unique<saturn::SnackBar>(
+                  "Saved!", "Undo",
+                  [status_ptr]() {
+                    status_ptr->set_value("last event: snack undo");
+                  },
+                  3000));
+              status_ptr->set_value("last event: snackbar");
+            }));
+
         auto left_body = std::make_unique<saturn::Column>(16.f);
         left_body->add(std::move(btn_row));
         left_body->add(std::move(check_row));
         left_body->add(std::move(slider_row));
         left_body->add(std::move(drop_row));
-        // Deferred: TextField, Dialog/SnackBar.
+        left_body->add(std::move(dlg_row));
+        // Deferred: TextField (frozen).
         left_body->add(std::make_unique<saturn::Text>(
             "TextField TBD", saturn::colors::kOnSurfaceVariant, 13.f));
 

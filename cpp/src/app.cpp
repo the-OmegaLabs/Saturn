@@ -62,6 +62,7 @@ int App::run() {
     for (const auto& pe : impl_->window.take_pointer_events()) {
       impl_->page.dispatch_pointer(pe);
     }
+    impl_->page.tick(); // SnackBar duration + deferred dialog pops
     r.clear(impl_->page.bgcolor());
     impl_->page.paint(r);
 

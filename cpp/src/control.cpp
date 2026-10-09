@@ -6,6 +6,7 @@
 #include "saturn/font.hpp"
 #include "saturn/geometry.hpp"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -324,12 +325,16 @@ void Pressable::on_pointer(const PointerEvent& e) {
   if (e.down && hit_test(e.x, e.y)) {
     pressed_ = true;
     if (page_) page_->update();
+    return;
   }
   if (e.up) {
-    bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside && on_click_) on_click_();
+    // Snapshot before on_click_: dialog action may pop_dialog and destroy this.
+    const bool fire = pressed_ && hit_test(e.x, e.y);
     pressed_ = false;
-    if (page_) page_->update();
+    Page* p = page_;
+    auto click = on_click_;
+    if (p) p->update();
+    if (fire && click) click(); // may destroy *this — must be last
   }
 }
 
@@ -393,6 +398,16 @@ void OutlinedButton::paint_background(Renderer& r) {
   r.stroke_rect(rect_, colors::kOutlineVariant, kStrokeW, corner_radius());
 }
 Color OutlinedButton::content_color() const { return colors::kOnSurfaceVariant; }
+
+TextButton::TextButton(std::string label, std::function<void()> on_click,
+                       ControlOptions opt)
+  : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
+void TextButton::paint_background(Renderer& r) {
+  if (pressed()) {
+    r.fill_rect(rect_, colors::kSurfaceContainer, corner_radius());
+  }
+}
+Color TextButton::content_color() const { return colors::kPrimary; }
 
 IconButton::IconButton(std::string icon_path, std::function<void()> on_click,
                        ControlOptions opt)
@@ -938,6 +953,219 @@ void Dropdown::on_pointer(const PointerEvent& e) {
     }
     if (page_) page_->update();
   }
+}
+
+
+namespace {
+void require_text_bytes(const std::string& s, const char* what) {
+  if (s.size() > kMaxTextBytes)
+    throw std::invalid_argument(std::string(what) + " exceeds kMaxTextBytes");
+}
+} // namespace
+
+DialogControl::DialogControl(bool barrier, bool modal)
+  : Control({}), barrier_(barrier), modal_(modal) {}
+void DialogControl::on_shown() {}
+void DialogControl::tick() {}
+void DialogControl::dismiss() {
+  if (page_) page_->pop_dialog(this);
+}
+
+AlertDialog::AlertDialog(std::string title, std::string content,
+                         std::vector<std::unique_ptr<Control>> actions,
+                         bool modal)
+  : DialogControl(/*barrier=*/true, modal),
+    title_(std::move(title)), content_(std::move(content)) {
+  require_text_bytes(title_, "AlertDialog title");
+  require_text_bytes(content_, "AlertDialog content");
+  if (actions.size() > kMaxDialogActions)
+    throw std::invalid_argument("AlertDialog actions exceed kMaxDialogActions");
+  for (auto& a : actions) {
+    if (!a) throw std::invalid_argument("AlertDialog action is null");
+    add_child(std::move(a));
+  }
+}
+
+bool AlertDialog::point_in_card(float x, float y) const {
+  return x >= card_rect_.x && y >= card_rect_.y &&
+         x < card_rect_.x + card_rect_.w && y < card_rect_.y + card_rect_.h;
+}
+
+void AlertDialog::layout() {
+  const float avail_w = std::max(0.f, rect_.w - 2.f * kInset);
+  const float avail_h = std::max(0.f, rect_.h - 2.f * kInset);
+  Size title_sz = title_.empty() ? Size{0, 0}
+                                 : default_font().measure(title_, kTitlePx);
+  Size content_sz = content_.empty() ? Size{0, 0}
+                                     : default_font().measure(content_, kContentPx);
+
+  float actions_w = 0.f;
+  float actions_h = 0.f;
+  for (std::size_t i = 0; i < children_.size(); ++i) {
+    Control* c = children_[i].get();
+    if (!c || !c->options().visible) continue;
+    Size s = c->intrinsic({}, {});
+    if (i > 0) actions_w += kActionGap;
+    actions_w += s.w;
+    if (s.h > actions_h) actions_h = s.h;
+  }
+
+  float card_w = kMinCardW;
+  if (title_sz.w + 2.f * kPad > card_w) card_w = title_sz.w + 2.f * kPad;
+  if (content_sz.w + 2.f * kPad > card_w) card_w = content_sz.w + 2.f * kPad;
+  if (actions_w + 2.f * kPad > card_w) card_w = actions_w + 2.f * kPad;
+  if (card_w > avail_w) card_w = avail_w;
+  if (card_w > float(kMaxLayoutDim)) card_w = float(kMaxLayoutDim);
+
+  float card_h = 0.f;
+  if (!title_.empty()) card_h += kPad + title_sz.h;
+  if (!content_.empty()) card_h += kPad + content_sz.h;
+  if (actions_h > 0.f) card_h += kPad + actions_h;
+  card_h += kPad; // bottom pad
+  if (card_h > avail_h) card_h = avail_h;
+  if (card_h > float(kMaxLayoutDim)) card_h = float(kMaxLayoutDim);
+
+  const float cx = rect_.x + kInset + (avail_w - card_w) * 0.5f;
+  const float cy = rect_.y + kInset + (avail_h - card_h) * 0.5f;
+  card_rect_ = Rect{cx, cy, card_w, card_h};
+
+  float y = cy + kPad;
+  if (!title_.empty()) y += title_sz.h + kPad;
+  if (!content_.empty()) y += content_sz.h + kPad;
+
+  // Actions end-aligned along the bottom pad row.
+  float ax = cx + card_w - kPad - actions_w;
+  float ay = cy + card_h - kPad - actions_h;
+  for (std::size_t i = 0; i < children_.size(); ++i) {
+    Control* c = children_[i].get();
+    if (!c || !c->options().visible) continue;
+    Size s = c->intrinsic({}, {});
+    c->set_rect(Rect{ax, ay + (actions_h - s.h) * 0.5f, s.w, s.h});
+    c->layout();
+    ax += s.w + kActionGap;
+  }
+  (void)y;
+}
+
+void AlertDialog::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  r.fill_rect(rect_, colors::kScrim, 0.f);
+  r.fill_rect(card_rect_, colors::kSurfaceContainerHigh, kRadius);
+  r.clip_push(card_rect_);
+
+  float y = card_rect_.y + kPad;
+  if (!title_.empty()) {
+    Size ts = default_font().measure(title_, kTitlePx);
+    default_font().draw(r, card_rect_.x + kPad, y, title_, colors::kOnSurface,
+                        kTitlePx);
+    y += ts.h + kPad;
+  }
+  if (!content_.empty()) {
+    default_font().draw(r, card_rect_.x + kPad, y, content_,
+                        colors::kOnSurfaceVariant, kContentPx);
+  }
+  Control::paint(r); // action buttons
+  r.clip_pop();
+}
+
+bool AlertDialog::hit_test(float x, float y) const {
+  // Barrier fills the page — swallows everything.
+  return opt_.visible && x >= rect_.x && y >= rect_.y &&
+         x < rect_.x + rect_.w && y < rect_.y + rect_.h;
+}
+
+void AlertDialog::on_pointer(const PointerEvent& e) {
+  if (!opt_.visible || opt_.disabled) return;
+  // Scrim / card chrome click: dismiss unless modal. Action buttons are hit
+  // as children via hit_target, so they never reach here.
+  if (e.down && !modal() && !point_in_card(e.x, e.y)) {
+    dismiss();
+  }
+}
+
+SnackBar::SnackBar(std::string message, std::string action_label,
+                   std::function<void()> on_action, int duration_ms)
+  : DialogControl(/*barrier=*/false, /*modal=*/false),
+    message_(std::move(message)),
+    action_label_(std::move(action_label)),
+    on_action_(std::move(on_action)),
+    duration_ms_(duration_ms) {
+  require_text_bytes(message_, "SnackBar message");
+  require_text_bytes(action_label_, "SnackBar action label");
+  if (duration_ms_ <= 0 || duration_ms_ > kMaxSnackBarDurationMs)
+    throw std::invalid_argument("SnackBar duration_ms out of range");
+  if (!action_label_.empty()) {
+    // Persist while action present (Python default). Action dismisses.
+    SnackBar* self = this;
+    add_child(std::make_unique<TextButton>(
+        action_label_, [self]() {
+          if (self->on_action_) self->on_action_();
+          self->dismiss();
+        }));
+  }
+}
+
+void SnackBar::on_shown() {
+  has_deadline_ = false;
+  // With an action label, persist until action / explicit pop (Python).
+  if (!action_label_.empty()) return;
+  deadline_ = std::chrono::steady_clock::now() +
+              std::chrono::milliseconds(duration_ms_);
+  has_deadline_ = true;
+}
+
+void SnackBar::tick() {
+  if (!has_deadline_) return;
+  if (std::chrono::steady_clock::now() >= deadline_) {
+    has_deadline_ = false;
+    dismiss();
+  }
+}
+
+void SnackBar::layout() {
+  Size msg = default_font().measure(message_, kTextPx);
+  float action_w = 0.f;
+  float action_h = 0.f;
+  Control* action = nullptr;
+  if (!children_.empty()) action = children_[0].get();
+  if (action && action->options().visible) {
+    Size s = action->intrinsic({}, {});
+    action_w = s.w;
+    action_h = s.h;
+  }
+  float inner_w = std::max(0.f, rect_.w - 2.f * kMargin);
+  float bar_w = inner_w;
+  if (bar_w > float(kMaxLayoutDim)) bar_w = float(kMaxLayoutDim);
+  float content_h = std::max(msg.h, action_h);
+  float bar_h = std::max(kMinH, content_h + 2.f * kPad);
+  if (bar_h > float(kMaxLayoutDim)) bar_h = float(kMaxLayoutDim);
+  float bx = rect_.x + kMargin + (inner_w - bar_w) * 0.5f;
+  float by = rect_.y + rect_.h - kMargin - bar_h;
+  bar_rect_ = Rect{bx, by, bar_w, bar_h};
+
+  if (action && action->options().visible) {
+    Size s = action->intrinsic({}, {});
+    float ax = bx + bar_w - kPad - s.w;
+    float ay = by + (bar_h - s.h) * 0.5f;
+    action->set_rect(Rect{ax, ay, s.w, s.h});
+    action->layout();
+  }
+}
+
+void SnackBar::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  r.fill_rect(bar_rect_, colors::kInverseSurface, kRadius);
+  Size msg = default_font().measure(message_, kTextPx);
+  float tx = bar_rect_.x + kPad;
+  float ty = bar_rect_.y + (bar_rect_.h - msg.h) * 0.5f;
+  default_font().draw(r, tx, ty, message_, colors::kOnInverseSurface, kTextPx);
+  Control::paint(r);
+}
+
+bool SnackBar::hit_test(float x, float y) const {
+  if (!opt_.visible) return false;
+  return x >= bar_rect_.x && y >= bar_rect_.y &&
+         x < bar_rect_.x + bar_rect_.w && y < bar_rect_.y + bar_rect_.h;
 }
 
 Column::Column(float spacing, ControlOptions opt)

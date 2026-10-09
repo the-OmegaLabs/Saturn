@@ -104,6 +104,18 @@ Synced with group agreement (Saturn room). Update when constraints change.
   **fails loud** if missing (`SATURN_FONT_PATH` or `assets/Inter-Regular.ttf` next to exe).
 - 5x7 `bitmap_font.hpp` is **not** for pixel parity (kept as emergency reference only).
 
+## Dialog / SnackBar
+- `DialogControl` overlay base; `Page::show_dialog` / `pop_dialog` / `tick`.
+  Depth ≤ `kMaxDialogDepth` (8). Pops deferred until after pointer dispatch
+  (action `on_click` cannot UAF the button).
+- `AlertDialog`: barrier scrim (`kScrim`) + card `SURFACE_CONTAINER_HIGH`;
+  actions ≤ `kMaxDialogActions`; title/content > `kMaxTextBytes` → throw.
+- `TextButton`: no fill / PRIMARY label (dialog Cancel).
+- `SnackBar`: non-barrier bottom bar; `INVERSE_SURFACE` / `ON_INVERSE_SURFACE`;
+  duration in `(0, kMaxSnackBarDurationMs]`; action present → persist until
+  action dismisses. Message/action label > `kMaxTextBytes` → throw.
+- TextField / ListView still frozen. No open/close motion yet.
+
 ## Next goal (not done)
 - First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare against
   Windows true-GL golden `demo-opengl-win-944x761.png`). Size contract: Python outer 960x800

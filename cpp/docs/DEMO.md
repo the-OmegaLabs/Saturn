@@ -57,8 +57,11 @@ check mark = `icons/check.png`; press via `Pressable`).
 Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48) + `Switch`
 (`Pressable`, 52×40, no label) + `ProgressRing(0.6)` (40×40 / stroke 4 /
 PRIMARY). Dropdown row spacing 12: `Dropdown` hint `"dropdown..."` options
-Alpha/Beta/Gamma width 180 + `Image(test_img.png)` 140×70. Right panel:
-`ListView TBD` until scroll caps land with security review.
+Alpha/Beta/Gamma width 180 + `Image(test_img.png)` 140×70.
+Dialog row spacing 8: `ElevatedButton("Dialog")` → `AlertDialog` (Confirm /
+Cancel `TextButton` + Delete `FilledButton`) via `Page::show_dialog`;
+`ElevatedButton("SnackBar")` → `SnackBar("Saved!", "Undo", 3000)`.
+Right panel: `ListView TBD` until scroll caps land with security review.
 
 **ProgressRing pixel debt:** track is a real SDF annulus (`stroke_rect`);
 progress is still **segmented discs** along the centerline (no angular SDF /
@@ -75,10 +78,18 @@ finite value clamp) stay. Do **not** claim ProgressRing matches golden.
 **Dropdown:** simple inline popup (expands intrinsic height when open; no
 animation / no page overlay). Options capped by `kMaxDropdownOptions`.
 
-**Still deferred** (expect `compare_shots` FAIL): TextField,
-Dialog/SnackBar, ListView scroll, variable Inter weight / Noto SC,
-flex weights / MainAxisAlignment, HiDPI scale-aware golden, ProgressRing
-true stroked arc, Dropdown outside-click dismiss.
+**Dialog / SnackBar:** `Page` overlay stack (`kMaxDialogDepth=8`);
+`AlertDialog` scrim + centered card (pad 24 / inset 40 / radius 28;
+`kMaxDialogActions=8`; title/content/action labels > `kMaxTextBytes` throw).
+`SnackBar` bottom bar (INVERSE_SURFACE); duration `(0, kMaxSnackBarDurationMs]`;
+with action label persists until Undo (Python default). Overlay is simple —
+no animation; true menu overlay/clip depth still deferred for Dropdown.
+TextField/ListView still frozen.
+
+**Still deferred** (expect `compare_shots` FAIL): TextField, ListView scroll,
+variable Inter weight / Noto SC, flex weights / MainAxisAlignment, HiDPI
+scale-aware golden, ProgressRing true stroked arc, Dropdown outside-click
+dismiss / true overlay+clip, Dialog open/close motion.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
@@ -120,7 +131,8 @@ See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
 `kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`,
 `kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`),
 `kMaxSliderDivisions` (ctor throw if out of range; `set_value` rejects non-finite),
-`kMaxDropdownOptions` (ctor throw if options oversize).
+`kMaxDropdownOptions` (ctor throw if options oversize),
+`kMaxDialogDepth` / `kMaxDialogActions` / `kMaxSnackBarDurationMs` (throw, no truncate).
 Screenshot / image / icon path length capped by `kMaxPathBytes` — oversize paths
 **throw**, never truncate. `Image` / `IconButton` fail loud on bad/oversize
 decode (no silent empty paint). ListView scroll caches must honor these —
