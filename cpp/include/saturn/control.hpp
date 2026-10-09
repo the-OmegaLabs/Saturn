@@ -1,6 +1,7 @@
 #pragma once
 #include "types.hpp"
 #include "events.hpp"
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -65,16 +66,15 @@ private:
   float size_ = 16.f;
 };
 
+// Shared M3 button metrics (h40 / padH24 / label14 / pill radius).
 class FilledButton final : public Control {
 public:
-  // M3 filled uses pill (height/2 ≈ 20). Renderer also clamps to kMaxCornerRadius / half min(w,h).
   static constexpr float kDefaultCornerRadius = 20.f;
   FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
   void set_corner_radius(float radius);
   float corner_radius() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
-  // Same effective radius as paint (kMaxCornerRadius / half min(w,h)).
   bool hit_test(float x, float y) const override;
   void on_pointer(const PointerEvent& e) override;
 private:
@@ -82,6 +82,90 @@ private:
   std::function<void()> on_click_;
   float corner_radius_ = kDefaultCornerRadius;
   bool pressed_ = false;
+};
+
+// M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg, elev=1 via fill.
+class ElevatedButton final : public Control {
+public:
+  static constexpr float kDefaultCornerRadius = 20.f;
+  // Optional leading icon glyph (e.g. "+"); empty skips icon slot.
+  ElevatedButton(std::string label, std::function<void()> on_click,
+                 std::string icon = "+", ControlOptions opt = {});
+  void set_corner_radius(float radius);
+  float corner_radius() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  std::string label_;
+  std::string icon_;
+  std::function<void()> on_click_;
+  float corner_radius_ = kDefaultCornerRadius;
+  bool pressed_ = false;
+};
+
+// M3 outlined: no fill, ON_SURFACE_VARIANT fg, OUTLINE_VARIANT 1px stroke.
+class OutlinedButton final : public Control {
+public:
+  static constexpr float kDefaultCornerRadius = 20.f;
+  OutlinedButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
+  void set_corner_radius(float radius);
+  float corner_radius() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  std::string label_;
+  std::function<void()> on_click_;
+  float corner_radius_ = kDefaultCornerRadius;
+  bool pressed_ = false;
+};
+
+// M3 IconButton: side 40, icon_size 24. Glyph via Inter text (no icon font yet).
+class IconButton final : public Control {
+public:
+  static constexpr float kSide = 40.f;
+  static constexpr float kIconPx = 24.f;
+  IconButton(std::string icon, std::function<void()> on_click, ControlOptions opt = {});
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  std::string icon_;
+  std::function<void()> on_click_;
+  bool pressed_ = false;
+};
+
+// PNG Image via stb_image. Optional tint (multiply). BoxFit.CONTAIN when both
+// width and height are set on ControlOptions.
+class Image final : public Control {
+public:
+  explicit Image(std::string path, ControlOptions opt = {});
+  ~Image() override;
+  Image(const Image&) = delete;
+  Image& operator=(const Image&) = delete;
+  void set_tint(Color c);
+  void clear_tint();
+  bool loaded() const;
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+private:
+  void ensure_loaded() const;
+  void ensure_texture(Renderer& r);
+  void release_texture();
+  std::string path_;
+  mutable std::vector<std::uint8_t> rgba_;
+  mutable int src_w_ = 0;
+  mutable int src_h_ = 0;
+  mutable bool tried_load_ = false;
+  mutable bool load_ok_ = false;
+  bool has_tint_ = false;
+  Color tint_{255, 255, 255, 255};
+  void* tex_ = nullptr;
+  Renderer* tex_r_ = nullptr;
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.

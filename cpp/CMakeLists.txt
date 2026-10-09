@@ -33,11 +33,14 @@ if (WIN32 AND DEFINED SDL3_DIR)
   endif()
 endif()
 
-# Bundled Inter Regular (OFL) next to both exes.
+# Bundled Inter Regular (OFL) + logo next to both exes.
 foreach(_tgt saturn_hello saturn_demo)
   add_custom_command(TARGET ${_tgt} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${_tgt}>/assets"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_SOURCE_DIR}/assets/Inter-Regular.ttf"
-      "$<TARGET_FILE_DIR:${_tgt}>/assets/Inter-Regular.ttf")
+      "$<TARGET_FILE_DIR:${_tgt}>/assets/Inter-Regular.ttf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_SOURCE_DIR}/../.static/saturn-logo-transparent.png"
+      "$<TARGET_FILE_DIR:${_tgt}>/assets/saturn-logo-transparent.png")
 endforeach()
