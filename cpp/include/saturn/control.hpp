@@ -290,7 +290,8 @@ struct DropdownOption {
 
 // Simple M3-ish dropdown: closed field (hint or selected text) + inline popup
 // list when open (no animation / no page overlay). options capped by
-// kMaxDropdownOptions. TextField/ListView still frozen elsewhere.
+// kMaxDropdownOptions; hint/key/text > kMaxTextBytes throw (no truncate).
+// TextField/ListView still frozen elsewhere.
 class Dropdown final : public Control {
 public:
   static constexpr float kDefaultWidth = 180.f;

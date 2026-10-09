@@ -763,12 +763,15 @@ Dropdown::Dropdown(std::string hint, std::vector<DropdownOption> options,
                    ControlOptions opt)
   : Control(std::move(opt)), hint_(std::move(hint)),
     options_(std::move(options)), on_select_(std::move(on_select)) {
-  if (hint_.size() > kMaxTextBytes) hint_.resize(kMaxTextBytes);
+  if (hint_.size() > kMaxTextBytes)
+    throw std::invalid_argument("Dropdown hint exceeds kMaxTextBytes");
   if (options_.size() > kMaxDropdownOptions)
     throw std::invalid_argument("Dropdown options exceed kMaxDropdownOptions");
   for (auto& o : options_) {
-    if (o.key.size() > kMaxTextBytes) o.key.resize(kMaxTextBytes);
-    if (o.text.size() > kMaxTextBytes) o.text.resize(kMaxTextBytes);
+    if (o.key.size() > kMaxTextBytes)
+      throw std::invalid_argument("Dropdown option key exceeds kMaxTextBytes");
+    if (o.text.size() > kMaxTextBytes)
+      throw std::invalid_argument("Dropdown option text exceeds kMaxTextBytes");
     if (o.key.empty())
       throw std::invalid_argument("Dropdown option key must be non-empty");
   }
