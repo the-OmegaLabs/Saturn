@@ -1,10 +1,14 @@
 """Material NavigationRail: a vertical strip of navigation destinations."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import enum
 
 from .. import colors
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..types import Alignment, CrossAxisAlignment, as_padding
 from ._compat import value
@@ -25,7 +29,7 @@ class NavigationRailDestination(Control):
     directly; the owning rail builds a button for it)."""
 
     def __init__(self, icon=None, *, selected_icon=None, label=None,
-                 padding=None, indicator_color=None, indicator_shape=None, **base):
+                 padding=None, indicator_color=None, indicator_shape=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.icon = icon
         self.selected_icon = selected_icon
@@ -48,7 +52,7 @@ class NavigationRail(Control):
                  indicator_color=None, leading=None, trailing=None,
                  min_width=None, min_height=None, min_extended_width=None,
                  group_alignment=None, use_indicator=None, on_change=None,
-                 **base):
+                 **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.destinations = list(destinations or [])
         self.selected_index = selected_index

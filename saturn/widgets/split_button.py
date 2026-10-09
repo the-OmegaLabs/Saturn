@@ -4,9 +4,13 @@
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from .. import colors, motion, text as txt
 from .._gen.icons import Icons
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..text import render_icon_cached
 from ..types import AnimationCurve
 from ._material import draw_state_layer
@@ -111,7 +115,7 @@ class SplitButton(Control):
 
     def __init__(self, content: str = "", *, icon=None,
                  trailing_icon=Icons.ARROW_DROP_DOWN, on_click=None,
-                 on_trailing_click=None, bgcolor=None, color=None, **base):
+                 on_trailing_click=None, bgcolor=None, color=None, **base: Unpack[ControlOptions]):
         if not isinstance(content, str):
             raise TypeError("SplitButton content must be text")
         if not content and icon is None:

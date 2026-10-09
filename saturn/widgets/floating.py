@@ -1,8 +1,13 @@
 """Expressive floating toolbars and anchored FAB action menus."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import pygame
 
 from .. import colors, motion
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..painting import draw_shadow
 from .._gen.icons import Icons
@@ -19,7 +24,7 @@ class FloatingToolbar(Control):
     """64dp capsule toolbar, with animated optional leading/trailing slots."""
     def __init__(self, *items, controls=None, leading=None, trailing=None,
                  expanded=True, vertical=False, vibrant=False, bgcolor=None,
-                 elevation=6, **base):
+                 elevation=6, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         if controls is not None and items:
             raise TypeError('use either controls or positional items')
@@ -141,7 +146,7 @@ class FloatingActionButtonMenuItem(ExpressiveButton):
     variant_fg = colors.Colors.ON_PRIMARY_CONTAINER
     variant_elevation = 6
 
-    def __init__(self, content, *, icon=None, on_click=None, **base):
+    def __init__(self, content, *, icon=None, on_click=None, **base: Unpack[ControlOptions]):
         self.on_action = on_click
         self._menu = None
         super().__init__(content, icon=icon, size='medium', on_click=self._activate, **base)
@@ -247,7 +252,7 @@ class _FabMenuOverlay(Control):
 
 class FloatingActionButtonMenu(Control):
     """An anchored FAB with scrollable actions. Outside click or Escape closes it."""
-    def __init__(self, items=None, *, icon=Icons.ADD, expanded=False, on_select=None, **base):
+    def __init__(self, items=None, *, icon=Icons.ADD, expanded=False, on_select=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.items = list(items or [])
         if not all(isinstance(c,FloatingActionButtonMenuItem) for c in self.items):

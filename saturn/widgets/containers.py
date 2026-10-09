@@ -12,6 +12,10 @@ Stack children position via their own left/top/right/bottom.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import enum
 import math
 import sys
@@ -19,7 +23,7 @@ import time
 
 from .. import colors
 from ..animation import ease
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..types import (Alignment, AnimationCurve, CrossAxisAlignment,
                      MainAxisAlignment, as_border_radius, as_padding)
 from ._material import (draw_state_layer, init_state_layer, press,
@@ -44,7 +48,7 @@ class _Multi(Control):
                  run_spacing=10, run_alignment=MainAxisAlignment.START,
                  intrinsic_height=False, intrinsic_width=False,
                  scroll=None, auto_scroll=False, auto_scroll_animation=None,
-                 scroll_interval=10, on_scroll=None, **base):
+                 scroll_interval=10, on_scroll=None, **base: Unpack[ControlOptions]):
         reject_options(type(self).__name__,auto_scroll_animation=auto_scroll_animation)
         if controls is not None:
             if items:
@@ -354,7 +358,7 @@ class Container(Control):
                  clip_behavior=None, shape="rectangle", url=None,
                  ignore_interactions=False, blend_mode=None, image=None,
                  blur=None, theme=None, dark_theme=None, theme_mode=None,
-                 color_filter=None, foreground_decoration=None, **base):
+                 color_filter=None, foreground_decoration=None, **base: Unpack[ControlOptions]):
         reject_options("Container", blend_mode=blend_mode, image=image, blur=blur,
                        theme=theme, dark_theme=dark_theme, theme_mode=theme_mode,
                        color_filter=color_filter, foreground_decoration=foreground_decoration)
@@ -611,7 +615,7 @@ class Container(Control):
 
 class Stack(Control):
     def __init__(self, *items, controls=None, clip_behavior="hardEdge",
-                 alignment=None, fit="loose", **base):
+                 alignment=None, fit="loose", **base: Unpack[ControlOptions]):
         if controls is not None:
             if items:
                 raise TypeError("controls cannot be combined with positional children")
@@ -710,7 +714,7 @@ class Stack(Control):
 class Divider(Control):
     def __init__(self, height: float = 16, *, thickness: float = 1,
                  color=None, leading_indent: float = 0, trailing_indent: float = 0,
-                 radius=None, **base):
+                 radius=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.height = 16 if height is None else height
         self.thickness = 1 if thickness is None else thickness
@@ -740,7 +744,7 @@ class VerticalDivider(Control):
 
     def __init__(self, width: float | None = None, *, thickness: float | None = 1,
                  color=None, leading_indent: float = 0, trailing_indent: float = 0,
-                 radius=None, **base):
+                 radius=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.width = 16 if width is None else width
         self.thickness = 1 if thickness is None else thickness
@@ -774,7 +778,7 @@ class WindowDragArea(Control):
     """
 
     def __init__(self, content=None, *, maximizable: bool = True,
-                 on_double_tap=None, on_drag_start=None, on_drag_end=None, **base):
+                 on_double_tap=None, on_drag_start=None, on_drag_end=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.content = content
         self.maximizable = maximizable
@@ -882,7 +886,7 @@ class AnimatedSwitcher(Stack):
     def __init__(self, content=None, *, duration=1000, reverse_duration=None,
                  switch_in_curve=AnimationCurve.LINEAR,
                  switch_out_curve=AnimationCurve.LINEAR,
-                 transition=AnimatedSwitcherTransition.FADE, **base):
+                 transition=AnimatedSwitcherTransition.FADE, **base: Unpack[ControlOptions]):
         super().__init__(alignment=Alignment.CENTER, clip_behavior="none", **base)
         self.duration = duration
         self.reverse_duration = (reverse_duration if reverse_duration is not None

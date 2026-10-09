@@ -1,6 +1,10 @@
 """Built-in effects and user GLSL fragment backgrounds."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import math
 import time as _time
 from enum import Enum
@@ -8,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .. import colors
-from ..control import Control
+from ..control import Control, ControlOptions
 
 
 class ShaderEffect(str, Enum):
@@ -67,7 +71,7 @@ class Shader(Control):
                  color="#6750A4", secondary_color="#EADDFF", uniforms=None,
                  animate: bool = True, speed: float = 1.0, time: float = 0.0,
                  border_radius: float = 0.0, fallback_color=None,
-                 includes=None, include_dirs=(), on_error=None, buffer=None, **base):
+                 includes=None, include_dirs=(), on_error=None, buffer=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         if shader is not None and effect is not None:
             raise ValueError("Pass shader or the legacy effect argument, not both")
@@ -186,8 +190,10 @@ class Shader(Control):
         return _EFFECTS[effect], (elapsed, intensity, frequency, radius), (cx, cy, angle, 0)
 
     def _intrinsic(self, max_w, max_h, scale):
-        return (self._width if self._width is not None else min(240, max_w),
-                self._height if self._height is not None else min(160, max_h))
+        # unbounded constraints arrive as None; fall back to the defaults
+        width = self._width if self._width is not None else min(240, max_w if max_w is not None else 240)
+        height = self._height if self._height is not None else min(160, max_h if max_h is not None else 160)
+        return width, height
 
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)

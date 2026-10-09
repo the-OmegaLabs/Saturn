@@ -1,8 +1,12 @@
 """Expressive button groups with shared animated paint and hit rectangles."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from .. import motion
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..types import CrossAxisAlignment
 
 
@@ -16,7 +20,7 @@ class ButtonGroup(Control):
 
     def __init__(self, *items, controls=None, connected=False, spacing=None,
                  expanded_ratio=0.15, compression_limit=24.0,
-                 vertical_alignment=CrossAxisAlignment.START, **base):
+                 vertical_alignment=CrossAxisAlignment.START, **base: Unpack[ControlOptions]):
         if controls is not None:
             if items:
                 raise TypeError("controls cannot be combined with positional children")

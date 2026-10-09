@@ -1,6 +1,10 @@
 """Basic visual controls: Icon, Image, Card, ProgressBar, ProgressRing."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import base64
 import io
 import math
@@ -13,7 +17,7 @@ from .containers import Container
 from .. import colors
 from .. import motion
 from ..animation import _cubic_bezier, ease
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..text import render_icon_cached
 from ..types import AnimationCurve, BoxFit
 from ..types import as_padding
@@ -53,7 +57,7 @@ def _segment(t, start_t, end_t, start_value, end_value, curve):
 class Icon(Control):
     def __init__(self, icon, *, color=None, size: float = 24,
                  semantics_label=None, shadows=None, fill=None, apply_text_scaling=None,
-                 grade=None, weight=None, optical_size=None, blend_mode=None, **base):
+                 grade=None, weight=None, optical_size=None, blend_mode=None, **base: Unpack[ControlOptions]):
         reject_options("Icon", fill=fill, grade=grade, weight=weight, optical_size=optical_size,
                        apply_text_scaling=apply_text_scaling if apply_text_scaling else None,
                        blend_mode=blend_mode if value(blend_mode) not in (None,"srcOver") else None)
@@ -117,7 +121,7 @@ class Image(Control):
                  gapless_playback=False, semantics_label=None, exclude_from_semantics=False,
                  filter_quality="medium", placeholder_src=None, placeholder_fit=None,
                  fade_in_animation=None, placeholder_fade_out_animation=None,
-                 cache_width=None, cache_height=None, anti_alias=False, **base):
+                 cache_width=None, cache_height=None, anti_alias=False, **base: Unpack[ControlOptions]):
         reject_options("Image", fade_in_animation=fade_in_animation,
                        placeholder_fade_out_animation=placeholder_fade_out_animation,
                        color_blend_mode=color_blend_mode if value(color_blend_mode) not in (None,"modulate") else None)
@@ -310,7 +314,7 @@ class Card(Container):
     def __init__(self, content=None, *, elevation: float = 1,
                  variant: str = "elevated", bgcolor=None, shadow_color=None,
                  shape=None, clip_behavior=None, semantic_container=True,
-                 show_border_on_foreground=True, **base):
+                 show_border_on_foreground=True, **base: Unpack[ControlOptions]):
         from ..types import Border, BoxShadow, Offset
 
         elevation = 1 if elevation is None else elevation
@@ -373,7 +377,7 @@ class ProgressBar(Control):
     def __init__(self, value: float | None = None, *, bar_height: float = 4,
                  color=None, bgcolor=None, border_radius=None, semantics_label=None,
                  semantics_value=None, stop_indicator_color=None, stop_indicator_radius=None,
-                 track_gap=None, year_2023=None, **base):
+                 track_gap=None, year_2023=None, **base: Unpack[ControlOptions]):
         super().__init__(semantics_label=semantics_label, **base)
         self.value = value
         self.bar_height = 4 if bar_height is None else bar_height
@@ -487,7 +491,7 @@ class ProgressRing(Control):
     def __init__(self, value: float | None = None, *, stroke_width: float = 4,
                  color=None, bgcolor=None, stroke_align=None, stroke_cap=None,
                  semantics_label=None, semantics_value=None, track_gap=None,
-                 size_constraints=None, padding=None, year_2023=None, **base):
+                 size_constraints=None, padding=None, year_2023=None, **base: Unpack[ControlOptions]):
         super().__init__(semantics_label=semantics_label, **base)
         self.value = value
         self.stroke_width = 4 if stroke_width is None else stroke_width

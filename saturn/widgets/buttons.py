@@ -5,8 +5,12 @@ color/bgcolor, disabled.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from .. import colors, motion, text as txt
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..text import render_icon_cached
 from ..painting import draw_shadow
@@ -46,7 +50,7 @@ class Button(Control):
                  bgcolor=None, elevation: float = 1, style=None, on_click=None,
                  on_hover=None, on_long_press=None, on_focus=None, on_blur=None,
                  autofocus=False, url=None, clip_behavior=None, expressive=False, size=None,
-                 shape="round", **base):
+                 shape="round", **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.expressive = bool(expressive or size is not None)
         self.button_size = (size or "small").replace("_", "").lower()
@@ -404,7 +408,7 @@ class IconButton(Control):
                  padding=None, enable_feedback=None, url=None, mouse_cursor=None,
                  visual_density=None, size_constraints=None,
                  on_long_press=None, on_focus=None, on_blur=None,
-                 expressive=False, size=None, shape="round", **base):
+                 expressive=False, size=None, shape="round", **base: Unpack[ControlOptions]):
         reject_options("IconButton", enable_feedback=True if enable_feedback else None)
         super().__init__(tooltip=tooltip, **base)
         self.expressive = bool(expressive or size is not None)

@@ -1,8 +1,12 @@
 """Expressive list item with text or existing-control content slots."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from .. import colors, motion, text as txt
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..types import as_border_radius
 from ._material import (draw_state_layer, init_state_layer, press,
@@ -40,7 +44,7 @@ class ListItem(Control):
                  selected=False, container_color=None,
                  selected_container_color=None, content_color=None,
                  selected_content_color=None, border_radius=None,
-                 on_click=None, on_hover=None, on_long_press=None, **base):
+                 on_click=None, on_hover=None, on_long_press=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.headline = headline if headline is not None else content
         self.leading = leading

@@ -7,10 +7,60 @@ import math
 import threading
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from . import colors
 from .animation import animation_spec, ease, interpolate
 from .types import Alignment, AnimationCurve, Margin, as_padding
+
+if TYPE_CHECKING:
+    from typing import Unpack  # typing.Unpack needs 3.11+
+
+
+class ControlOptions(TypedDict, total=False):
+    """Keyword options shared by every control.
+
+    Widget ``__init__``s forward common options as ``**base``; annotating
+    it ``Unpack[ControlOptions]`` (PEP 692) lets IDEs complete and check
+    inherited parameters such as ``expand`` even though they are not
+    spelled out in each signature.
+    """
+    visible: bool
+    disabled: bool
+    opacity: float
+    expand: bool | int | None
+    expand_loose: bool
+    tooltip: str | None
+    data: Any
+    width: float | None
+    height: float | None
+    margin: Any
+    align: Alignment | None
+    left: float | None
+    top: float | None
+    right: float | None
+    bottom: float | None
+    rotate: Any
+    scale: Any
+    offset: Any
+    animate_opacity: Any
+    animate_size: Any
+    animate_position: Any
+    animate_align: Any
+    animate_margin: Any
+    animate_rotation: Any
+    animate_scale: Any
+    animate_offset: Any
+    on_animation_end: Any
+    key: Any
+    ref: Any
+    rtl: bool | None
+    aspect_ratio: float | None
+    mouse_cursor: Any
+    semantics_label: str | None
+    can_request_focus: bool
+    on_size_change: Any
+    size_change_interval: float
 
 
 @dataclass

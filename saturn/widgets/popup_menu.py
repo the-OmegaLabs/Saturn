@@ -6,11 +6,15 @@ menu instead of reaching the controls underneath.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import time
 
 from .. import colors, motion
 from .._gen.icons import Icons
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..painting import draw_shadow
 from ..types import Alignment, AnimationCurve, Padding, as_padding
@@ -31,7 +35,7 @@ class PopupMenuItem(Control):
 
     def __init__(self, text=None, *, content=None, icon=None, leading=None,
                  trailing=None, height=None, on_click=None, disabled=False,
-                 checked=None, **base):
+                 checked=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.text = text
         self.content = content
@@ -133,7 +137,7 @@ class PopupMenuButton(Control):
     def __init__(self, items=None, *, content=None, icon=None, icon_color=None,
                  icon_size=None, width=None, height=None, padding=None,
                  tooltip=None, bgcolor=None, elevation=8, on_opened=None,
-                 on_closed=None, **base):
+                 on_closed=None, **base: Unpack[ControlOptions]):
         base.setdefault("width", width)
         base.setdefault("height", height)
         super().__init__(tooltip=tooltip, **base)

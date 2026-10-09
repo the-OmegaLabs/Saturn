@@ -7,11 +7,15 @@ Usage:
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import threading
 
 from .. import colors, motion
 from .. import text as txt
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire
 from ..types import AnimationCurve, as_padding, Alignment, MainAxisAlignment
 from .containers import Container, Row
@@ -30,7 +34,7 @@ class DialogControl(Control):
     _barrier = True  # clicks outside the card dismiss and are swallowed
 
     def __init__(self, *, open: bool = False, modal: bool = False,
-                 on_dismiss=None, **base):
+                 on_dismiss=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.open = bool(open)
         self.modal = modal
@@ -76,7 +80,7 @@ class AlertDialog(DialogControl):
                  action_button_padding=None, shadow_color=None, icon_color=None,
                  scrollable=False, actions_overflow_button_spacing=None, alignment=None,
                  content_text_style=None, title_text_style=None, clip_behavior="none",
-                 semantics_label=None, barrier_color=None, **base):
+                 semantics_label=None, barrier_color=None, **base: Unpack[ControlOptions]):
         reject_options("AlertDialog",content_text_style=content_text_style,shadow_color=shadow_color)
         if isinstance(content,str):
             content = Text(content)
@@ -300,7 +304,7 @@ class SnackBar(DialogControl):
                  dismiss_direction=None, show_close_icon=False, close_icon_color=None,
                  margin=None, padding=None, width=None, elevation=None, shape=None,
                  clip_behavior="hardEdge", action_overflow_threshold=.25,
-                 persist=None, on_visible=None, **base):
+                 persist=None, on_visible=None, **base: Unpack[ControlOptions]):
         reject_options("SnackBar",dismiss_direction=dismiss_direction)
         super().__init__(open=open, on_dismiss=on_dismiss, **base)
         self.content = content      # str | Control

@@ -1,4 +1,9 @@
 """Expressive rounded-polygon loading and moving-wave progress controls."""
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import json
 import math
 import time
@@ -8,7 +13,7 @@ from pathlib import Path
 import pygame
 
 from .. import colors, motion
-from ..control import Control
+from ..control import Control, ControlOptions
 
 
 @lru_cache(maxsize=1)
@@ -48,7 +53,7 @@ class LoadingIndicator(Control):
     """
     shape_names = ('SoftBurst', 'Cookie9Sided', 'Pentagon', 'Pill', 'Sunny', 'Cookie4Sided', 'Oval')
 
-    def __init__(self, value=None, *, color=None, bgcolor=None, contained=False, **base):
+    def __init__(self, value=None, *, color=None, bgcolor=None, contained=False, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.value, self.color, self.bgcolor = value, color, bgcolor
         self.contained = contained
@@ -129,7 +134,7 @@ class WavyProgressIndicator(Control):
     circular = False
 
     def __init__(self, value=None, *, color=None, bgcolor=None, stroke_width=4,
-                 amplitude=None, wavelength=None, wave_speed=1.0, **base):
+                 amplitude=None, wavelength=None, wave_speed=1.0, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         if stroke_width <= 0 or (wavelength is not None and wavelength <= 0):
             raise ValueError('stroke_width and wavelength must be positive')

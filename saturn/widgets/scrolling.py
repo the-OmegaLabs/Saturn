@@ -5,6 +5,10 @@ auto_scroll, scroll_to()); GestureDetector(content, on_tap, on_hover...).
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import time
 import math
 from types import SimpleNamespace
@@ -13,7 +17,7 @@ from collections import OrderedDict
 
 from .. import colors
 from .. import motion
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import TapEvent, fire, ControlEvent, normalize_handlers, _invoke
 from ..types import as_padding
 from .containers import Container, _margins
@@ -128,7 +132,7 @@ class ListView(Control):
                  reverse=False, first_item_prototype=False, prototype_item=None,
                  divider_thickness=0, clip_behavior="hardEdge", semantic_child_count=None,
                  cache_extent=None, build_controls_on_demand=True, scroll=None,
-                 auto_scroll_animation=None, scroll_interval=10, **base):
+                 auto_scroll_animation=None, scroll_interval=10, **base: Unpack[ControlOptions]):
         reject_options("ListView", auto_scroll_animation=auto_scroll_animation)
         if controls is not None:
             if items:
@@ -806,7 +810,7 @@ class GestureDetector(Control):
                  on_vertical_drag_update=None, on_vertical_drag_end=None,on_vertical_drag_cancel=None,
                  on_pan_down=None,on_pan_start=None,on_pan_update=None,on_pan_end=None,on_pan_cancel=None,
                  on_scroll=None,allowed_devices=None,exclude_from_semantics=False,
-                 multi_tap_touches=0,trackpad_scroll_causes_scale=False, **base):
+                 multi_tap_touches=0,trackpad_scroll_causes_scale=False, **base: Unpack[ControlOptions]):
         if multi_tap_touches:
             raise NotImplementedError("GestureDetector.multi_tap_touches requires multitouch input")
         if trackpad_scroll_causes_scale:

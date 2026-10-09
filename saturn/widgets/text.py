@@ -1,11 +1,15 @@
 """Text control. Icon/Image/Divider join this module in the widgets milestone."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from collections import OrderedDict
 
 from .. import colors
 from .. import text as font_state
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..text import (family_for, line_height, line_width, measure,
                     render_line_cached, wrap)
 from ..text import weight_num
@@ -26,7 +30,7 @@ class Text(Control):
                  show_selection_cursor=False, enable_interactive_selection=True,
                  selection_cursor_width=2.0, selection_cursor_height=None,
                  selection_cursor_color=None, spans=None, theme_style=None,
-                 **base):
+                 **base: Unpack[ControlOptions]):
         if spans is not None or theme_style is not None:
             raise NotImplementedError("Rich TextSpan and theme_style text are not supported yet")
         if getattr(overflow, "value", overflow) == "fade":

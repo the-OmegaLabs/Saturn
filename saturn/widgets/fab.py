@@ -1,13 +1,17 @@
 """Expressive floating action buttons, measured in logical pixels."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 from .. import colors, motion, text as txt
 from ..event import fire
 from ..text import render_icon_cached
 from ..painting import draw_shadow
 from ._material import draw_state_layer, press, release, set_hover
 from .buttons import Button
-from ..control import Control
+from ..control import Control, ControlOptions
 from ._compat import shape_radius, value, reject_options
 
 
@@ -44,7 +48,7 @@ class FloatingActionButton(Button):
                  focus_color=None, disabled_elevation=None, focus_elevation=None,
                  highlight_elevation=None, hover_elevation=None, hover_color=None,
                  splash_color=None, enable_feedback=None, url=None, mouse_cursor=None,
-                 clip_behavior="none", **base):
+                 clip_behavior="none", **base: Unpack[ControlOptions]):
         reject_options("FloatingActionButton",enable_feedback=True if enable_feedback else None)
         if text is None:
             text = content

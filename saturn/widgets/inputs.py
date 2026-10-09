@@ -3,6 +3,10 @@ Dropdown (+ legacy Option alias).
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Unpack
+
 import math
 import re
 import threading
@@ -18,7 +22,7 @@ from ._material import (draw_state_layer, init_state_layer, press,
 from .text import Text
 from .. import colors, motion, text as txt
 from .._gen.icons import Icons
-from ..control import Control
+from ..control import Control, ControlOptions
 from ..event import fire, dispatch_event, TextSelectionChangeEvent
 from ..text import get_font, get_icon_font
 from ..painting import draw_notched_outline
@@ -193,7 +197,7 @@ class TextField(Control):
                  smart_dashes_type=True, smart_quotes_type=True,
                  enable_ime_personalized_learning=True,
                  enable_stylus_handwriting=True, autofill_hints=None,
-                 keyboard_brightness=None, **base):
+                 keyboard_brightness=None, **base: Unpack[ControlOptions]):
         unsupported = dict(autocorrect=(autocorrect, True),
                            enable_suggestions=(enable_suggestions, True),
                            smart_dashes_type=(smart_dashes_type, True),
@@ -1262,7 +1266,7 @@ class _Toggle(Control):
                  label_position=LabelPosition.RIGHT, label_style=None,
                  autofocus=False, on_focus=None, on_blur=None,
                  overlay_color=None, hover_color=None, focus_color=None,
-                 splash_radius=None, on_change=None, **base):
+                 splash_radius=None, on_change=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.label = label
         self.value = bool(value)
@@ -1417,7 +1421,7 @@ class Checkbox(_Toggle):
                  overlay_color=None, check_color=None, active_color=None,
                  hover_color=None, focus_color=None, splash_radius=None,
                  border_side=None, error=False, shape=None, visual_density=None,
-                 on_change=None, on_focus=None, on_blur=None, **base):
+                 on_change=None, on_focus=None, on_blur=None, **base: Unpack[ControlOptions]):
         if shape is not None or visual_density is not None:
             raise NotImplementedError("Checkbox shape and visual_density are not supported")
         if value is None and not tristate:
@@ -1487,7 +1491,7 @@ class Switch(_Toggle):
                  track_color=None, track_outline_color=None, track_outline_width=None,
                  overlay_color=None, focus_color=None, hover_color=None,
                  splash_radius=None, padding=None, on_change=None, on_focus=None, on_blur=None,
-                 **base):
+                 **base: Unpack[ControlOptions]):
         # label_style remains an existing Saturn convenience alias.
         label_style = base.pop("label_style", label_text_style)
         super().__init__(label, value=value, label_position=label_position,
@@ -1619,7 +1623,7 @@ class Switch(_Toggle):
 
 
 class RadioGroup(Control):
-    def __init__(self, content=None, *, value=None, on_change=None, **base):
+    def __init__(self, content=None, *, value=None, on_change=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.content = content
         self.value = value
@@ -1679,7 +1683,7 @@ class Radio(Control):
                  autofocus=False, active_color=None, fill_color=None,
                  overlay_color=None, hover_color=None, focus_color=None,
                  splash_radius=None, toggleable=False, visual_density=None,
-                 on_focus=None, on_blur=None, **base):
+                 on_focus=None, on_blur=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.value = value
         self.label = label
@@ -1811,7 +1815,7 @@ class Slider(Control):
                  autofocus=False, interaction=None, secondary_active_color=None,
                  secondary_track_value=None, overlay_color=None, padding=None,
                  year_2023=None, on_change=None, on_change_start=None,
-                 on_change_end=None, on_focus=None, on_blur=None, **base):
+                 on_change_end=None, on_focus=None, on_blur=None, **base: Unpack[ControlOptions]):
         if max < min:
             raise ValueError("Slider max must not be less than min")
         if divisions is not None and divisions < 1:
@@ -2021,7 +2025,7 @@ class DropdownOption(Control):
     """Options hold key/text data; the Dropdown renders them as a menu."""
 
     def __init__(self, key=None, text=None, *, content=None,
-                 leading_icon=None, trailing_icon=None, style=None, **base):
+                 leading_icon=None, trailing_icon=None, style=None, **base: Unpack[ControlOptions]):
         super().__init__(**base)
         self.key = key if key is not None else (text if text is not None else
                                                 str(content))
@@ -2136,7 +2140,7 @@ class Dropdown(Control):
                  focused_border_width=None, focused_border_color=None,
                  color=None, content_padding=None, dense=False, hover_color=None,
                  label_style=None, hint_style=None, helper_text=None, helper_style=None,
-                 error_text=None, error_style=None, **base):
+                 error_text=None, error_style=None, **base: Unpack[ControlOptions]):
         if menu_style is not None or expanded_insets is not None:
             raise NotImplementedError("Dropdown menu_style and expanded_insets are not supported")
         if menu_height is not None and menu_height <= 0 or menu_width is not None and menu_width <= 0:
