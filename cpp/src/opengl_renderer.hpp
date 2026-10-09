@@ -22,6 +22,9 @@ private:
   std::unique_ptr<Impl> impl_;
   void ensure_quad_pipeline();
   void ensure_tex_pipeline();
+  void ensure_sdf_pipeline();
   void apply_scissor();
+  // stroke_width == 0 -> solid rounded fill; >0 -> inside stroke. Respects scissor.
+  void draw_sdf_rect(Rect r, Color c, float radius, float stroke_width);
 };
 }

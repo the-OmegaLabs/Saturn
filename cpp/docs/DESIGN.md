@@ -35,8 +35,10 @@ Synced with group agreement (Saturn room). Update when constraints change.
 | SDL via pygame-ce | SDL3 directly |
 
 ## Phase 2 status
-- `fill_rect` via GL 3.3 core shader + gl_VertexID quad (radius still ignored)
-- `stroke_rect` / clip / blit still stubs
+- `fill_rect` via GL 3.3 core: sharp path = solid batch `fill_rects`; `radius > 0` = SDF rounded fill
+- `stroke_rect` real via same SDF shader (annulus); **stroke alignment = inside** (outer edge on given Rect bounds; layout size unchanged)
+- Caps: `kMaxCornerRadius` / `kMaxStrokeWidth` (also clamped to half min(w,h)); non-finite throws
+- Clip / textured quads as before
 - UTF-8 without BOM
 
 ## Phase 3 status
@@ -56,4 +58,4 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).
 - Glyph path: CPU atlas (16x8 cells of 8px, ASCII 0..127) uploaded once; one textured quad per character via `draw_textured_quads` (not per-pixel / not solid `fill_rects`).
 - Caps: `kMaxTextLen` (4096) on text draw; `kMaxFillRects` (16384) on `fill_rects` / `draw_textured_quads` (throw, no silent truncate).
-- Hello track closed; next knives are elsewhere (e.g. stroke_rect/radius, layout widgets) - not more ColorBox/hello churn.
+- Hello track closed; next knives are elsewhere (e.g. layout widgets) - not more ColorBox/hello churn.

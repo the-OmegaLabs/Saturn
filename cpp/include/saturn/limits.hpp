@@ -9,4 +9,7 @@ inline constexpr std::size_t kMaxLayoutDim = 1u << 15;
 inline constexpr std::size_t kMaxChildren = 1u << 14;
 inline constexpr std::size_t kMaxPathBytes = 4096;
 inline constexpr std::size_t kMaxClipDepth = 64;
+// Soft caps for SDF rounded fill / stroke (also clamped to half min(w,h)).
+inline constexpr float kMaxCornerRadius = 4096.f;
+inline constexpr float kMaxStrokeWidth = 4096.f;
 }
