@@ -187,6 +187,7 @@ struct OpenGLRenderer::Impl {
   std::size_t vbo_capacity = 0; // floats
   unsigned tex_vao = 0, tex_vbo = 0, tex_prog = 0;
   int u_tex_viewport = -1, u_tex_size = -1, u_tint = -1, u_sampler = -1;
+  int u_tex_rect = -1, u_tex_radius = -1;
   bool tex_pipeline = false;
   std::size_t tex_vbo_capacity = 0; // floats
   unsigned sdf_vao = 0, sdf_vbo = 0, sdf_prog = 0;
@@ -221,20 +222,42 @@ layout(location = 1) in vec2 aUV;
 uniform vec2 uViewport;
 uniform vec2 uTexSize;
 out vec2 vUV;
+out vec2 vPos;
 void main() {
   vec2 ndc = vec2(aPos.x / uViewport.x * 2.0 - 1.0,
                   1.0 - aPos.y / uViewport.y * 2.0);
   gl_Position = vec4(ndc, 0.0, 1.0);
   vUV = aUV / uTexSize;
+  vPos = aPos;
 }
 )";
 
 static const char* kTexFrag = R"(#version 330 core
 uniform sampler2D uTex;
 uniform vec4 uTint;
+uniform vec4 uRect;
+uniform float uRadius;
 in vec2 vUV;
+in vec2 vPos;
 out vec4 frag;
-void main() { frag = texture(uTex, vUV) * uTint; }
+float sdRoundBox(vec2 p, vec2 b, float r) {
+  vec2 q = abs(p) - b + r;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+void main() {
+  vec4 c = texture(uTex, vUV) * uTint;
+  if (uRadius > 0.0) {
+    vec2 center = uRect.xy + uRect.zw * 0.5;
+    vec2 halfSize = uRect.zw * 0.5;
+    float r = min(uRadius, min(halfSize.x, halfSize.y));
+    float d = sdRoundBox(vPos - center, halfSize, r);
+    float aa = 1.0;
+    float mask = 1.0 - smoothstep(-aa, aa, d);
+    c.a *= mask;
+    if (c.a <= 0.001) discard;
+  }
+  frag = c;
+}
 )";
 
 // Screen-space pos in; SDF rounded rect fill (uStrokeWidth==0) or inside stroke.
@@ -433,6 +456,8 @@ void OpenGLRenderer::ensure_tex_pipeline() {
     impl_->u_tex_size = g.getUniformLocation(impl_->tex_prog, "uTexSize");
     impl_->u_tint = g.getUniformLocation(impl_->tex_prog, "uTint");
     impl_->u_sampler = g.getUniformLocation(impl_->tex_prog, "uTex");
+    impl_->u_tex_rect = g.getUniformLocation(impl_->tex_prog, "uRect");
+    impl_->u_tex_radius = g.getUniformLocation(impl_->tex_prog, "uRadius");
     g.useProgram(0);
     impl_->tex_pipeline = true;
   } catch (...) {
@@ -639,9 +664,12 @@ void OpenGLRenderer::destroy_texture(void* tex) {
   delete rec;
 }
 
-void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count, Color tint) {
+void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count,
+                                          Color tint, float radius) {
   if (count > kMaxFillRects)
     throw std::runtime_error("draw_textured_quads exceeds kMaxFillRects");
+  if (!std::isfinite(radius))
+    throw std::invalid_argument("draw_textured_quads radius must be finite");
   if (!impl_ || !impl_->ctx || !tex || !quads || count == 0) return;
   auto* rec = static_cast<Impl::GpuTexture*>(tex);
   if (!rec->id || rec->w <= 0 || rec->h <= 0) return;
@@ -649,19 +677,11 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
   ensure_tex_pipeline();
   if (!impl_->tex_pipeline) return;
 
-  impl_->scratch.clear();
-  impl_->scratch.reserve(count * 24);
-  for (std::size_t i = 0; i < count; ++i) {
-    const TexturedQuad& q = quads[i];
-    if (!(q.dst.w > 0 && q.dst.h > 0)) continue;
-    if (!std::isfinite(q.dst.x) || !std::isfinite(q.dst.y) ||
-        !std::isfinite(q.dst.w) || !std::isfinite(q.dst.h)) continue;
-    if (!std::isfinite(q.uv.x) || !std::isfinite(q.uv.y) ||
-        !std::isfinite(q.uv.w) || !std::isfinite(q.uv.h)) continue;
-    if (q.dst.w > kMaxLayoutDim || q.dst.h > kMaxLayoutDim) continue;
-    append_textured(impl_->scratch, q.dst, q.uv);
-  }
-  if (impl_->scratch.empty()) return;
+  float rad = radius;
+  if (rad < 0.f) rad = 0.f;
+  if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
+  // Rounded path needs uRadius; without glUniform1f fall back to sharp.
+  bool rounded = rad > 0.f && impl_->gl.uniform1f && impl_->u_tex_radius >= 0;
 
   auto& g = impl_->gl;
   apply_scissor();
@@ -673,18 +693,59 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
   g.bindTexture(kTexture2D, rec->id);
   g.bindVertexArray(impl_->tex_vao);
   g.bindBuffer(kArrBuf, impl_->tex_vbo);
-  const std::size_t floats = impl_->scratch.size();
-  if (floats > impl_->tex_vbo_capacity) {
-    impl_->tex_vbo_capacity = floats * 2;
-    g.bufferData(kArrBuf, ptrdiff_t(impl_->tex_vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
-  }
-  g.bufferSubData(kArrBuf, 0, ptrdiff_t(floats * sizeof(float)), impl_->scratch.data());
   g.useProgram(impl_->tex_prog);
   g.uniform2f(impl_->u_tex_viewport, float(impl_->w), float(impl_->h));
   g.uniform2f(impl_->u_tex_size, float(rec->w), float(rec->h));
   g.uniform4f(impl_->u_tint, tint.r / 255.f, tint.g / 255.f, tint.b / 255.f, tint.a / 255.f);
   if (g.uniform1i && impl_->u_sampler >= 0) g.uniform1i(impl_->u_sampler, 0);
-  g.drawArrays(GL_TRIANGLES, 0, int(floats / 4));
+
+  auto upload_and_draw = [&](const std::vector<float>& verts) {
+    if (verts.empty()) return;
+    const std::size_t floats = verts.size();
+    if (floats > impl_->tex_vbo_capacity) {
+      impl_->tex_vbo_capacity = floats * 2;
+      g.bufferData(kArrBuf, ptrdiff_t(impl_->tex_vbo_capacity * sizeof(float)), nullptr, kDynamicDraw);
+    }
+    g.bufferSubData(kArrBuf, 0, ptrdiff_t(floats * sizeof(float)), verts.data());
+    g.drawArrays(GL_TRIANGLES, 0, int(floats / 4));
+  };
+
+  if (!rounded) {
+    if (g.uniform1f && impl_->u_tex_radius >= 0) g.uniform1f(impl_->u_tex_radius, 0.f);
+    impl_->scratch.clear();
+    impl_->scratch.reserve(count * 24);
+    for (std::size_t i = 0; i < count; ++i) {
+      const TexturedQuad& q = quads[i];
+      if (!(q.dst.w > 0 && q.dst.h > 0)) continue;
+      if (!std::isfinite(q.dst.x) || !std::isfinite(q.dst.y) ||
+          !std::isfinite(q.dst.w) || !std::isfinite(q.dst.h)) continue;
+      if (!std::isfinite(q.uv.x) || !std::isfinite(q.uv.y) ||
+          !std::isfinite(q.uv.w) || !std::isfinite(q.uv.h)) continue;
+      if (q.dst.w > kMaxLayoutDim || q.dst.h > kMaxLayoutDim) continue;
+      append_textured(impl_->scratch, q.dst, q.uv);
+    }
+    upload_and_draw(impl_->scratch);
+  } else {
+    // Per-quad SDF mask (uRect/uRadius are uniforms).
+    for (std::size_t i = 0; i < count; ++i) {
+      const TexturedQuad& q = quads[i];
+      if (!(q.dst.w > 0 && q.dst.h > 0)) continue;
+      if (!std::isfinite(q.dst.x) || !std::isfinite(q.dst.y) ||
+          !std::isfinite(q.dst.w) || !std::isfinite(q.dst.h)) continue;
+      if (!std::isfinite(q.uv.x) || !std::isfinite(q.uv.y) ||
+          !std::isfinite(q.uv.w) || !std::isfinite(q.uv.h)) continue;
+      if (q.dst.w > kMaxLayoutDim || q.dst.h > kMaxLayoutDim) continue;
+      float qr = rad;
+      float half_min = 0.5f * (std::min)(q.dst.w, q.dst.h);
+      if (qr > half_min) qr = half_min;
+      if (g.uniform4f && impl_->u_tex_rect >= 0)
+        g.uniform4f(impl_->u_tex_rect, q.dst.x, q.dst.y, q.dst.w, q.dst.h);
+      if (g.uniform1f && impl_->u_tex_radius >= 0) g.uniform1f(impl_->u_tex_radius, qr);
+      impl_->scratch.clear();
+      append_textured(impl_->scratch, q.dst, q.uv);
+      upload_and_draw(impl_->scratch);
+    }
+  }
   g.useProgram(0);
   g.bindTexture(kTexture2D, 0);
 }

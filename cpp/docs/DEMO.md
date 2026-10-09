@@ -57,7 +57,7 @@ check mark = `icons/check.png`; press via `Pressable`).
 Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48) + `Switch`
 (`Pressable`, 52×40, no label) + `ProgressRing(0.6)` (40×40 / stroke 4 /
 PRIMARY). Dropdown row spacing 12: `Dropdown` hint `"dropdown..."` options
-Alpha/Beta/Gamma width 180 + `Image(test_img.png)` 140×70.
+Alpha/Beta/Gamma width 180 + `Image(test_img.png)` 140×70 `border_radius=8`.
 Dialog row spacing 8: `ElevatedButton("Dialog")` → `AlertDialog` (Confirm /
 Cancel `TextButton` + Delete `FilledButton`) via `Page::show_dialog`;
 `ElevatedButton("SnackBar")` → `SnackBar("Saved!", "Undo", 3000)`.

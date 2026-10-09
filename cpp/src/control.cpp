@@ -216,12 +216,12 @@ void* TextureImage::ensure_texture(Renderer& r) {
   tex_r_ = &r;
   return tex_;
 }
-void TextureImage::draw(Renderer& r, Rect dst, Color tint) {
+void TextureImage::draw(Renderer& r, Rect dst, Color tint, float radius) {
   void* tex = ensure_texture(r);
   TexturedQuad q;
   q.dst = dst;
   q.uv = Rect{0.f, 0.f, float(src_w_), float(src_h_)};
-  r.draw_textured_quads(tex, &q, 1, tint);
+  r.draw_textured_quads(tex, &q, 1, tint, radius);
 }
 
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
@@ -595,8 +595,10 @@ void Slider::on_pointer(const PointerEvent& e) {
   }
 }
 
-Image::Image(std::string path, ControlOptions opt)
-  : Control(std::move(opt)), image_(std::move(path)) {}
+Image::Image(std::string path, ControlOptions opt, float border_radius)
+  : Control(std::move(opt)), image_(std::move(path)) {
+  set_border_radius(border_radius);
+}
 void Image::set_tint(Color c) {
   has_tint_ = true;
   tint_ = c;
@@ -607,6 +609,13 @@ void Image::clear_tint() {
   tint_ = Color{255, 255, 255, 255};
   if (page_) page_->update();
 }
+void Image::set_border_radius(float radius) {
+  if (!std::isfinite(radius))
+    throw std::invalid_argument("Image border_radius must be finite");
+  border_radius_ = clamp_radius(radius);
+  if (page_) page_->update();
+}
+float Image::border_radius() const { return border_radius_; }
 bool Image::loaded() const { return image_.loaded(); }
 Size Image::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width && opt_.height) return Control::intrinsic(opt_.width, opt_.height);
@@ -652,7 +661,7 @@ void Image::paint(Renderer& r) {
     rect_.y + (rect_.h - dh) * 0.5f,
     dw, dh};
   Color tint = has_tint_ ? tint_ : Color{255, 255, 255, 255};
-  image_.draw(r, dst, tint);
+  image_.draw(r, dst, tint, border_radius_);
 }
 
 Switch::Switch(bool value, std::function<void(bool)> on_change, ControlOptions opt)

@@ -55,7 +55,8 @@ public:
   void ensure_loaded() const;
   void* ensure_texture(Renderer& r);
   void release_texture();
-  void draw(Renderer& r, Rect dst, Color tint);
+  // radius: SDF rounded mask (0 = sharp). Caps via renderer / clamp_radius.
+  void draw(Renderer& r, Rect dst, Color tint, float radius = 0.f);
   bool loaded() const { return load_ok_; }
   int src_w() const { return src_w_; }
   int src_h() const { return src_h_; }
@@ -192,11 +193,15 @@ private:
 // PNG Image via TextureImage (stb_image). Optional tint (multiply).
 // BoxFit.CONTAIN when both width and height are set on ControlOptions.
 // Path/decode/dim failures throw (no silent empty paint).
+// border_radius: SDF textured round (demo Image uses 8). Non-finite throws;
+// otherwise clamp_radius / kMaxCornerRadius (no unbounded path).
 class Image final : public Control {
 public:
-  explicit Image(std::string path, ControlOptions opt = {});
+  explicit Image(std::string path, ControlOptions opt = {}, float border_radius = 0.f);
   void set_tint(Color c);
   void clear_tint();
+  void set_border_radius(float radius);
+  float border_radius() const;
   bool loaded() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
@@ -204,6 +209,7 @@ private:
   TextureImage image_;
   bool has_tint_ = false;
   Color tint_{255, 255, 255, 255};
+  float border_radius_ = 0.f;
 };
 
 // M3 Checkbox: 18×18 box radius 2, active PRIMARY, optional label.
