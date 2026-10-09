@@ -99,9 +99,10 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Elevated leading icon path defaults to **empty**; callers pass PNG explicitly.
 - ElevatedButton idle shadow: `draw_elevation_shadow` ≈ Python
   `painting.draw_shadow` — ambient (α=28) + key (α=40), with blur/dy
-  rounded like `_shadow`: `max(1, round((1+0.7e)*scale))` /
-  `max(1, round((0.5+0.8e)*scale))` / `round(0.5e*scale)` (scale=1 →
-  e=1: blur 2/1, dy=1). Concentric translucent fills only. Non-finite
+  rounded like `_shadow` with Python3 banker’s `round`: `max(1,
+  round((1+0.7e)*scale))` / `max(1, round((0.5+0.8e)*scale))` /
+  `round(0.5e*scale)` (scale=1 → e=1: blur 2/1, dy=0). Concentric
+  translucent fills only. Non-finite
   throw; blur/radius via `clamp_radius` / `kMaxCornerRadius`; layer >
   `kMaxLayoutDim` throw. No blur kernel/FBO. Not Card
   `BoxShadow(blur=3*e)`. Hover/press elevation animation deferred.

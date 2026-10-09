@@ -94,7 +94,7 @@ scale-aware golden, Dropdown outside-click dismiss / true overlay+clip,
 Dialog open/close motion.
 
 **Elevated shadow:** ambient+key ≈ `painting.draw_shadow` (α=28/40;
-blur=`max(1,round(...))`, dy=`round(0.5e)` — e=1 → blur 2/1, dy=1) via
+blur=`max(1,round(...))`, dy=`round(0.5e)` — Python3 banker’s; e=1 → blur 2/1, dy=0) via
 stacked translucent fills; no blur kernel/FBO. Idle elevation=1 only —
 hover/press animation deferred.
 Not Card `BoxShadow(blur=3*e)`. Won't move the ~27% headline much (frozen

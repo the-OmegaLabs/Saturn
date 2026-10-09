@@ -52,9 +52,19 @@ float clamp_radius(float radius) {
 //   ambient_blur = max(1, round((1 + 0.7e) * scale))
 //   key_blur     = max(1, round((0.5 + 0.8e) * scale))
 //   key_dy       = round(0.5 * e * scale)
-// At e=1, scale=1: blur ambient=2, key=1, dy=1 (α=28/40).
-// Uses std::lround (half away from zero) so dy(e=1)=1.
+// Python3 round is banker's (half to even): e=1 → blur 2/1, dy=0.
 // Not containers._draw_shadow / BoxShadow(blur=3*e).
+
+// Python 3 round(): nearest integer, ties to even.
+long py_round(double x) {
+  const double floored = std::floor(x);
+  const double frac = x - floored;
+  if (frac < 0.5) return static_cast<long>(floored);
+  if (frac > 0.5) return static_cast<long>(floored) + 1;
+  const long n = static_cast<long>(floored);
+  return (n % 2 == 0) ? n : n + 1;
+}
+
 void draw_elevation_shadow(Renderer& r, const Rect& box, float radius,
                            float elevation) {
   if (!std::isfinite(elevation) || !std::isfinite(radius) ||
@@ -97,13 +107,14 @@ void draw_elevation_shadow(Renderer& r, const Rect& box, float radius,
   };
 
   // painting._shadow with scale=1 (logical demo / golden shots).
-  constexpr float kScale = 1.f;
+  // py_round = Python3 banker's round (not std::lround).
+  constexpr double kScale = 1.0;
+  const double e = double(elevation);
   const float ambient_blur = float(std::max(
-      1L, std::lround((1.f + elevation * 0.7f) * kScale)));
+      1L, py_round((1.0 + e * 0.7) * kScale)));
   const float key_blur = float(std::max(
-      1L, std::lround((0.5f + elevation * 0.8f) * kScale)));
-  const float key_dy =
-      float(std::lround(elevation * 0.5f * kScale));
+      1L, py_round((0.5 + e * 0.8) * kScale)));
+  const float key_dy = float(py_round(e * 0.5 * kScale));
   paint_layer(ambient_blur, 0.f, /*alpha=*/28);
   paint_layer(key_blur, key_dy, /*alpha=*/40);
 }
