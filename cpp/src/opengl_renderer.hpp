@@ -1,5 +1,6 @@
-#pragma once
+﻿#pragma once
 #include "saturn/renderer.hpp"
+#include <memory>
 namespace saturn {
 class OpenGLRenderer final : public Renderer {
 public:
@@ -14,6 +15,6 @@ public:
   void on_resize(int w, int h) override;
 private:
   struct Impl;
-  Impl* impl_; // owned; opaque to keep header dense
+  std::unique_ptr<Impl> impl_;
 };
 }
