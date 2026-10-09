@@ -100,4 +100,23 @@ public:
 private:
   float spacing_ = 0.f;
 };
+
+// Box with padding/bgcolor/radius. Owns children; clips paint to bounds.
+class Container final : public Control {
+public:
+  explicit Container(ControlOptions opt = {});
+  void set_bgcolor(Color c);
+  void set_padding(float pad);
+  void set_corner_radius(float radius);
+  void add(std::unique_ptr<Control> child);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void layout() override;
+  void paint(Renderer& r) override;
+  bool hit_test(float x, float y) const override;
+private:
+  Color bgcolor_{0,0,0,0};
+  bool has_bg_ = false;
+  float padding_ = 0.f;
+  float corner_radius_ = 0.f;
+};
 }
