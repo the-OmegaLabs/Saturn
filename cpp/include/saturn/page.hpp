@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "control.hpp"
 #include <string>
 namespace saturn {

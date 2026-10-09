@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstddef>
 namespace saturn {
 inline constexpr std::size_t kMaxTextBytes = 1u << 20;
