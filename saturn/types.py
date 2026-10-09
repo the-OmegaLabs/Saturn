@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import enum
+import math
 from dataclasses import dataclass, field
 
 
@@ -480,6 +481,14 @@ class Blur:
     tile_mode: BlurTileMode = BlurTileMode.CLAMP
 
 
+def _finite_blur_sigma(value) -> float:
+    """Coerce a blur sigma; reject NaN/Inf so they never reach GL uniforms."""
+    sigma = float(value)
+    if not math.isfinite(sigma):
+        raise ValueError("blur sigma must be a finite number")
+    return sigma
+
+
 def as_blur(value) -> Blur | None:
     """Normalize Container.blur: None, number, (sx, sy), or Blur."""
     if value is None:
@@ -488,15 +497,15 @@ def as_blur(value) -> Blur | None:
         mode = value.tile_mode
         if not isinstance(mode, BlurTileMode):
             mode = BlurTileMode(getattr(mode, "value", mode))
-        return Blur(float(value.sigma_x), float(value.sigma_y), mode)
+        return Blur(_finite_blur_sigma(value.sigma_x), _finite_blur_sigma(value.sigma_y), mode)
     if isinstance(value, (int, float)):
-        sigma = float(value)
+        sigma = _finite_blur_sigma(value)
         return Blur(sigma, sigma)
     if isinstance(value, (tuple, list)):
         if not value:
             return Blur()
-        sx = float(value[0])
-        sy = float(value[1]) if len(value) > 1 else sx
+        sx = _finite_blur_sigma(value[0])
+        sy = _finite_blur_sigma(value[1]) if len(value) > 1 else sx
         return Blur(sx, sy)
     raise TypeError(f"blur must be a number, pair, or Blur, got {type(value)!r}")
 

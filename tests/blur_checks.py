@@ -33,6 +33,28 @@ def check_accepts_blur_api():
     print("Container.blur API OK")
 
 
+def check_rejects_nonfinite_blur():
+    """NaN/Inf must not bypass sigma clamps and reach GL uniforms."""
+    from saturn.painting import normalize_blur_sigmas
+
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        for value in (bad, (bad, 1.0), (1.0, bad), st.Blur(bad, 1.0)):
+            try:
+                st.Container(blur=value)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"expected ValueError for blur={value!r}")
+
+    sx, sy = normalize_blur_sigmas(float("nan"), 5.0, 2.0)
+    assert sx == 0.0 and sy == 10.0, (sx, sy)
+    sx, sy = normalize_blur_sigmas(float("inf"), float("-inf"), 1.0)
+    assert sx == 0.0 and sy == 0.0, (sx, sy)
+    sx, sy = normalize_blur_sigmas(3.0, 4.0, float("nan"))
+    assert sx == 0.0 and sy == 0.0, (sx, sy)
+    print("Container.blur non-finite reject OK")
+
+
 def check_software_screenshot():
     def main(page):
         page.bgcolor = "#000000"
@@ -100,6 +122,7 @@ def check_blur_none_and_zero_skip():
 
 if __name__ == "__main__":
     check_accepts_blur_api()
+    check_rejects_nonfinite_blur()
     check_blur_none_and_zero_skip()
     check_software_screenshot()
     print("ALL BLUR CHECKS PASS")

@@ -36,6 +36,9 @@ def _set_swap_interval(enabled: bool) -> bool:
     except (AttributeError, OSError):
         return False
 
+# Match cpp saturn::kMaxLayoutDim — hard ceiling for blur FBO edge length.
+_MAX_BLUR_TARGET_DIM = 1 << 15
+
 RECT_VS = """
 #version 330
 in vec2 in_pos;          // px, origin top-left
@@ -878,7 +881,11 @@ class GLRenderer(Renderer):
     # -- present -------------------------------------------------------------
 
     def _ensure_blur_targets(self, width, height):
-        size = (max(1, int(width)), max(1, int(height)))
+        # Absolute cap matches cpp saturn::kMaxLayoutDim — dual FBOs must not
+        # explode VRAM when a huge framebuffer meets a small downsample factor.
+        w = max(1, min(_MAX_BLUR_TARGET_DIM, int(width)))
+        h = max(1, min(_MAX_BLUR_TARGET_DIM, int(height)))
+        size = (w, h)
         if self._blur_size == size and self._blur_tex_a is not None:
             return
         for resource in (self._blur_fbo_a, self._blur_fbo_b,
@@ -925,6 +932,15 @@ class GLRenderer(Renderer):
             return
         factor = blur_downsample_factor(sx, sy)
         bw, bh = max(1, rw // factor), max(1, rh // factor)
+        if bw > _MAX_BLUR_TARGET_DIM or bh > _MAX_BLUR_TARGET_DIM:
+            extra = max(
+                math.ceil(bw / _MAX_BLUR_TARGET_DIM),
+                math.ceil(bh / _MAX_BLUR_TARGET_DIM),
+            )
+            factor = max(factor, factor * extra)
+            bw, bh = max(1, rw // factor), max(1, rh // factor)
+            bw = min(bw, _MAX_BLUR_TARGET_DIM)
+            bh = min(bh, _MAX_BLUR_TARGET_DIM)
         self._ensure_blur_targets(bw, bh)
         u0, u1 = x0 / tw, x1 / tw
         v_top, v_bottom = 1.0 - y0 / th, 1.0 - y1 / th

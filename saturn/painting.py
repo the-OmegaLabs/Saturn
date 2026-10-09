@@ -96,9 +96,22 @@ _MAX_DEVICE_SIGMA = 48.0
 
 
 def normalize_blur_sigmas(sigma_x, sigma_y, scale):
-    """Logical sigmas -> device-pixel radii, clamped for cost."""
-    sx = max(0.0, float(sigma_x)) * scale
-    sy = max(0.0, float(sigma_y)) * scale
+    """Logical sigmas -> device-pixel radii, clamped for cost.
+
+    Non-finite inputs (NaN/Inf) become 0 so dirty values never reach GL uniforms
+    even if a caller bypasses as_blur.
+    """
+    sx = float(sigma_x)
+    sy = float(sigma_y)
+    sc = float(scale)
+    if not math.isfinite(sx):
+        sx = 0.0
+    if not math.isfinite(sy):
+        sy = 0.0
+    if not math.isfinite(sc) or sc <= 0.0:
+        sc = 0.0
+    sx = max(0.0, sx) * sc
+    sy = max(0.0, sy) * sc
     peak = max(sx, sy)
     if peak > _MAX_DEVICE_SIGMA:
         factor = _MAX_DEVICE_SIGMA / peak
