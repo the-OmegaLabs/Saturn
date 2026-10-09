@@ -50,7 +50,7 @@ Has: SURFACE page, brand header (logo `Image` 52×40 CONTAIN + PRIMARY tint +
 title 28 + `v0.1.0` 12), status 13, two 440px panels (pad 20 / radius 16),
 button row spacing 8: `ElevatedButton` (+ Inter glyph) / `FilledButton` /
 `OutlinedButton` / `IconButton` (**Material FAVORITE PNG** at
-`assets/icons/favorite.png` — not Inter ♥). Pressed fills use theme tokens.
+`assets/icons/favorite.png` / embedded `icon_assets.hpp` — not Inter ♥). Pressed fills use theme tokens.
 Checkbox row spacing 12: `Checkbox("agree")` (18×18 / radius 2 / PRIMARY).
 Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48, PRIMARY; click +
 drag via pointer move while captured). Right panel: `ListView TBD` until scroll
