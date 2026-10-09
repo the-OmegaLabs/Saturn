@@ -489,14 +489,27 @@ def _finite_blur_sigma(value) -> float:
     return sigma
 
 
+def _clamp_only_tile_mode(mode) -> BlurTileMode:
+    """Only CLAMP is implemented; reject other Flet tile modes explicitly."""
+    if not isinstance(mode, BlurTileMode):
+        mode = BlurTileMode(getattr(mode, "value", mode))
+    if mode is not BlurTileMode.CLAMP:
+        raise ValueError(
+            f"BlurTileMode.{mode.name} is not supported; only "
+            f"BlurTileMode.CLAMP is implemented (edge samples clamp)"
+        )
+    return mode
+
+
 def as_blur(value) -> Blur | None:
-    """Normalize Container.blur: None, number, (sx, sy), or Blur."""
+    """Normalize Container.blur: None, number, (sx, sy), or Blur.
+
+    ``tile_mode`` must be ``BlurTileMode.CLAMP`` (the only implemented mode).
+    """
     if value is None:
         return None
     if isinstance(value, Blur):
-        mode = value.tile_mode
-        if not isinstance(mode, BlurTileMode):
-            mode = BlurTileMode(getattr(mode, "value", mode))
+        mode = _clamp_only_tile_mode(value.tile_mode)
         return Blur(_finite_blur_sigma(value.sigma_x), _finite_blur_sigma(value.sigma_y), mode)
     if isinstance(value, (int, float)):
         sigma = _finite_blur_sigma(value)

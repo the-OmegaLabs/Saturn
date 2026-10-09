@@ -15,4 +15,5 @@ Source: [`saturn/types.py`](../../saturn/types.py).
 | `REPEATED` | `repeated` |
 | `DECAL` | `decal` |
 
-Saturn currently clamps edge samples for both software and OpenGL paths.
+Only `CLAMP` is implemented for software and OpenGL. Passing `MIRROR`,
+`REPEATED`, or `DECAL` to `Blur` / `Container(blur=…)` raises `ValueError`.
