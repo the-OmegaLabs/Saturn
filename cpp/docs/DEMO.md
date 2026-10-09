@@ -48,18 +48,26 @@ Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
 Layout register cut toward `examples/demo.py` — **not** pixel parity.
 Has: SURFACE page, brand header (logo `Image` 52×40 CONTAIN + PRIMARY tint +
 title 28 + `v0.1.0` 12), status 13, two 440px panels (pad 20 / radius 16),
-button row spacing 8: `ElevatedButton` (+ icon) / `FilledButton` / `OutlinedButton`
-/ `IconButton` (Inter ♥). Pressed fills use theme tokens (`PRIMARY_CONTAINER` /
-surface-container family) — no hand-written RGB. Right panel: `ListView TBD`
-until scroll caps land with security review.
-**Still deferred** (expect `compare_shots` FAIL): TextField, Checkbox, Slider,
-Switch, ProgressRing, Dropdown, Dialog/SnackBar, ListView scroll, variable Inter
-weight / Noto SC, flex weights / MainAxisAlignment.
+button row spacing 8: `ElevatedButton` (+ Inter glyph) / `FilledButton` /
+`OutlinedButton` / `IconButton` (**Material FAVORITE PNG** at
+`assets/icons/favorite.png` / embedded `icon_assets.hpp` — not Inter ♥). Pressed fills use theme tokens.
+Checkbox row spacing 12: `Checkbox("agree")` (18×18 / radius 2 / PRIMARY).
+Slider row spacing 12: `Slider(0,100,divisions=10)` (~300×48, PRIMARY; click +
+drag via pointer move while captured). Right panel: `ListView TBD` until scroll
+caps land with security review.
+
+**Button factoring:** `Pressable` (shared `on_pointer`) → `ButtonBase` (measure /
+label paint / round hit / style hooks `paint_background` + `content_color`) →
+`Elevated` / `Filled` / `Outlined`. `IconButton` is `Pressable` + PNG tint.
+
+**Still deferred** (expect `compare_shots` FAIL): TextField, Switch, ProgressRing,
+Dropdown, Dialog/SnackBar, ListView scroll, variable Inter weight / Noto SC,
+flex weights / MainAxisAlignment, HiDPI scale-aware golden.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
 cmake --build cpp/build --config Release --target saturn_demo
-# Windows: run beside copied assets/Inter-Regular.ttf + saturn-logo-transparent.png
+# Windows: run beside copied assets/ (Inter + logo + icons/*.png)
 set SATURN_SHOT=cpp_skeleton.png
 saturn_demo.exe
 # optional: SATURN_SHOT_FRAMES=5 (default 3)
@@ -95,11 +103,13 @@ python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png pat
 See `limits.hpp`: `kMaxChildren`, `kMaxClipDepth`, `kMaxListItems`,
 `kMaxScrollBackBytes`, `kMaxScreenshotPixels`, `kMaxImageFileBytes`,
 `kMaxImageDecodeDim` (STBI_MAX_DIMENSIONS; tighter than `kMaxLayoutDim`).
-Screenshot / image path length capped by `kMaxPathBytes` — oversize paths
-**throw**, never truncate. `Image::ensure_loaded` fails loud on bad/oversize
+Screenshot / image / icon path length capped by `kMaxPathBytes` — oversize paths
+**throw**, never truncate. `Image` / `IconButton` fail loud on bad/oversize
 decode (no silent empty paint). ListView scroll caches must honor these —
 no unbounded tile buffers.
 
 ## Ownership
 Containers / Row / Column own children via `unique_ptr`. Page `pointer_capture_`
 is a non-owning raw pointer into that tree; clear it before removing a child.
+Pointer **move** events (LMB held) are forwarded to the capture target so
+`Slider` can drag.

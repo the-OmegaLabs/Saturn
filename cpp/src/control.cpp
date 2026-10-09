@@ -18,6 +18,7 @@
 // Must match saturn::kMaxImageDecodeDim (limits.hpp). Set before stb include.
 #define STBI_MAX_DIMENSIONS 4096
 #include "stb_image.h"
+#include "icon_assets.hpp"
 
 namespace saturn {
 static_assert(STBI_MAX_DIMENSIONS == kMaxImageDecodeDim,
@@ -131,6 +132,57 @@ std::string resolve_asset_path(const std::string& path) {
   return path; // let loader report the original
 }
 
+
+// Decode PNG with same caps as Image (path / file bytes / STBI dim / pixel count).
+struct DecodedPng {
+  std::vector<std::uint8_t> rgba;
+  int w = 0;
+  int h = 0;
+};
+DecodedPng decode_png_from_bytes(const std::uint8_t* data, std::size_t len,
+                                  const std::string& label) {
+  if (!data || len == 0)
+    throw std::runtime_error("image bytes empty: " + label);
+  if (len > kMaxImageFileBytes)
+    throw std::runtime_error("image bytes exceed kMaxImageFileBytes: " + label);
+  int w = 0, h = 0, n = 0;
+  stbi_uc* pixels = stbi_load_from_memory(
+      data, static_cast<int>(len), &w, &h, &n, 4);
+  if (!pixels || w <= 0 || h <= 0) {
+    if (pixels) stbi_image_free(pixels);
+    throw std::runtime_error("image decode failed: " + label);
+  }
+  const auto uw = static_cast<std::size_t>(w);
+  const auto uh = static_cast<std::size_t>(h);
+  if (w > kMaxImageDecodeDim || h > kMaxImageDecodeDim ||
+      uw > kMaxLayoutDim || uh > kMaxLayoutDim ||
+      uw * uh > kMaxScreenshotPixels) {
+    stbi_image_free(pixels);
+    throw std::runtime_error("image dimensions exceed caps: " + label);
+  }
+  DecodedPng out;
+  out.rgba.assign(pixels, pixels + uw * uh * 4u);
+  stbi_image_free(pixels);
+  out.w = w;
+  out.h = h;
+  return out;
+}
+
+DecodedPng decode_png_capped(const std::string& path) {
+  if (path.empty())
+    throw std::invalid_argument("image path is empty");
+  if (path.size() > kMaxPathBytes)
+    throw std::invalid_argument("image path exceeds kMaxPathBytes");
+  // Bundled Material icon bitmaps (also shipped under assets/icons/).
+  if (auto emb = icon_assets::find(path.c_str()); emb.data)
+    return decode_png_from_bytes(emb.data, emb.len, path);
+  const std::string resolved = resolve_asset_path(path);
+  if (resolved.size() > kMaxPathBytes)
+    throw std::invalid_argument("image resolved path exceeds kMaxPathBytes");
+  auto file = read_file_capped(resolved, kMaxImageFileBytes);
+  return decode_png_from_bytes(file.data(), file.size(), path);
+}
+
 } // namespace
 
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
@@ -226,116 +278,112 @@ void Text::paint(Renderer& r) {
   default_font().draw(r, rect_.x, rect_.y, value_, color_, size_);
 }
 
-FilledButton::FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt)
-  : Control(std::move(opt)), label_(std::move(label)), on_click_(std::move(on_click)) {
-  if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
-}
-void FilledButton::set_corner_radius(float radius) {
-  corner_radius_ = clamp_radius(radius);
-  if (page_) page_->update();
-}
-float FilledButton::corner_radius() const { return corner_radius_; }
-Size FilledButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
-  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  return measure_button_label(label_, "", max_w, max_h);
-}
-void FilledButton::paint(Renderer& r) {
-  if (!opt_.visible) return;
-  // Idle PRIMARY; pressed PRIMARY_CONTAINER (theme token — no hand-written RGB).
-  Color bg = pressed_ ? colors::kPrimaryContainer : colors::kPrimary;
-  Color fg = pressed_ ? colors::kOnPrimaryContainer : colors::kOnPrimary;
-  r.fill_rect(rect_, bg, corner_radius_);
-  paint_centered_label(r, rect_, label_, "", fg);
-}
-bool FilledButton::hit_test(float x, float y) const {
-  return hit_round_rect(x, y, rect_, corner_radius_);
-}
-void FilledButton::on_pointer(const PointerEvent& e) {
+
+Pressable::Pressable(std::function<void()> on_click, ControlOptions opt)
+  : Control(std::move(opt)), on_click_(std::move(on_click)) {}
+void Pressable::on_pointer(const PointerEvent& e) {
   if (!opt_.visible || opt_.disabled) return;
-  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
+  if (e.down && hit_test(e.x, e.y)) {
+    pressed_ = true;
+    if (page_) page_->update();
+  }
   if (e.up) {
     bool inside = hit_test(e.x, e.y);
     if (pressed_ && inside && on_click_) on_click_();
     pressed_ = false;
+    if (page_) page_->update();
   }
+}
+
+ButtonBase::ButtonBase(std::string label, std::function<void()> on_click,
+                       std::string leading_icon, ControlOptions opt)
+  : Pressable(std::move(on_click), std::move(opt)),
+    label_(std::move(label)), icon_(std::move(leading_icon)) {
+  if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
+  if (icon_.size() > kMaxTextBytes) icon_.resize(kMaxTextBytes);
+}
+void ButtonBase::set_corner_radius(float radius) {
+  corner_radius_ = clamp_radius(radius);
+  if (page_) page_->update();
+}
+float ButtonBase::corner_radius() const { return corner_radius_; }
+Size ButtonBase::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
+  return measure_button_label(label_, icon_, max_w, max_h);
+}
+void ButtonBase::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  paint_background(r);
+  paint_centered_label(r, rect_, label_, icon_, content_color());
+}
+bool ButtonBase::hit_test(float x, float y) const {
+  return hit_round_rect(x, y, rect_, corner_radius_);
+}
+
+FilledButton::FilledButton(std::string label, std::function<void()> on_click,
+                           ControlOptions opt)
+  : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
+void FilledButton::paint_background(Renderer& r) {
+  Color bg = pressed() ? colors::kPrimaryContainer : colors::kPrimary;
+  r.fill_rect(rect_, bg, corner_radius());
+}
+Color FilledButton::content_color() const {
+  return pressed() ? colors::kOnPrimaryContainer : colors::kOnPrimary;
 }
 
 ElevatedButton::ElevatedButton(std::string label, std::function<void()> on_click,
                                std::string icon, ControlOptions opt)
-  : Control(std::move(opt)), label_(std::move(label)), icon_(std::move(icon)),
-    on_click_(std::move(on_click)) {
-  if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
-  if (icon_.size() > kMaxTextBytes) icon_.resize(kMaxTextBytes);
+  : ButtonBase(std::move(label), std::move(on_click), std::move(icon), std::move(opt)) {}
+void ElevatedButton::paint_background(Renderer& r) {
+  Color bg = pressed() ? colors::kSurfaceContainerHigh : colors::kSurfaceContainerLow;
+  r.fill_rect(rect_, bg, corner_radius());
 }
-void ElevatedButton::set_corner_radius(float radius) {
-  corner_radius_ = clamp_radius(radius);
-  if (page_) page_->update();
-}
-float ElevatedButton::corner_radius() const { return corner_radius_; }
-Size ElevatedButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
-  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  return measure_button_label(label_, icon_, max_w, max_h);
-}
-void ElevatedButton::paint(Renderer& r) {
-  if (!opt_.visible) return;
-  // Elev look via fill: SURFACE_CONTAINER_LOW idle; pressed SURFACE_CONTAINER_HIGH.
-  Color bg = pressed_ ? colors::kSurfaceContainerHigh : colors::kSurfaceContainerLow;
-  r.fill_rect(rect_, bg, corner_radius_);
-  paint_centered_label(r, rect_, label_, icon_, colors::kPrimary);
-}
-bool ElevatedButton::hit_test(float x, float y) const {
-  return hit_round_rect(x, y, rect_, corner_radius_);
-}
-void ElevatedButton::on_pointer(const PointerEvent& e) {
-  if (!opt_.visible || opt_.disabled) return;
-  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
-  if (e.up) {
-    bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside && on_click_) on_click_();
-    pressed_ = false;
-  }
-}
+Color ElevatedButton::content_color() const { return colors::kPrimary; }
 
 OutlinedButton::OutlinedButton(std::string label, std::function<void()> on_click,
                                ControlOptions opt)
-  : Control(std::move(opt)), label_(std::move(label)), on_click_(std::move(on_click)) {
-  if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
-}
-void OutlinedButton::set_corner_radius(float radius) {
-  corner_radius_ = clamp_radius(radius);
-  if (page_) page_->update();
-}
-float OutlinedButton::corner_radius() const { return corner_radius_; }
-Size OutlinedButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
-  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  return measure_button_label(label_, "", max_w, max_h);
-}
-void OutlinedButton::paint(Renderer& r) {
-  if (!opt_.visible) return;
-  if (pressed_) {
-    r.fill_rect(rect_, colors::kSurfaceContainer, corner_radius_);
+  : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
+void OutlinedButton::paint_background(Renderer& r) {
+  if (pressed()) {
+    r.fill_rect(rect_, colors::kSurfaceContainer, corner_radius());
   }
-  r.stroke_rect(rect_, colors::kOutlineVariant, kStrokeW, corner_radius_);
-  paint_centered_label(r, rect_, label_, "", colors::kOnSurfaceVariant);
+  r.stroke_rect(rect_, colors::kOutlineVariant, kStrokeW, corner_radius());
 }
-bool OutlinedButton::hit_test(float x, float y) const {
-  return hit_round_rect(x, y, rect_, corner_radius_);
-}
-void OutlinedButton::on_pointer(const PointerEvent& e) {
-  if (!opt_.visible || opt_.disabled) return;
-  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
-  if (e.up) {
-    bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside && on_click_) on_click_();
-    pressed_ = false;
-  }
-}
+Color OutlinedButton::content_color() const { return colors::kOnSurfaceVariant; }
 
-IconButton::IconButton(std::string icon, std::function<void()> on_click, ControlOptions opt)
-  : Control(std::move(opt)), icon_(std::move(icon)), on_click_(std::move(on_click)) {
-  if (icon_.size() > kMaxTextBytes) icon_.resize(kMaxTextBytes);
+IconButton::IconButton(std::string icon_path, std::function<void()> on_click,
+                       ControlOptions opt)
+  : Pressable(std::move(on_click), std::move(opt)), path_(std::move(icon_path)) {
+  if (path_.empty())
+    throw std::invalid_argument("IconButton path is empty");
+  if (path_.size() > kMaxPathBytes)
+    throw std::invalid_argument("IconButton path exceeds kMaxPathBytes");
   if (!opt_.width) opt_.width = kSide;
   if (!opt_.height) opt_.height = kSide;
+}
+IconButton::~IconButton() { release_texture(); }
+void IconButton::release_texture() {
+  if (tex_ && tex_r_) tex_r_->destroy_texture(tex_);
+  tex_ = nullptr;
+  tex_r_ = nullptr;
+}
+void IconButton::ensure_loaded() const {
+  if (load_ok_) return;
+  if (tried_load_)
+    throw std::runtime_error("icon load previously failed: " + path_);
+  tried_load_ = true;
+  DecodedPng dec = decode_png_capped(path_);
+  rgba_ = std::move(dec.rgba);
+  src_w_ = dec.w;
+  src_h_ = dec.h;
+  load_ok_ = true;
+}
+void IconButton::ensure_texture(Renderer& r) {
+  if (!load_ok_ || rgba_.empty()) return;
+  if (tex_ && tex_r_ == &r) return;
+  release_texture();
+  tex_ = r.create_texture_rgba8(src_w_, src_h_, rgba_.data());
+  if (tex_) tex_r_ = &r;
 }
 Size IconButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   Size s{opt_.width.value_or(kSide), opt_.height.value_or(kSide)};
@@ -346,26 +394,185 @@ Size IconButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
 void IconButton::paint(Renderer& r) {
   if (!opt_.visible) return;
   const float radius = std::min(rect_.w, rect_.h) * 0.5f;
-  if (pressed_) {
+  if (pressed()) {
     r.fill_rect(rect_, colors::kPrimaryContainer, radius);
   }
-  Size ic = default_font().measure(icon_, kIconPx);
-  float tx = rect_.x + (rect_.w - ic.w) * 0.5f;
-  float ty = rect_.y + (rect_.h - ic.h) * 0.5f;
-  Color fg = pressed_ ? colors::kOnPrimaryContainer : colors::kOnSurface;
-  default_font().draw(r, tx, ty, icon_, fg, kIconPx);
+  ensure_loaded();
+  ensure_texture(r);
+  if (!tex_) return;
+  const float side = kIconPx;
+  Rect dst{
+    rect_.x + (rect_.w - side) * 0.5f,
+    rect_.y + (rect_.h - side) * 0.5f,
+    side, side};
+  TexturedQuad q;
+  q.dst = dst;
+  q.uv = Rect{0.f, 0.f, float(src_w_), float(src_h_)};
+  Color fg = pressed() ? colors::kOnPrimaryContainer : colors::kOnSurface;
+  r.draw_textured_quads(tex_, &q, 1, fg);
 }
 bool IconButton::hit_test(float x, float y) const {
   const float radius = std::min(rect_.w, rect_.h) * 0.5f;
   return hit_round_rect(x, y, rect_, radius);
 }
-void IconButton::on_pointer(const PointerEvent& e) {
+
+Checkbox::Checkbox(std::string label, bool value,
+                   std::function<void(bool)> on_change, ControlOptions opt)
+  : Control(std::move(opt)), label_(std::move(label)), value_(value),
+    on_change_(std::move(on_change)) {
+  if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
+}
+bool Checkbox::value() const { return value_; }
+void Checkbox::set_value(bool v) {
+  if (value_ == v) return;
+  value_ = v;
+  if (page_) page_->update();
+  if (on_change_) on_change_(value_);
+}
+Size Checkbox::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
+  float w = kBox;
+  float h = kBox;
+  if (!label_.empty()) {
+    Size t = default_font().measure(label_, kLabelPx);
+    w += kLabelGap + t.w;
+    if (t.h > h) h = t.h;
+  }
+  // Match Python toggle row height comfort (~40) when labeled.
+  if (!label_.empty() && h < 40.f) h = 40.f;
+  Size s{w, h};
+  if (max_w && s.w > *max_w) s.w = *max_w;
+  if (max_h && s.h > *max_h) s.h = *max_h;
+  return s;
+}
+void Checkbox::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  const float box_y = rect_.y + (rect_.h - kBox) * 0.5f;
+  const Rect box{rect_.x, box_y, kBox, kBox};
+  if (value_) {
+    r.fill_rect(box, colors::kPrimary, kBoxRadius);
+    // Geometric check (short leg + long arm); Material check.png is demo-only asset.
+    Color ck = colors::kOnPrimary;
+    r.fill_rect(Rect{box.x + 4.f, box.y + 8.2f, 2.2f, 5.2f}, ck, 1.1f);
+    r.fill_rect(Rect{box.x + 5.2f, box.y + 11.6f, 8.6f, 2.2f}, ck, 1.1f);
+  } else {
+    r.stroke_rect(box, colors::kOnSurfaceVariant, 2.f, kBoxRadius);
+  }
+  if (!label_.empty()) {
+    Size t = default_font().measure(label_, kLabelPx);
+    float tx = rect_.x + kBox + kLabelGap;
+    float ty = rect_.y + (rect_.h - t.h) * 0.5f;
+    default_font().draw(r, tx, ty, label_, colors::kOnSurface, kLabelPx);
+  }
+}
+void Checkbox::on_pointer(const PointerEvent& e) {
   if (!opt_.visible || opt_.disabled) return;
   if (e.down && hit_test(e.x, e.y)) pressed_ = true;
   if (e.up) {
     bool inside = hit_test(e.x, e.y);
-    if (pressed_ && inside && on_click_) on_click_();
+    if (pressed_ && inside) {
+      value_ = !value_;
+      if (page_) page_->update();
+      if (on_change_) on_change_(value_);
+    }
     pressed_ = false;
+  }
+}
+
+Slider::Slider(float min_v, float max_v, int divisions,
+               std::function<void(float)> on_change, ControlOptions opt)
+  : Control(std::move(opt)), min_(min_v), max_(max_v), divisions_(divisions),
+    on_change_(std::move(on_change)) {
+  if (!(std::isfinite(min_) && std::isfinite(max_)) || max_ < min_)
+    throw std::invalid_argument("Slider min/max invalid");
+  if (divisions_ < 0) divisions_ = 0;
+  value_ = min_;
+  if (!opt_.width) opt_.width = kDefaultWidth;
+  if (!opt_.height) opt_.height = kDefaultHeight;
+}
+float Slider::value() const { return value_; }
+void Slider::set_value(float v) { apply_value(v); }
+float Slider::value_from_x(float x) const {
+  const float pad = 2.f;
+  const float track_x = rect_.x + pad;
+  const float track_w = std::max(1.f, rect_.w - 2.f * pad);
+  float k = (x - track_x) / track_w;
+  if (k < 0.f) k = 0.f;
+  if (k > 1.f) k = 1.f;
+  float v = min_ + k * (max_ - min_);
+  if (divisions_ > 0 && max_ > min_) {
+    const float step = (max_ - min_) / float(divisions_);
+    v = min_ + std::round((v - min_) / step) * step;
+  }
+  if (v < min_) v = min_;
+  if (v > max_) v = max_;
+  return v;
+}
+void Slider::apply_value(float v) {
+  if (!(std::isfinite(v))) return;
+  if (v < min_) v = min_;
+  if (v > max_) v = max_;
+  if (v == value_) return;
+  value_ = v;
+  if (page_) page_->update();
+  if (on_change_) on_change_(value_);
+}
+Size Slider::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  Size s{opt_.width.value_or(kDefaultWidth), opt_.height.value_or(kDefaultHeight)};
+  if (max_w && s.w > *max_w) s.w = *max_w;
+  if (max_h && s.h > *max_h) s.h = *max_h;
+  return s;
+}
+void Slider::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  const float cy = rect_.y + rect_.h * 0.5f;
+  const float pad = 2.f;
+  const float track_x = rect_.x + pad;
+  const float track_w = std::max(1.f, rect_.w - 2.f * pad);
+  const float span = (max_ > min_) ? (max_ - min_) : 1.f;
+  const float k = (value_ - min_) / span;
+  const float thumb_x = track_x + track_w * k;
+  const float handle_w = 4.f;
+  const float gap = handle_w * 0.5f + 6.f;
+  Color active = colors::kPrimary;
+  Color inactive = colors::kSecondaryContainer;
+
+  const float active_end = std::max(track_x, thumb_x - gap);
+  const float active_w = active_end - track_x;
+  if (active_w > 8.f) {
+    r.fill_rect(Rect{track_x, cy - 8.f, active_w, 16.f}, active,
+                std::min(8.f, active_w * 0.5f));
+  }
+  const float inactive_x = std::min(track_x + track_w, thumb_x + gap);
+  const float inactive_w = track_x + track_w - inactive_x;
+  if (inactive_w > 8.f) {
+    r.fill_rect(Rect{inactive_x, cy - 8.f, inactive_w, 16.f}, inactive,
+                std::min(8.f, inactive_w * 0.5f));
+  }
+  if (divisions_ > 1) {
+    for (int step = 1; step < divisions_; ++step) {
+      float tick_x = track_x + track_w * float(step) / float(divisions_);
+      if (std::fabs(tick_x - thumb_x) > gap) {
+        Color tick = tick_x < thumb_x ? inactive : active;
+        r.fill_rect(Rect{tick_x - 2.f, cy - 2.f, 4.f, 4.f}, tick, 2.f);
+      }
+    }
+  }
+  r.fill_rect(Rect{thumb_x - handle_w * 0.5f, cy - 22.f, handle_w, 44.f},
+              active, handle_w * 0.5f);
+}
+void Slider::on_pointer(const PointerEvent& e) {
+  if (!opt_.visible || opt_.disabled) return;
+  if (e.down && hit_test(e.x, e.y)) {
+    dragging_ = true;
+    apply_value(value_from_x(e.x));
+  }
+  if (e.move && dragging_) {
+    apply_value(value_from_x(e.x));
+  }
+  if (e.up) {
+    if (dragging_) apply_value(value_from_x(e.x));
+    dragging_ = false;
   }
 }
 
@@ -400,29 +607,10 @@ void Image::ensure_loaded() const {
   if (tried_load_)
     throw std::runtime_error("image load previously failed: " + path_);
   tried_load_ = true;
-  const std::string resolved = resolve_asset_path(path_);
-  if (resolved.size() > kMaxPathBytes)
-    throw std::invalid_argument("image resolved path exceeds kMaxPathBytes");
-  auto file = read_file_capped(resolved, kMaxImageFileBytes);
-  int w = 0, h = 0, n = 0;
-  stbi_uc* pixels = stbi_load_from_memory(
-      file.data(), static_cast<int>(file.size()), &w, &h, &n, 4);
-  if (!pixels || w <= 0 || h <= 0) {
-    if (pixels) stbi_image_free(pixels);
-    throw std::runtime_error("image decode failed: " + path_);
-  }
-  const auto uw = static_cast<std::size_t>(w);
-  const auto uh = static_cast<std::size_t>(h);
-  if (w > kMaxImageDecodeDim || h > kMaxImageDecodeDim ||
-      uw > kMaxLayoutDim || uh > kMaxLayoutDim ||
-      uw * uh > kMaxScreenshotPixels) {
-    stbi_image_free(pixels);
-    throw std::runtime_error("image dimensions exceed caps: " + path_);
-  }
-  rgba_.assign(pixels, pixels + uw * uh * 4u);
-  stbi_image_free(pixels);
-  src_w_ = w;
-  src_h_ = h;
+  DecodedPng dec = decode_png_capped(path_);
+  rgba_ = std::move(dec.rgba);
+  src_w_ = dec.w;
+  src_h_ = dec.h;
   load_ok_ = true;
 }
 void Image::ensure_texture(Renderer& r) {
