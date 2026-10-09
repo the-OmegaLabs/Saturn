@@ -3,6 +3,7 @@
 #include "saturn/renderer.hpp"
 #include "saturn/window.hpp"
 #include "saturn/types.hpp"
+#include "saturn/font.hpp"
 #include <SDL3/SDL.h>
 namespace saturn {
 struct App::Impl {
@@ -31,6 +32,8 @@ int App::run() {
   return 0;
 }
 int run(MainFn main_fn, int w, int h) {
+  // Fail loud: demo/hello need TTF metrics (not 5x7 bitmap).
+  set_default_font(Font::load_default());
   App app(w, h);
   if (main_fn) main_fn(app.page());
   return app.run();

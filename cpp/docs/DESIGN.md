@@ -56,14 +56,20 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Invalid layout size clears `layout_dirty_` (no per-frame no-op spin).
 
 ## Phase 4 status
-- `Text` + `FilledButton` with embedded 5x7 bitmap font (ASCII subset)
-- `FilledButton` paints SDF rounded fill + 1px inside stroke (default radius 8; `set_corner_radius`)
-- Page clips children to bounds (overflow cropped; no scroll yet)
-- Pointer down/up routed to buttons
-- Pointer: down hit-tests topmost child and captures; up goes only to capture (no broadcast).
-- Glyph path: CPU atlas (16x8 cells of 8px, ASCII 0..127) uploaded once; one textured quad per character via `draw_textured_quads` (not per-pixel / not solid `fill_rects`).
-- Caps: `kMaxTextLen` (4096) on text draw; `kMaxFillRects` (16384) on `fill_rects` / `draw_textured_quads` (throw, no silent truncate).
-- Hello track closed; layout widgets (`Row`/`Column`) landed as phase-5 start.
+- `Text` + `FilledButton` hello (pointer capture, SDF round fill/stroke)
+- Caps: `kMaxTextLen` / `kMaxFillRects` throw, no silent truncate
+- Hello track closed; layout widgets (`Row`/`Column`/`Container`) landed
+
+## Font (TTF metrics)
+- `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
+  (OFL; instanced from Python `saturn/assets` Inter variable @ wght=400/opsz=14).
+- Real advances / ascent / descent; on-demand atlas (ASCII preload) → `create_texture_rgba8` +
+  `draw_textured_quads`. Caps: `kMaxFontPx`, `kMaxFontFileBytes`, `kMaxPathBytes`, `kFontAtlasDim`.
+- `Text` / `FilledButton` use `default_font()` at 16px. `run()` calls `Font::load_default()` and
+  **fails loud** if missing (`SATURN_FONT_PATH` or `assets/Inter-Regular.ttf` next to exe).
+- 5x7 `bitmap_font.hpp` is **not** for pixel parity (kept as emergency reference only).
 
 ## Next goal (not done)
-- First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare). `Row`/`Column` + rounded hit are on that path; full demo port / Container / scroll / parity pixels are **not** claimed here.
+- First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare against
+  Windows true-GL golden `demo-opengl-win-944x761.png`). Full control port / expand-align /
+  parity pixels are **not** claimed here.

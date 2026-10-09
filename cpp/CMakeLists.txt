@@ -7,8 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(SDL3 REQUIRED CONFIG)
 
 add_library(saturn
-  src/app.cpp src/window.cpp src/page.cpp src/control.cpp src/opengl_renderer.cpp src/renderer_default.cpp)
-target_include_directories(saturn PUBLIC include PRIVATE src)
+  src/app.cpp src/window.cpp src/page.cpp src/control.cpp src/font.cpp
+  src/opengl_renderer.cpp src/renderer_default.cpp)
+target_include_directories(saturn PUBLIC include PRIVATE src third_party)
 target_link_libraries(saturn PUBLIC SDL3::SDL3)
 if (WIN32)
   target_link_libraries(saturn PUBLIC opengl32)
@@ -26,3 +27,10 @@ if (WIN32 AND DEFINED SDL3_DIR)
         "${_sdl3_root}/lib/x64/SDL3.dll" $<TARGET_FILE_DIR:saturn_hello>)
   endif()
 endif()
+
+# Bundled Inter Regular (OFL) for hello / metrics — same family Python ships (instanced wght=400).
+add_custom_command(TARGET saturn_hello POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:saturn_hello>/assets"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/assets/Inter-Regular.ttf"
+    "$<TARGET_FILE_DIR:saturn_hello>/assets/Inter-Regular.ttf")
