@@ -3,14 +3,16 @@
 #include <string>
 namespace saturn {
 class Renderer;
-// Owns SDL window. Creates/destroys paired Renderer.
 class Window {
 public:
   Window(const std::string& title, int w, int h);
   ~Window();
   Window(const Window&) = delete;
   Window& operator=(const Window&) = delete;
-  bool poll_quit(); // process events; true if quit
+  bool poll_quit();
+  bool consume_resized(int* out_w, int* out_h); // true if size changed since last consume
+  int width() const;
+  int height() const;
   Renderer& renderer();
   void swap();
 private:
