@@ -122,7 +122,8 @@ int main() {
         saturn::ControlOptions img_opt;
         img_opt.width = 140.f;
         img_opt.height = 70.f;
-        drop_row->add(std::make_unique<saturn::Image>("test_img.png", img_opt));
+        // Inventory: Python Image border_radius=8
+        drop_row->add(std::make_unique<saturn::Image>("test_img.png", img_opt, 8.f));
 
         // Inventory: Row spacing=8 — Dialog + SnackBar (Elevated = Python Button).
         auto dlg_row = std::make_unique<saturn::Row>(8.f);

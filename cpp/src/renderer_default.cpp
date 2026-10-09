@@ -1,5 +1,6 @@
 #include "saturn/renderer.hpp"
 #include "saturn/limits.hpp"
+#include <cmath>
 #include <stdexcept>
 namespace saturn {
 void Renderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
@@ -11,9 +12,11 @@ void Renderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
 
 void* Renderer::create_texture_rgba8(int, int, const std::uint8_t*) { return nullptr; }
 void Renderer::destroy_texture(void*) {}
-void Renderer::draw_textured_quads(void*, const TexturedQuad*, std::size_t count, Color) {
+void Renderer::draw_textured_quads(void*, const TexturedQuad*, std::size_t count, Color, float radius) {
   if (count > kMaxFillRects)
     throw std::runtime_error("draw_textured_quads exceeds kMaxFillRects");
+  if (!std::isfinite(radius))
+    throw std::invalid_argument("draw_textured_quads radius must be finite");
 }
 bool Renderer::read_pixels_rgba(std::vector<std::uint8_t>*, int*, int*) { return false; }
 }
