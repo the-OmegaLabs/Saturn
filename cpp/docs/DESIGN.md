@@ -76,5 +76,5 @@ Synced with group agreement (Saturn room). Update when constraints change.
 
 ## Next goal (not done)
 - First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare against
-  Windows true-GL golden `demo-opengl-win-944x761.png`). Full control port / parity pixels are **not** claimed here.
+  Windows true-GL golden `demo-opengl-win-944x761.png`; C++ drawable must be 944x761, not Python outer 960x800). Full control port / parity pixels are **not** claimed here.
   `expand`/`CrossAxisAlignment` landed on Row/Column; MainAxisAlignment / flex weights still deferred.
