@@ -22,9 +22,11 @@ public:
   void layout(float width, float height);
   void paint(Renderer& r) override;
   void dispatch_pointer(const PointerEvent& e);
-  // Overlay stack (AlertDialog / SnackBar). Depth capped by kMaxDialogDepth.
-  // Ownership transfers to Page; pops are deferred until after pointer dispatch
-  // so action on_click cannot UAF the button mid-handler.
+  // Overlay stack (AlertDialog / SnackBar). Budgets are separate: barrier
+  // dialogs ≤ kMaxDialogDepth, SnackBars (non-barrier) ≤ kMaxSnackBarQueue —
+  // neither steals the other's slots. Ownership transfers to Page; pops are
+  // deferred until after pointer dispatch so action on_click cannot UAF the
+  // button mid-handler.
   void show_dialog(std::unique_ptr<DialogControl> dialog);
   void pop_dialog(DialogControl* dialog = nullptr);
   // Per-frame: SnackBar deadlines + flush deferred pops.

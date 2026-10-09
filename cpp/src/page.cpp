@@ -48,8 +48,22 @@ bool Page::overlay_contains(Control* root, Control* target) const {
 
 void Page::show_dialog(std::unique_ptr<DialogControl> dialog) {
   if (!dialog) throw std::invalid_argument("show_dialog: null dialog");
-  if (overlays_.size() >= kMaxDialogDepth)
-    throw std::runtime_error("dialog stack exceeds kMaxDialogDepth");
+  // Separate budgets: barrier → kMaxDialogDepth; non-barrier (SnackBar) →
+  // kMaxSnackBarQueue. Shared overlays_.size() must not gate either.
+  std::size_t dialog_n = 0;
+  std::size_t snack_n = 0;
+  for (const auto& o : overlays_) {
+    if (!o) continue;
+    if (o->barrier()) ++dialog_n;
+    else ++snack_n;
+  }
+  if (dialog->barrier()) {
+    if (dialog_n >= kMaxDialogDepth)
+      throw std::runtime_error("dialog stack exceeds kMaxDialogDepth");
+  } else {
+    if (snack_n >= kMaxSnackBarQueue)
+      throw std::runtime_error("snackbar queue exceeds kMaxSnackBarQueue");
+  }
   for (const auto& o : overlays_) {
     if (o.get() == dialog.get()) return;
   }
