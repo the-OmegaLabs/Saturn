@@ -43,6 +43,33 @@ protected:
   std::vector<std::unique_ptr<Control>> children_;
 };
 
+// Shared PNG decode + GPU upload + destroy. Used by Image, IconButton,
+// Checkbox check mark, Elevated leading icon. Path/file/dim caps fail loud.
+class TextureImage {
+public:
+  explicit TextureImage(std::string path);
+  ~TextureImage();
+  TextureImage(const TextureImage&) = delete;
+  TextureImage& operator=(const TextureImage&) = delete;
+  void ensure_loaded() const;
+  void* ensure_texture(Renderer& r);
+  void release_texture();
+  void draw(Renderer& r, Rect dst, Color tint);
+  bool loaded() const { return load_ok_; }
+  int src_w() const { return src_w_; }
+  int src_h() const { return src_h_; }
+  const std::string& path() const { return path_; }
+private:
+  std::string path_;
+  mutable std::vector<std::uint8_t> rgba_;
+  mutable int src_w_ = 0;
+  mutable int src_h_ = 0;
+  mutable bool tried_load_ = false;
+  mutable bool load_ok_ = false;
+  void* tex_ = nullptr;
+  Renderer* tex_r_ = nullptr;
+};
+
 // Shared click press/release + on_click. Subclasses own hit_test.
 class Pressable : public Control {
 public:
@@ -56,26 +83,28 @@ private:
   bool pressed_ = false;
 };
 
-// M3 labeled button skeleton: measure / paint label(+optional leading icon) /
+// M3 labeled button skeleton: measure / paint label(+optional leading PNG) /
 // round hit / corner radius. Style via paint_background + content_color.
 class ButtonBase : public Pressable {
 public:
   static constexpr float kDefaultCornerRadius = 20.f;
+  ~ButtonBase() override;
   void set_corner_radius(float radius);
   float corner_radius() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
 protected:
+  // leading_icon_path: Material PNG under assets/ (empty = no icon).
   ButtonBase(std::string label, std::function<void()> on_click,
-             std::string leading_icon, ControlOptions opt = {});
+             std::string leading_icon_path, ControlOptions opt = {});
   virtual void paint_background(Renderer& r) = 0;
   virtual Color content_color() const = 0;
   const std::string& label() const { return label_; }
-  const std::string& leading_icon() const { return icon_; }
+  bool has_leading_icon() const { return static_cast<bool>(leading_); }
 private:
   std::string label_;
-  std::string icon_;
+  std::unique_ptr<TextureImage> leading_;
   float corner_radius_ = kDefaultCornerRadius;
 };
 
@@ -113,11 +142,11 @@ protected:
 };
 
 // M3 elevated (Python Button): SURFACE_CONTAINER_LOW bg, PRIMARY fg.
-// leading_icon is Inter text glyph (e.g. "+"); empty skips icon slot.
+// leading_icon is a Material PNG path (e.g. "icons/add.png"); empty skips.
 class ElevatedButton final : public ButtonBase {
 public:
   ElevatedButton(std::string label, std::function<void()> on_click,
-                 std::string icon = "+", ControlOptions opt = {});
+                 std::string icon_path = "icons/add.png", ControlOptions opt = {});
 protected:
   void paint_background(Renderer& r) override;
   Color content_color() const override;
@@ -138,67 +167,42 @@ class IconButton final : public Pressable {
 public:
   static constexpr float kSide = 40.f;
   static constexpr float kIconPx = 24.f;
-  // icon_path: PNG under assets/ (e.g. "icons/favorite.png"). Caps: path /
-  // file bytes / decode dim same as Image.
+  // icon_path: PNG under assets/ (e.g. "icons/favorite.png"). Caps via TextureImage.
   IconButton(std::string icon_path, std::function<void()> on_click,
              ControlOptions opt = {});
-  ~IconButton() override;
-  IconButton(const IconButton&) = delete;
-  IconButton& operator=(const IconButton&) = delete;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
 private:
-  void ensure_loaded() const;
-  void ensure_texture(Renderer& r);
-  void release_texture();
-  std::string path_;
-  mutable std::vector<std::uint8_t> rgba_;
-  mutable int src_w_ = 0;
-  mutable int src_h_ = 0;
-  mutable bool tried_load_ = false;
-  mutable bool load_ok_ = false;
-  void* tex_ = nullptr;
-  Renderer* tex_r_ = nullptr;
+  TextureImage image_;
 };
 
-// PNG Image via stb_image. Optional tint (multiply). BoxFit.CONTAIN when both
-// width and height are set on ControlOptions. Path/decode/dim failures throw
-// (no silent empty paint); see kMaxImageDecodeDim / kMaxImageFileBytes.
+// PNG Image via TextureImage (stb_image). Optional tint (multiply).
+// BoxFit.CONTAIN when both width and height are set on ControlOptions.
+// Path/decode/dim failures throw (no silent empty paint).
 class Image final : public Control {
 public:
   explicit Image(std::string path, ControlOptions opt = {});
-  ~Image() override;
-  Image(const Image&) = delete;
-  Image& operator=(const Image&) = delete;
   void set_tint(Color c);
   void clear_tint();
   bool loaded() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
 private:
-  void ensure_loaded() const;
-  void ensure_texture(Renderer& r);
-  void release_texture();
-  std::string path_;
-  mutable std::vector<std::uint8_t> rgba_;
-  mutable int src_w_ = 0;
-  mutable int src_h_ = 0;
-  mutable bool tried_load_ = false;
-  mutable bool load_ok_ = false;
+  TextureImage image_;
   bool has_tint_ = false;
   Color tint_{255, 255, 255, 255};
-  void* tex_ = nullptr;
-  Renderer* tex_r_ = nullptr;
 };
 
 // M3 Checkbox: 18×18 box radius 2, active PRIMARY, optional label.
+// Check mark is Material check.png (TextureImage), not a geometric scribble.
 class Checkbox final : public Control {
 public:
   static constexpr float kBox = 18.f;
   static constexpr float kBoxRadius = 2.f;
   static constexpr float kLabelGap = 8.f;
   static constexpr float kLabelPx = 14.f;
+  static constexpr float kCheckPx = 14.f;
   Checkbox(std::string label, bool value = false,
            std::function<void(bool)> on_change = {}, ControlOptions opt = {});
   bool value() const;
@@ -211,6 +215,7 @@ private:
   bool value_ = false;
   std::function<void(bool)> on_change_;
   bool pressed_ = false;
+  TextureImage check_icon_;
 };
 
 // M3 Slider: intrinsic ~300×48, active PRIMARY. Click + drag (pointer move
@@ -239,6 +244,41 @@ private:
   float value_ = 0.f;
   std::function<void(float)> on_change_;
   bool dragging_ = false;
+};
+
+// M3 Switch: track 52×32 inside 52×40 hit box; no label required.
+// Toggle on click; active track PRIMARY, inactive SURFACE_CONTAINER_HIGHEST.
+class Switch final : public Control {
+public:
+  static constexpr float kTrackW = 52.f;
+  static constexpr float kTrackH = 32.f;
+  static constexpr float kHeight = 40.f;
+  Switch(bool value = false, std::function<void(bool)> on_change = {},
+         ControlOptions opt = {});
+  bool value() const;
+  void set_value(bool v);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  void on_pointer(const PointerEvent& e) override;
+private:
+  bool value_ = false;
+  std::function<void(bool)> on_change_;
+  bool pressed_ = false;
+};
+
+// M3 ProgressRing: default 40×40, stroke 4, color PRIMARY. value in [0,1].
+// Track = full annulus (SECONDARY_CONTAINER); progress = stroked arc approx.
+class ProgressRing final : public Control {
+public:
+  static constexpr float kSide = 40.f;
+  static constexpr float kStroke = 4.f;
+  explicit ProgressRing(float value = 0.f, ControlOptions opt = {});
+  float value() const;
+  void set_value(float v);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+private:
+  float value_ = 0.f;
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.

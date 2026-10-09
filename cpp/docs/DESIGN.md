@@ -78,6 +78,17 @@ Synced with group agreement (Saturn room). Update when constraints change.
   (no clamp) — paint ticks loop `divisions-1` times.
 - `set_value` / `apply_value`: non-finite → throw (same as min/max).
 
+## TextureImage / icons
+- `TextureImage` is the single decode+upload+destroy helper for `Image`,
+  `IconButton`, Checkbox `check.png`, Elevated leading `add.png`.
+- Embedded fallbacks in `icon_assets.hpp` (favorite/check/add); same path/file/dim
+  fail-loud caps as Image (`kMaxPathBytes` / `kMaxImageFileBytes` / `kMaxImageDecodeDim`).
+
+## Switch / ProgressRing
+- Switch: track 52×32 in 52×40 hit box; click toggle; no animation yet.
+- ProgressRing: value ∈ [0,1] (non-finite throw); track = SDF annulus, progress =
+  stroked arc approx (segmented discs). Default 40×40 / stroke 4 / PRIMARY.
+
 ## Font (TTF metrics)
 - `saturn::Font` via vendored `third_party/stb_truetype.h`; bundled `assets/Inter-Regular.ttf`
   (OFL; instanced from Python `saturn/assets` Inter variable @ wght=400/opsz=14).

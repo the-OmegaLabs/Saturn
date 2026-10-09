@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <stdexcept>
+#include <memory>
 #include <vector>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -58,14 +59,11 @@ float cross_offset(CrossAxisAlignment a, float child_cross, float parent_cross) 
   }
 }
 
-Size measure_button_label(const std::string& label, const std::string& icon,
+Size measure_button_label(const std::string& label, bool has_icon,
                           OptionalSize max_w, OptionalSize max_h) {
   Size text = default_font().measure(label, kLabelFontPx);
   float w = text.w + 2.f * kPadH;
-  if (!icon.empty()) {
-    Size ic = default_font().measure(icon, kLeadingIconPx);
-    w += ic.w + kIconGap;
-  }
+  if (has_icon) w += kLeadingIconPx + kIconGap;
   Size s{w, kHeight};
   if (max_w && s.w > *max_w) s.w = *max_w;
   if (max_h && s.h > *max_h) s.h = *max_h;
@@ -73,20 +71,17 @@ Size measure_button_label(const std::string& label, const std::string& icon,
 }
 
 void paint_centered_label(Renderer& r, const Rect& rect, const std::string& label,
-                          const std::string& icon, Color fg) {
+                          TextureImage* leading, Color fg) {
   Size text = default_font().measure(label, kLabelFontPx);
   float content_w = text.w;
-  Size ic{};
-  if (!icon.empty()) {
-    ic = default_font().measure(icon, kLeadingIconPx);
-    content_w += ic.w + kIconGap;
-  }
+  if (leading) content_w += kLeadingIconPx + kIconGap;
   float x = rect.x + (rect.w - content_w) * 0.5f;
   float ty = rect.y + (rect.h - text.h) * 0.5f;
-  if (!icon.empty()) {
-    float iy = rect.y + (rect.h - ic.h) * 0.5f;
-    default_font().draw(r, x, iy, icon, fg, kLeadingIconPx);
-    x += ic.w + kIconGap;
+  if (leading) {
+    Rect idst{x, rect.y + (rect.h - kLeadingIconPx) * 0.5f,
+              kLeadingIconPx, kLeadingIconPx};
+    leading->draw(r, idst, fg);
+    x += kLeadingIconPx + kIconGap;
   }
   default_font().draw(r, x, ty, label, fg, kLabelFontPx);
 }
@@ -184,6 +179,49 @@ DecodedPng decode_png_capped(const std::string& path) {
 }
 
 } // namespace
+
+TextureImage::TextureImage(std::string path) : path_(std::move(path)) {
+  if (path_.empty())
+    throw std::invalid_argument("TextureImage path is empty");
+  if (path_.size() > kMaxPathBytes)
+    throw std::invalid_argument("TextureImage path exceeds kMaxPathBytes");
+}
+TextureImage::~TextureImage() { release_texture(); }
+void TextureImage::release_texture() {
+  if (tex_ && tex_r_) tex_r_->destroy_texture(tex_);
+  tex_ = nullptr;
+  tex_r_ = nullptr;
+}
+void TextureImage::ensure_loaded() const {
+  if (load_ok_) return;
+  if (tried_load_)
+    throw std::runtime_error("image load previously failed: " + path_);
+  tried_load_ = true;
+  DecodedPng dec = decode_png_capped(path_);
+  rgba_ = std::move(dec.rgba);
+  src_w_ = dec.w;
+  src_h_ = dec.h;
+  load_ok_ = true;
+}
+void* TextureImage::ensure_texture(Renderer& r) {
+  ensure_loaded();
+  if (!load_ok_ || rgba_.empty())
+    throw std::runtime_error("image not loaded: " + path_);
+  if (tex_ && tex_r_ == &r) return tex_;
+  release_texture();
+  tex_ = r.create_texture_rgba8(src_w_, src_h_, rgba_.data());
+  if (!tex_)
+    throw std::runtime_error("create_texture_rgba8 failed: " + path_);
+  tex_r_ = &r;
+  return tex_;
+}
+void TextureImage::draw(Renderer& r, Rect dst, Color tint) {
+  void* tex = ensure_texture(r);
+  TexturedQuad q;
+  q.dst = dst;
+  q.uv = Rect{0.f, 0.f, float(src_w_), float(src_h_)};
+  r.draw_textured_quads(tex, &q, 1, tint);
+}
 
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
 void Control::set_options(ControlOptions opt) { opt_ = std::move(opt); }
@@ -296,12 +334,17 @@ void Pressable::on_pointer(const PointerEvent& e) {
 }
 
 ButtonBase::ButtonBase(std::string label, std::function<void()> on_click,
-                       std::string leading_icon, ControlOptions opt)
+                       std::string leading_icon_path, ControlOptions opt)
   : Pressable(std::move(on_click), std::move(opt)),
-    label_(std::move(label)), icon_(std::move(leading_icon)) {
+    label_(std::move(label)) {
   if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
-  if (icon_.size() > kMaxTextBytes) icon_.resize(kMaxTextBytes);
+  if (!leading_icon_path.empty()) {
+    if (leading_icon_path.size() > kMaxPathBytes)
+      throw std::invalid_argument("ButtonBase icon path exceeds kMaxPathBytes");
+    leading_ = std::make_unique<TextureImage>(std::move(leading_icon_path));
+  }
 }
+ButtonBase::~ButtonBase() = default;
 void ButtonBase::set_corner_radius(float radius) {
   corner_radius_ = clamp_radius(radius);
   if (page_) page_->update();
@@ -309,12 +352,12 @@ void ButtonBase::set_corner_radius(float radius) {
 float ButtonBase::corner_radius() const { return corner_radius_; }
 Size ButtonBase::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  return measure_button_label(label_, icon_, max_w, max_h);
+  return measure_button_label(label_, static_cast<bool>(leading_), max_w, max_h);
 }
 void ButtonBase::paint(Renderer& r) {
   if (!opt_.visible) return;
   paint_background(r);
-  paint_centered_label(r, rect_, label_, icon_, content_color());
+  paint_centered_label(r, rect_, label_, leading_.get(), content_color());
 }
 bool ButtonBase::hit_test(float x, float y) const {
   return hit_round_rect(x, y, rect_, corner_radius_);
@@ -353,37 +396,9 @@ Color OutlinedButton::content_color() const { return colors::kOnSurfaceVariant; 
 
 IconButton::IconButton(std::string icon_path, std::function<void()> on_click,
                        ControlOptions opt)
-  : Pressable(std::move(on_click), std::move(opt)), path_(std::move(icon_path)) {
-  if (path_.empty())
-    throw std::invalid_argument("IconButton path is empty");
-  if (path_.size() > kMaxPathBytes)
-    throw std::invalid_argument("IconButton path exceeds kMaxPathBytes");
+  : Pressable(std::move(on_click), std::move(opt)), image_(std::move(icon_path)) {
   if (!opt_.width) opt_.width = kSide;
   if (!opt_.height) opt_.height = kSide;
-}
-IconButton::~IconButton() { release_texture(); }
-void IconButton::release_texture() {
-  if (tex_ && tex_r_) tex_r_->destroy_texture(tex_);
-  tex_ = nullptr;
-  tex_r_ = nullptr;
-}
-void IconButton::ensure_loaded() const {
-  if (load_ok_) return;
-  if (tried_load_)
-    throw std::runtime_error("icon load previously failed: " + path_);
-  tried_load_ = true;
-  DecodedPng dec = decode_png_capped(path_);
-  rgba_ = std::move(dec.rgba);
-  src_w_ = dec.w;
-  src_h_ = dec.h;
-  load_ok_ = true;
-}
-void IconButton::ensure_texture(Renderer& r) {
-  if (!load_ok_ || rgba_.empty()) return;
-  if (tex_ && tex_r_ == &r) return;
-  release_texture();
-  tex_ = r.create_texture_rgba8(src_w_, src_h_, rgba_.data());
-  if (tex_) tex_r_ = &r;
 }
 Size IconButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   Size s{opt_.width.value_or(kSide), opt_.height.value_or(kSide)};
@@ -397,19 +412,13 @@ void IconButton::paint(Renderer& r) {
   if (pressed()) {
     r.fill_rect(rect_, colors::kPrimaryContainer, radius);
   }
-  ensure_loaded();
-  ensure_texture(r);
-  if (!tex_) return;
   const float side = kIconPx;
   Rect dst{
     rect_.x + (rect_.w - side) * 0.5f,
     rect_.y + (rect_.h - side) * 0.5f,
     side, side};
-  TexturedQuad q;
-  q.dst = dst;
-  q.uv = Rect{0.f, 0.f, float(src_w_), float(src_h_)};
   Color fg = pressed() ? colors::kOnPrimaryContainer : colors::kOnSurface;
-  r.draw_textured_quads(tex_, &q, 1, fg);
+  image_.draw(r, dst, fg);
 }
 bool IconButton::hit_test(float x, float y) const {
   const float radius = std::min(rect_.w, rect_.h) * 0.5f;
@@ -419,7 +428,7 @@ bool IconButton::hit_test(float x, float y) const {
 Checkbox::Checkbox(std::string label, bool value,
                    std::function<void(bool)> on_change, ControlOptions opt)
   : Control(std::move(opt)), label_(std::move(label)), value_(value),
-    on_change_(std::move(on_change)) {
+    on_change_(std::move(on_change)), check_icon_("icons/check.png") {
   if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
 }
 bool Checkbox::value() const { return value_; }
@@ -451,10 +460,12 @@ void Checkbox::paint(Renderer& r) {
   const Rect box{rect_.x, box_y, kBox, kBox};
   if (value_) {
     r.fill_rect(box, colors::kPrimary, kBoxRadius);
-    // Geometric check (short leg + long arm); Material check.png is demo-only asset.
-    Color ck = colors::kOnPrimary;
-    r.fill_rect(Rect{box.x + 4.f, box.y + 8.2f, 2.2f, 5.2f}, ck, 1.1f);
-    r.fill_rect(Rect{box.x + 5.2f, box.y + 11.6f, 8.6f, 2.2f}, ck, 1.1f);
+    const float side = kCheckPx;
+    Rect idst{
+      box.x + (kBox - side) * 0.5f,
+      box.y + (kBox - side) * 0.5f,
+      side, side};
+    check_icon_.draw(r, idst, colors::kOnPrimary);
   } else {
     r.stroke_rect(box, colors::kOnSurfaceVariant, 2.f, kBoxRadius);
   }
@@ -579,13 +590,7 @@ void Slider::on_pointer(const PointerEvent& e) {
 }
 
 Image::Image(std::string path, ControlOptions opt)
-  : Control(std::move(opt)), path_(std::move(path)) {
-  if (path_.empty())
-    throw std::invalid_argument("Image path is empty");
-  if (path_.size() > kMaxPathBytes)
-    throw std::invalid_argument("Image path exceeds kMaxPathBytes");
-}
-Image::~Image() { release_texture(); }
+  : Control(std::move(opt)), image_(std::move(path)) {}
 void Image::set_tint(Color c) {
   has_tint_ = true;
   tint_ = c;
@@ -596,44 +601,22 @@ void Image::clear_tint() {
   tint_ = Color{255, 255, 255, 255};
   if (page_) page_->update();
 }
-bool Image::loaded() const { return load_ok_; }
-void Image::release_texture() {
-  if (tex_ && tex_r_) {
-    tex_r_->destroy_texture(tex_);
-  }
-  tex_ = nullptr;
-  tex_r_ = nullptr;
-}
-void Image::ensure_loaded() const {
-  if (load_ok_) return;
-  if (tried_load_)
-    throw std::runtime_error("image load previously failed: " + path_);
-  tried_load_ = true;
-  DecodedPng dec = decode_png_capped(path_);
-  rgba_ = std::move(dec.rgba);
-  src_w_ = dec.w;
-  src_h_ = dec.h;
-  load_ok_ = true;
-}
-void Image::ensure_texture(Renderer& r) {
-  if (!load_ok_ || rgba_.empty()) return;
-  if (tex_ && tex_r_ == &r) return;
-  release_texture();
-  tex_ = r.create_texture_rgba8(src_w_, src_h_, rgba_.data());
-  if (tex_) tex_r_ = &r;
-}
+bool Image::loaded() const { return image_.loaded(); }
 Size Image::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width && opt_.height) return Control::intrinsic(opt_.width, opt_.height);
-  ensure_loaded();
-  float w = opt_.width.value_or(load_ok_ ? float(src_w_) : 0.f);
-  float h = opt_.height.value_or(load_ok_ ? float(src_h_) : 0.f);
-  if (!opt_.width && !opt_.height && load_ok_) {
-    w = float(src_w_);
-    h = float(src_h_);
-  } else if (opt_.width && !opt_.height && load_ok_ && src_w_ > 0) {
-    h = (*opt_.width) * float(src_h_) / float(src_w_);
-  } else if (!opt_.width && opt_.height && load_ok_ && src_h_ > 0) {
-    w = (*opt_.height) * float(src_w_) / float(src_h_);
+  image_.ensure_loaded();
+  const int src_w = image_.src_w();
+  const int src_h = image_.src_h();
+  const bool ok = image_.loaded();
+  float w = opt_.width.value_or(ok ? float(src_w) : 0.f);
+  float h = opt_.height.value_or(ok ? float(src_h) : 0.f);
+  if (!opt_.width && !opt_.height && ok) {
+    w = float(src_w);
+    h = float(src_h);
+  } else if (opt_.width && !opt_.height && ok && src_w > 0) {
+    h = (*opt_.width) * float(src_h) / float(src_w);
+  } else if (!opt_.width && opt_.height && ok && src_h > 0) {
+    w = (*opt_.height) * float(src_w) / float(src_h);
   }
   if (max_w && w > *max_w) w = *max_w;
   if (max_h && h > *max_h) h = *max_h;
@@ -645,28 +628,145 @@ Size Image::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
 }
 void Image::paint(Renderer& r) {
   if (!opt_.visible) return;
-  ensure_loaded();
-  if (!load_ok_) return;
-  ensure_texture(r);
-  if (!tex_) return;
+  image_.ensure_loaded();
+  if (!image_.loaded()) return;
+  const int src_w = image_.src_w();
+  const int src_h = image_.src_h();
   // BoxFit.CONTAIN when both axes are constrained by the laid-out rect.
   float scale = 1.f;
-  if (src_w_ > 0 && src_h_ > 0 && rect_.w > 0.f && rect_.h > 0.f) {
-    scale = std::min(rect_.w / float(src_w_), rect_.h / float(src_h_));
+  if (src_w > 0 && src_h > 0 && rect_.w > 0.f && rect_.h > 0.f) {
+    scale = std::min(rect_.w / float(src_w), rect_.h / float(src_h));
   }
-  float dw = float(src_w_) * scale;
-  float dh = float(src_h_) * scale;
+  float dw = float(src_w) * scale;
+  float dh = float(src_h) * scale;
   if (dw > float(kMaxLayoutDim)) dw = float(kMaxLayoutDim);
   if (dh > float(kMaxLayoutDim)) dh = float(kMaxLayoutDim);
   Rect dst{
     rect_.x + (rect_.w - dw) * 0.5f,
     rect_.y + (rect_.h - dh) * 0.5f,
     dw, dh};
-  TexturedQuad q;
-  q.dst = dst;
-  q.uv = Rect{0.f, 0.f, float(src_w_), float(src_h_)};
   Color tint = has_tint_ ? tint_ : Color{255, 255, 255, 255};
-  r.draw_textured_quads(tex_, &q, 1, tint);
+  image_.draw(r, dst, tint);
+}
+
+Switch::Switch(bool value, std::function<void(bool)> on_change, ControlOptions opt)
+  : Control(std::move(opt)), value_(value), on_change_(std::move(on_change)) {
+  if (!opt_.width) opt_.width = kTrackW;
+  if (!opt_.height) opt_.height = kHeight;
+}
+bool Switch::value() const { return value_; }
+void Switch::set_value(bool v) {
+  if (value_ == v) return;
+  value_ = v;
+  if (page_) page_->update();
+  if (on_change_) on_change_(value_);
+}
+Size Switch::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  Size s{opt_.width.value_or(kTrackW), opt_.height.value_or(kHeight)};
+  if (max_w && s.w > *max_w) s.w = *max_w;
+  if (max_h && s.h > *max_h) s.h = *max_h;
+  return s;
+}
+void Switch::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  const float track_w = kTrackW;
+  const float track_h = kTrackH;
+  const float track_x = rect_.x + (rect_.w - track_w) * 0.5f;
+  const float track_y = rect_.y + (rect_.h - track_h) * 0.5f;
+  const Rect track{track_x, track_y, track_w, track_h};
+  const float radius = track_h * 0.5f;
+  if (value_) {
+    r.fill_rect(track, colors::kPrimary, radius);
+  } else {
+    r.fill_rect(track, colors::kSurfaceContainerHighest, radius);
+    r.stroke_rect(track, colors::kOutline, 2.f, radius);
+  }
+  // Thumb: off r=8 centered at x+16; on r=12 centered at x+(w-16).
+  const float thumb_r = value_ ? 12.f : 8.f;
+  const float tx = value_ ? (track_x + track_w - 16.f) : (track_x + 16.f);
+  const float ty = track_y + track_h * 0.5f;
+  Color thumb = value_ ? colors::kOnPrimary : colors::kOutline;
+  r.fill_rect(Rect{tx - thumb_r, ty - thumb_r, thumb_r * 2.f, thumb_r * 2.f},
+              thumb, thumb_r);
+}
+void Switch::on_pointer(const PointerEvent& e) {
+  if (!opt_.visible || opt_.disabled) return;
+  if (e.down && hit_test(e.x, e.y)) pressed_ = true;
+  if (e.up) {
+    bool inside = hit_test(e.x, e.y);
+    if (pressed_ && inside) {
+      value_ = !value_;
+      if (page_) page_->update();
+      if (on_change_) on_change_(value_);
+    }
+    pressed_ = false;
+  }
+}
+
+namespace {
+void paint_ring_arc(Renderer& r, float cx, float cy, float outer_r, float stroke,
+                    float start_rad, float sweep_rad, Color c) {
+  if (!(stroke > 0.f) || !(outer_r > 0.f) || !(std::fabs(sweep_rad) > 1e-6f))
+    return;
+  const float centerline = std::max(0.f, outer_r - stroke * 0.5f);
+  const float abs_sweep = std::fabs(sweep_rad);
+  // ~1.5° per segment; cap so we stay well under kMaxFillRects.
+  int segs = static_cast<int>(abs_sweep / 0.026f);
+  if (segs < 8) segs = 8;
+  if (segs > 180) segs = 180;
+  const float step = sweep_rad / float(segs);
+  for (int i = 0; i < segs; ++i) {
+    const float a = start_rad + step * (float(i) + 0.5f);
+    const float x = cx + std::cos(a) * centerline;
+    const float y = cy + std::sin(a) * centerline;
+    r.fill_rect(Rect{x - stroke * 0.5f, y - stroke * 0.5f, stroke, stroke},
+                c, stroke * 0.5f);
+  }
+}
+} // namespace
+
+ProgressRing::ProgressRing(float value, ControlOptions opt)
+  : Control(std::move(opt)) {
+  if (!(std::isfinite(value)))
+    throw std::invalid_argument("ProgressRing value must be finite");
+  if (value < 0.f) value = 0.f;
+  if (value > 1.f) value = 1.f;
+  value_ = value;
+  if (!opt_.width) opt_.width = kSide;
+  if (!opt_.height) opt_.height = kSide;
+}
+float ProgressRing::value() const { return value_; }
+void ProgressRing::set_value(float v) {
+  if (!(std::isfinite(v)))
+    throw std::invalid_argument("ProgressRing value must be finite");
+  if (v < 0.f) v = 0.f;
+  if (v > 1.f) v = 1.f;
+  if (v == value_) return;
+  value_ = v;
+  if (page_) page_->update();
+}
+Size ProgressRing::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  Size s{opt_.width.value_or(kSide), opt_.height.value_or(kSide)};
+  if (max_w && s.w > *max_w) s.w = *max_w;
+  if (max_h && s.h > *max_h) s.h = *max_h;
+  return s;
+}
+void ProgressRing::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  const float side = std::min(rect_.w, rect_.h);
+  if (!(side > 0.f)) return;
+  float stroke = kStroke;
+  if (stroke > side) stroke = side;
+  const float cx = rect_.x + rect_.w * 0.5f;
+  const float cy = rect_.y + rect_.h * 0.5f;
+  // Full track annulus via SDF stroke_rect (circle).
+  const Rect ring{cx - side * 0.5f, cy - side * 0.5f, side, side};
+  r.stroke_rect(ring, colors::kSecondaryContainer, stroke, side * 0.5f);
+  if (value_ <= 0.f) return;
+  constexpr float kPi = 3.14159265358979323846f;
+  const float start = -0.5f * kPi;
+  const float sweep = 2.f * kPi * value_;
+  paint_ring_arc(r, cx, cy, side * 0.5f, stroke, start, sweep, colors::kPrimary);
 }
 
 Column::Column(float spacing, ControlOptions opt)

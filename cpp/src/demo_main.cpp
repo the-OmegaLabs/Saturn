@@ -70,7 +70,7 @@ int main() {
         auto btn_row = std::make_unique<saturn::Row>(8.f);
         btn_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
         btn_row->add(std::make_unique<saturn::ElevatedButton>(
-            "Elevated", on_click, "+"));
+            "Elevated", on_click));  // default leading icons/add.png
         btn_row->add(std::make_unique<saturn::FilledButton>(
             "Filled", on_click));
         btn_row->add(std::make_unique<saturn::OutlinedButton>(
@@ -88,7 +88,7 @@ int main() {
                                      : "last event: checkbox off");
             }));
 
-        // Inventory: Row spacing=12 — Slider + Switch/ProgressRing (latter deferred).
+        // Inventory: Row spacing=12 — Slider + Switch + ProgressRing.
         auto slider_row = std::make_unique<saturn::Row>(12.f);
         slider_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
         slider_row->add(std::make_unique<saturn::Slider>(
@@ -96,14 +96,20 @@ int main() {
               status_ptr->set_value("last event: slider " +
                                    std::to_string(static_cast<int>(v + 0.5f)));
             }));
+        slider_row->add(std::make_unique<saturn::Switch>(
+            false, [status_ptr](bool v) {
+              status_ptr->set_value(v ? "last event: switch on"
+                                     : "last event: switch off");
+            }));
+        slider_row->add(std::make_unique<saturn::ProgressRing>(0.6f));
 
         auto left_body = std::make_unique<saturn::Column>(16.f);
         left_body->add(std::move(btn_row));
         left_body->add(std::move(check_row));
         left_body->add(std::move(slider_row));
-        // Deferred: TextField, Switch, ProgressRing, Dropdown, Dialog/SnackBar.
+        // Deferred: TextField, Dropdown, Dialog/SnackBar.
         left_body->add(std::make_unique<saturn::Text>(
-            "TextField/Switch/Dropdown TBD", saturn::colors::kOnSurfaceVariant, 13.f));
+            "TextField/Dropdown TBD", saturn::colors::kOnSurfaceVariant, 13.f));
 
         // ListView deferred until scroll buffer caps with reviewer.
         auto right_body = std::make_unique<saturn::Column>(4.f);
