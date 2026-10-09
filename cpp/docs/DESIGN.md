@@ -38,3 +38,8 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - `fill_rect` via GL 3.3 core shader + gl_VertexID quad (radius still ignored)
 - `stroke_rect` / clip / blit still stubs
 - UTF-8 without BOM
+
+## Phase 3 status
+- GL entry points cached once; shader compile/link failures roll back GL objects
+- `clip_push`/`clip_pop` drive real scissor with `kMaxClipDepth`
+- Demo `ColorBox` added via `Page::add` (no hard-coded rect in `App::run`)
