@@ -39,6 +39,14 @@ def _set_swap_interval(enabled: bool) -> bool:
 # Match cpp saturn::kMaxLayoutDim — hard ceiling for blur FBO edge length.
 _MAX_BLUR_TARGET_DIM = 1 << 15
 
+
+def _release_gl_resource(resource):
+    if resource is not None:
+        try:
+            resource.release()
+        except Exception:
+            pass
+
 RECT_VS = """
 #version 330
 in vec2 in_pos;          // px, origin top-left
@@ -339,6 +347,8 @@ class GLRenderer(Renderer):
         self._blur_tex_a = self._blur_tex_b = None
         self._blur_fbo_a = self._blur_fbo_b = None
         self._blur_size = (0, 0)
+        from ..painting import BlurResultCache
+        self._blur_cache = BlurResultCache(on_evict=_release_gl_resource)
         self._custom_programs = OrderedDict()
         self._shader_buffers = OrderedDict()
         self._buffer_programs = OrderedDict()
@@ -429,6 +439,8 @@ class GLRenderer(Renderer):
         return (float(self._size[0]), float(self._size[1]))
 
     def _create_frame_target(self):
+        if hasattr(self, "_blur_cache"):
+            self._blur_cache.clear()
         if self._frame_target is not None:
             self._frame_target.release()
         if self._frame_color is not None:
@@ -913,11 +925,9 @@ class GLRenderer(Renderer):
 
     def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
         """Separable Gaussian backdrop blur on the supersampled frame target."""
-        from ..painting import blur_downsample_factor, normalize_blur_sigmas
+        from ..painting import (BlurResultCache, blur_source_digest,
+                                plan_backdrop_blur)
         if w <= 0 or h <= 0:
-            return
-        sx, sy = normalize_blur_sigmas(sigma_x, sigma_y, self.scale)
-        if sx < 0.5 and sy < 0.5:
             return
         self._flush_rects()
         x, y = self._translate(x, y)
@@ -928,24 +938,19 @@ class GLRenderer(Renderer):
         x1 = min(tw, int(math.ceil((x + w) * self.scale)))
         y1 = min(th, int(math.ceil((y + h) * self.scale)))
         rw, rh = x1 - x0, y1 - y0
-        if rw <= 0 or rh <= 0:
+        plan = plan_backdrop_blur(sigma_x, sigma_y, self.scale, rw, rh)
+        if plan["skip"]:
             return
-        factor = blur_downsample_factor(sx, sy)
-        bw, bh = max(1, rw // factor), max(1, rh // factor)
-        if bw > _MAX_BLUR_TARGET_DIM or bh > _MAX_BLUR_TARGET_DIM:
-            extra = max(
-                math.ceil(bw / _MAX_BLUR_TARGET_DIM),
-                math.ceil(bh / _MAX_BLUR_TARGET_DIM),
-            )
-            factor = max(factor, factor * extra)
-            bw, bh = max(1, rw // factor), max(1, rh // factor)
-            bw = min(bw, _MAX_BLUR_TARGET_DIM)
-            bh = min(bh, _MAX_BLUR_TARGET_DIM)
+        sx, sy = plan["sigma_x"], plan["sigma_y"]
+        factor = plan["factor"]
+        bw, bh = plan["target"]
         self._ensure_blur_targets(bw, bh)
         u0, u1 = x0 / tw, x1 / tw
         v_top, v_bottom = 1.0 - y0 / th, 1.0 - y1 / th
         viewport, scissor = self.ctx.viewport, self.ctx.scissor
         blend = self.ctx.blend_func
+        if not hasattr(self, "_blur_cache"):
+            self._blur_cache = BlurResultCache(on_evict=_release_gl_resource)
         try:
             self.ctx.disable(moderngl.BLEND)
             self.ctx.scissor = None
@@ -956,24 +961,38 @@ class GLRenderer(Renderer):
             self._prog_blur["u_sigma"].value = 0.001
             self._prog_blur["u_direction"].value = (0.0, 0.0)
             self._blur_draw_quad(self._blur_vao, u0, v_bottom, u1, v_top)
-            result = self._blur_tex_a
-            if sx >= 0.5:
-                self._blur_fbo_b.use()
-                self.ctx.viewport = (0, 0, bw, bh)
-                result.use(0)
-                self._prog_blur["u_sigma"].value = max(0.5, sx / factor)
-                self._prog_blur["u_direction"].value = (1.0 / bw, 0.0)
-                self._blur_draw_quad(self._blur_vao, 0.0, 0.0, 1.0, 1.0)
-                result = self._blur_tex_b
-            if sy >= 0.5:
-                target = self._blur_fbo_a if result is self._blur_tex_b else self._blur_fbo_b
-                target.use()
-                self.ctx.viewport = (0, 0, bw, bh)
-                result.use(0)
-                self._prog_blur["u_sigma"].value = max(0.5, sy / factor)
-                self._prog_blur["u_direction"].value = (0.0, 1.0 / bh)
-                self._blur_draw_quad(self._blur_vao, 0.0, 0.0, 1.0, 1.0)
-                result = self._blur_tex_a if target is self._blur_fbo_a else self._blur_tex_b
+            # Fingerprint the downsampled source so static stacked blurs reuse
+            # prior ping-pong results across frames.
+            digest = blur_source_digest(self._blur_tex_a.read())
+            qx, qy = round(sx * 4) / 4, round(sy * 4) / 4
+            rad_key = round(float(radius) * 4) / 4
+            cache_key = (x0, y0, x1, y1, qx, qy, rad_key, bw, bh)
+            cached = self._blur_cache.get(cache_key, digest)
+            if cached is not None:
+                result = cached
+            else:
+                result = self._blur_tex_a
+                for axis, sigma in plan["passes"]:
+                    target = (self._blur_fbo_b if result is self._blur_tex_a
+                              else self._blur_fbo_a)
+                    target.use()
+                    self.ctx.viewport = (0, 0, bw, bh)
+                    result.use(0)
+                    self._prog_blur["u_sigma"].value = float(sigma)
+                    if axis == "x":
+                        self._prog_blur["u_direction"].value = (1.0 / bw, 0.0)
+                    else:
+                        self._prog_blur["u_direction"].value = (0.0, 1.0 / bh)
+                    self._blur_draw_quad(self._blur_vao, 0.0, 0.0, 1.0, 1.0)
+                    result = (self._blur_tex_b if target is self._blur_fbo_b
+                              else self._blur_tex_a)
+                # Keep an owned copy; ping-pong textures are reused next call.
+                owned = self.ctx.texture((bw, bh), 4)
+                owned.filter = (moderngl.LINEAR, moderngl.LINEAR)
+                owned.repeat_x = owned.repeat_y = False
+                owned.write(result.read())
+                self._blur_cache.put(cache_key, digest, owned)
+                result = owned
             # Composite the blurred region back with optional rounded coverage.
             self._use_frame_target()
             self.ctx.enable(moderngl.BLEND)
@@ -1085,6 +1104,8 @@ class GLRenderer(Renderer):
             vao.release()
             program.release()
         self._custom_programs.clear()
+        if hasattr(self, "_blur_cache"):
+            self._blur_cache.clear()
         for resource in (self._blur_fbo_a, self._blur_fbo_b,
                          self._blur_tex_a, self._blur_tex_b,
                          self._blur_vao, self._blur_compose_vao, self._blur_vbo,

@@ -176,9 +176,10 @@ class Renderer(ABC):
     def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
         """Blur pixels already drawn under this logical rect (Container.blur).
 
-        Software uses a downscaled pygame gaussian; OpenGL runs a separable
-        GPU pass. No-op when both sigmas are zero. ``radius`` rounds the
-        affected region to match the container corner radius.
+        Both software and OpenGL run a separable (per-axis) Gaussian. No-op
+        when both sigmas are zero. ``radius`` rounds the affected region to
+        match the container corner radius. Results are cached by region,
+        sigmas, and a source-pixel digest (invalidated on resize).
         """
         raise NotImplementedError
 

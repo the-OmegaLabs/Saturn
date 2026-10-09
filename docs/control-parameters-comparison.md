@@ -111,7 +111,7 @@ Across **30 controls**: **1417** shared parameter occurrences implemented, **191
 
 **Saturn extensions:** `can_request_focus`, `mouse_cursor`, `semantics_label`.
 
-Backdrop `blur` accepts a number, `(sigma_x, sigma_y)`, or `Blur`. Software uses a downscaled `pygame.transform.gaussian_blur`; OpenGL runs a separable GPU pass via `Renderer.backdrop_blur`. `Blur.tile_mode` is accepted for Flet parity; sampling currently clamps.
+Backdrop `blur` accepts a number, `(sigma_x, sigma_y)`, or `Blur`. Software and OpenGL both run a separable (per-axis) Gaussian via `Renderer.backdrop_blur`, with a digest-keyed result cache. Only `BlurTileMode.CLAMP` is supported; other tile modes raise `ValueError`.
 
 ## Divider
 

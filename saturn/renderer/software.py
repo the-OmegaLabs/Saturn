@@ -52,6 +52,8 @@ class SoftwareRenderer(Renderer):
         self._transform_translation = (0.0, 0.0)
         self._buf_origin = (0.0, 0.0)
         self._layer_empty = False
+        from ..painting import BlurResultCache
+        self._blur_cache = BlurResultCache()
         self._apply_clip()
 
     def on_resize(self, width, height, *, pixel_size=None,
@@ -69,6 +71,8 @@ class SoftwareRenderer(Renderer):
         self._buf = pygame.Surface(
             (max(1, int(pixel_width)) * self._aa_scale,
              max(1, int(pixel_height)) * self._aa_scale), pygame.SRCALPHA)
+        if hasattr(self, "_blur_cache"):
+            self._blur_cache.clear()
         self._apply_clip()
 
     def configure(self, *, anti_aliasing: bool, vsync: bool):
@@ -327,7 +331,8 @@ class SoftwareRenderer(Renderer):
 
     def backdrop_blur(self, x, y, w, h, sigma_x, sigma_y, radius=0):
         """Blur the already-drawn buffer under this logical rect in place."""
-        from ..painting import (backdrop_blur_surface, corners,
+        from ..painting import (BlurResultCache, backdrop_blur_surface,
+                                blur_source_digest, corners,
                                 normalize_blur_sigmas, shape_mask)
         if w <= 0 or h <= 0:
             return
@@ -345,7 +350,16 @@ class SoftwareRenderer(Renderer):
         if rw <= 0 or rh <= 0:
             return
         region = self._buf.subsurface((x0, y0, rw, rh)).copy()
-        blurred = backdrop_blur_surface(region, sx, sy)
+        qx, qy = round(sx * 4) / 4, round(sy * 4) / 4
+        rad_key = round(float(radius) * self.scale * 4) / 4
+        cache_key = (x0, y0, rw, rh, qx, qy, rad_key)
+        digest = blur_source_digest(region.get_buffer().raw)
+        if not hasattr(self, "_blur_cache"):
+            self._blur_cache = BlurResultCache()
+        blurred = self._blur_cache.get(cache_key, digest)
+        if blurred is None:
+            blurred = backdrop_blur_surface(region, sx, sy)
+            self._blur_cache.put(cache_key, digest, blurred.copy())
         # Restrict the write to the container's rounded rect in device pixels.
         cx0 = max(x0, round(x * self.scale))
         cy0 = max(y0, round(y * self.scale))

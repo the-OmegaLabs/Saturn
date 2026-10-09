@@ -1,5 +1,7 @@
 """Shared supersampled shape masks and soft elevation shadows."""
+import hashlib
 import math
+from collections import OrderedDict
 from functools import lru_cache
 
 import pygame
@@ -93,6 +95,9 @@ def draw_notched_outline(renderer, rect, color, width, radius, left, gap, *, dep
 
 # Cap device-pixel sigma so a large Container.blur cannot stall the UI thread.
 _MAX_DEVICE_SIGMA = 48.0
+# Match OpenGL blur FBO ceiling (cpp saturn::kMaxLayoutDim).
+_MAX_BLUR_TARGET_DIM = 1 << 15
+_MAX_BLUR_CACHE_ENTRIES = 24
 
 
 def normalize_blur_sigmas(sigma_x, sigma_y, scale):
@@ -132,26 +137,163 @@ def blur_downsample_factor(sigma_x, sigma_y):
     return 4
 
 
-def backdrop_blur_surface(surface, sigma_x, sigma_y):
-    """Gaussian-blur an RGBA surface; downscale for large sigmas then upscale.
+def plan_backdrop_blur(sigma_x, sigma_y, scale, region_w, region_h):
+    """Pure planning for separable backdrop blur (shared by GL + unit tests).
 
-    pygame.transform.gaussian_blur is isotropic. When sigmas differ, the larger
-    radius is used so a Flet-style (0, 10) still softens the backdrop.
+    Returns a dict describing downsample target and which axis passes run.
+    Matches ``OpenGLRenderer.backdrop_blur`` pass selection.
+    """
+    sx, sy = normalize_blur_sigmas(sigma_x, sigma_y, scale)
+    rw = max(0, int(region_w))
+    rh = max(0, int(region_h))
+    if (sx < 0.5 and sy < 0.5) or rw <= 0 or rh <= 0:
+        return {
+            "skip": True,
+            "sigma_x": sx,
+            "sigma_y": sy,
+            "factor": 1,
+            "target": (0, 0),
+            "passes": (),
+        }
+    factor = blur_downsample_factor(sx, sy)
+    bw, bh = max(1, rw // factor), max(1, rh // factor)
+    if bw > _MAX_BLUR_TARGET_DIM or bh > _MAX_BLUR_TARGET_DIM:
+        extra = max(
+            math.ceil(bw / _MAX_BLUR_TARGET_DIM),
+            math.ceil(bh / _MAX_BLUR_TARGET_DIM),
+        )
+        factor = max(factor, factor * extra)
+        bw, bh = max(1, rw // factor), max(1, rh // factor)
+        bw = min(bw, _MAX_BLUR_TARGET_DIM)
+        bh = min(bh, _MAX_BLUR_TARGET_DIM)
+    passes = []
+    if sx >= 0.5:
+        passes.append(("x", max(0.5, sx / factor)))
+    if sy >= 0.5:
+        passes.append(("y", max(0.5, sy / factor)))
+    return {
+        "skip": False,
+        "sigma_x": sx,
+        "sigma_y": sy,
+        "factor": factor,
+        "target": (bw, bh),
+        "passes": tuple(passes),
+    }
+
+
+def blur_source_digest(raw: bytes) -> bytes:
+    """Stable fingerprint of backdrop pixels for blur-result caching."""
+    if not raw:
+        return b"\0" * 16
+    step = max(1, len(raw) // 1024)
+    return hashlib.blake2b(raw[::step], digest_size=16).digest()
+
+
+class BlurResultCache:
+    """LRU of blurred backdrops keyed by region+sigmas+source digest."""
+
+    def __init__(self, max_entries=_MAX_BLUR_CACHE_ENTRIES, on_evict=None):
+        self._max = max(1, int(max_entries))
+        self._on_evict = on_evict
+        self._entries = OrderedDict()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key, digest):
+        entry = self._entries.get(key)
+        if entry is None or entry[0] != digest:
+            self.misses += 1
+            return None
+        self._entries.move_to_end(key)
+        self.hits += 1
+        return entry[1]
+
+    def put(self, key, digest, payload):
+        old = self._entries.pop(key, None)
+        if old is not None and self._on_evict is not None and old[1] is not payload:
+            self._on_evict(old[1])
+        self._entries[key] = (digest, payload)
+        while len(self._entries) > self._max:
+            _, (_, payload) = self._entries.popitem(last=False)
+            if self._on_evict is not None:
+                self._on_evict(payload)
+
+    def clear(self):
+        if self._on_evict is not None:
+            for _, payload in self._entries.values():
+                self._on_evict(payload)
+        self._entries.clear()
+        self.hits = 0
+        self.misses = 0
+
+    def __len__(self):
+        return len(self._entries)
+
+
+def _separable_gaussian_surface(work, sx, sy):
+    """Apply per-axis Gaussian blur so software matches the GL path.
+
+    pygame only exposes isotropic ``gaussian_blur``. When both axes are active
+    we pre-scale so an isotropic radius maps back to (sx, sy). A near-zero
+    axis is skipped (same threshold as GL: sigma < 0.5).
+    """
+    import pygame
+    do_x = sx >= 0.5
+    do_y = sy >= 0.5
+    if not do_x and not do_y:
+        return work
+    w, h = work.get_size()
+    if do_x and do_y:
+        ref = min(sx, sy)
+        bw = max(1, round(w * ref / sx))
+        bh = max(1, round(h * ref / sy))
+        scaled = work if (bw, bh) == (w, h) else pygame.transform.smoothscale(work, (bw, bh))
+        blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
+        if blurred.get_size() != (w, h):
+            blurred = pygame.transform.smoothscale(blurred, (w, h))
+        return blurred
+    # Single-axis: stretch the inactive axis so isotropic blur barely affects it,
+    # then restore. Cap stretch to keep cost bounded.
+    if do_x:
+        ref = sx
+        stretch = min(8, max(2, round(ref / 0.25)))
+        bh = max(1, min(h * stretch, h * 8))
+        scaled = pygame.transform.smoothscale(work, (w, bh))
+        blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
+        return pygame.transform.smoothscale(blurred, (w, h))
+    ref = sy
+    stretch = min(8, max(2, round(ref / 0.25)))
+    bw = max(1, min(w * stretch, w * 8))
+    scaled = pygame.transform.smoothscale(work, (bw, h))
+    blurred = pygame.transform.gaussian_blur(scaled, max(1, round(ref)), False)
+    return pygame.transform.smoothscale(blurred, (w, h))
+
+
+def backdrop_blur_surface(surface, sigma_x, sigma_y):
+    """Separable Gaussian blur; downscale for large sigmas then upscale.
+
+    Honors distinct ``sigma_x`` / ``sigma_y`` (matching OpenGL) instead of
+    collapsing to ``max(sx, sy)``.
     """
     import pygame
     sx = max(0.0, float(sigma_x))
     sy = max(0.0, float(sigma_y))
-    radius = max(sx, sy)
-    if radius < 0.5 or surface.get_width() <= 0 or surface.get_height() <= 0:
+    if (sx < 0.5 and sy < 0.5) or surface.get_width() <= 0 or surface.get_height() <= 0:
         return surface
-    factor = blur_downsample_factor(sx, sy)
+    # Factor from active axes only so a near-zero axis is not "helped" into a
+    # smoothscale that smears the seam before the separable pass.
+    factor = blur_downsample_factor(
+        sx if sx >= 0.5 else 0.0,
+        sy if sy >= 0.5 else 0.0,
+    )
     work = surface
     if factor > 1:
         size = (max(1, surface.get_width() // factor),
                 max(1, surface.get_height() // factor))
         work = pygame.transform.smoothscale(surface, size)
-        radius = max(0.5, radius / factor)
-    blurred = pygame.transform.gaussian_blur(work, max(1, round(radius)), False)
+        sx = sx / factor
+        sy = sy / factor
+    blurred = _separable_gaussian_surface(work, sx, sy)
     if factor > 1:
         blurred = pygame.transform.smoothscale(blurred, surface.get_size())
     return blurred
