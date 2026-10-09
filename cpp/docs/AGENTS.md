@@ -11,7 +11,7 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 3. Bounds: text/input buffers, event queues, layout allocations have explicit caps (see `saturn/limits.hpp`, including `kMaxTextLen` / `kMaxFillRects` / `kMaxCornerRadius` / `kMaxStrokeWidth`). Unconstrained layout sizes (`nullopt`) must not allocate unbounded memory.
 4. Untrusted inputs: fonts, images, FilePicker paths, GLSL - validate format + path escape before pipeline. Custom shaders = untrusted.
 5. `ControlOptions`: explicit struct. Open fields (`data`, urls) typed or opaque - never `any`/`void*` dump without tag.
-6. Phases 1-4: **hello runs only**. Do not expand Flet-wide widget surface before hello works.
+6. Hello shipped; next milestone is pixel-parity `examples/demo.py` (DEMO.md). Still no Software/Vulkan/web.
 7. Do not vendor giant icon/gen dumps or treat Python Windows-only behavior as truth.
 
 ## Phase map
@@ -23,6 +23,7 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 | 4 | `Text` + `FilledButton` - hello |
 | 5 | `Row` / `Column` / `Container` |
 | 6 | more controls as needed |
+| 7 | Pixel-parity `examples/demo.py` (see DEMO.md) |
 
 ## Layout
 ```

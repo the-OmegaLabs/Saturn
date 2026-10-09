@@ -242,4 +242,74 @@ void Row::layout() {
     x += s.w + spacing_;
   }
 }
+
+Container::Container(ControlOptions opt) : Control(std::move(opt)) {}
+void Container::set_bgcolor(Color c) { bgcolor_ = c; has_bg_ = true; if (page_) page_->update(); }
+void Container::set_padding(float pad) {
+  if (!std::isfinite(pad) || pad < 0.f) pad = 0.f;
+  if (pad > float(kMaxLayoutDim)) pad = float(kMaxLayoutDim);
+  padding_ = pad;
+  if (page_) page_->update();
+}
+void Container::set_corner_radius(float radius) {
+  if (!std::isfinite(radius) || radius < 0.f) radius = 0.f;
+  if (radius > kMaxCornerRadius) radius = kMaxCornerRadius;
+  corner_radius_ = radius;
+  if (page_) page_->update();
+}
+void Container::add(std::unique_ptr<Control> child) { add_child(std::move(child)); }
+Size Container::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
+  if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
+  float pad2 = padding_ * 2.f;
+  OptionalSize child_max_w = max_w ? OptionalSize(*max_w - pad2) : OptionalSize{};
+  OptionalSize child_max_h = max_h ? OptionalSize(*max_h - pad2) : OptionalSize{};
+  float w = 0.f, h = 0.f;
+  for (auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic(child_max_w, child_max_h);
+    if (s.w > w) w = s.w;
+    if (s.h > h) h = s.h;
+  }
+  w += pad2; h += pad2;
+  if (w < 0) w = 0; if (h < 0) h = 0;
+  if (w > float(kMaxLayoutDim)) w = float(kMaxLayoutDim);
+  if (h > float(kMaxLayoutDim)) h = float(kMaxLayoutDim);
+  return {w, h};
+}
+void Container::layout() {
+  float inner_x = rect_.x + padding_;
+  float inner_y = rect_.y + padding_;
+  float inner_w = rect_.w - padding_ * 2.f;
+  float inner_h = rect_.h - padding_ * 2.f;
+  if (inner_w < 0) inner_w = 0;
+  if (inner_h < 0) inner_h = 0;
+  for (auto& child : children_) {
+    if (!child || !child->options().visible) continue;
+    Size s = child->intrinsic(inner_w, inner_h);
+    if (s.w > inner_w) s.w = inner_w;
+    if (s.h > inner_h) s.h = inner_h;
+    child->set_rect(Rect{inner_x, inner_y, s.w, s.h});
+    child->layout();
+  }
+}
+void Container::paint(Renderer& r) {
+  if (!opt_.visible) return;
+  if (has_bg_ && bgcolor_.a) r.fill_rect(rect_, bgcolor_, corner_radius_);
+  r.clip_push(rect_);
+  Control::paint(r);
+  r.clip_pop();
+}
+bool Container::hit_test(float x, float y) const {
+  float rad = effective_corner_radius(corner_radius_, rect_.w, rect_.h);
+  if (!(x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h))
+    return false;
+  if (rad <= 0.f) return true;
+  float lx = x - rect_.x, ly = y - rect_.y, rw = rect_.w, rh = rect_.h;
+  if (lx >= rad && lx <= rw - rad) return true;
+  if (ly >= rad && ly <= rh - rad) return true;
+  float cx = (lx < rad) ? rad : (rw - rad);
+  float cy = (ly < rad) ? rad : (rh - rad);
+  float dx = lx - cx, dy = ly - cy;
+  return dx * dx + dy * dy <= rad * rad;
+}
 }
