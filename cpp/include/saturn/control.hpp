@@ -54,7 +54,11 @@ private:
 
 class FilledButton final : public Control {
 public:
+  // Default corner radius 8px; renderer also clamps to kMaxCornerRadius / half min(w,h).
+  static constexpr float kDefaultCornerRadius = 8.f;
   FilledButton(std::string label, std::function<void()> on_click, ControlOptions opt = {});
+  void set_corner_radius(float radius);
+  float corner_radius() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
@@ -62,6 +66,7 @@ public:
 private:
   std::string label_;
   std::function<void()> on_click_;
+  float corner_radius_ = kDefaultCornerRadius;
   bool pressed_ = false;
 };
 }
