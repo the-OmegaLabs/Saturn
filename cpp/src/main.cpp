@@ -6,10 +6,11 @@
 int main() {
   return saturn::run([](saturn::Page& page) {
     page.set_title("Saturn C++ hello");
-    saturn::ControlOptions opt;
-    opt.width = 240.f;
-    opt.height = 120.f;
-    page.add(std::make_unique<saturn::ColorBox>(
-      saturn::Color{0x4f, 0x46, 0xe5, 0xff}, opt));
+    page.add(std::make_unique<saturn::Text>("Hello from Saturn"));
+    page.add(std::make_unique<saturn::FilledButton>("Click me", [&page]() {
+      // Replace first child text if present via update path: add status text once.
+      page.add(std::make_unique<saturn::Text>("It works."));
+      page.update();
+    }));
   });
 }

@@ -48,3 +48,8 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - `Page::layout` is a vertical column (padding/gap), not flex. Resize via `Window::consume_resized` triggers relayout.
 - `clip_push` throws if stack exceeds `kMaxClipDepth` (no silent drop).
 - Invalid layout size clears `layout_dirty_` (no per-frame no-op spin).
+
+## Phase 4 status
+- `Text` + `FilledButton` with embedded 5x7 bitmap font (ASCII subset)
+- Page clips children to bounds (overflow cropped; no scroll yet)
+- Pointer down/up routed to buttons

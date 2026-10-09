@@ -20,7 +20,7 @@ void Page::update() { layout_dirty_ = true; }
 bool Page::layout_dirty() const { return layout_dirty_; }
 void Page::layout(float width, float height, float padding, float gap) {
   if (!(width > 0) || !(height > 0)) {
-    layout_dirty_ = false; // avoid per-frame spin on invalid size
+    layout_dirty_ = false;
     return;
   }
   if (width > kMaxLayoutDim) width = float(kMaxLayoutDim);
@@ -41,6 +41,19 @@ void Page::layout(float width, float height, float padding, float gap) {
   layout_dirty_ = false;
 }
 void Page::paint(Renderer& r) {
+  // Clip to page bounds so column overflow is cropped (not scrolled yet).
+  r.clip_push(rect_);
   Control::paint(r);
+  r.clip_pop();
+}
+void Page::dispatch_pointer(const PointerEvent& e) {
+  for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+    Control* c = it->get();
+    if (!c || !c->options().visible || c->options().disabled) continue;
+    if (c->hit_test(e.x, e.y) || (e.up && true)) {
+      c->on_pointer(e);
+      if (e.down && c->hit_test(e.x, e.y)) break;
+    }
+  }
 }
 }
