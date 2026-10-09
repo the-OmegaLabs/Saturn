@@ -91,7 +91,12 @@ text clips; not Python multi-line card wrap). TextField/ListView still frozen.
 **Still deferred** (expect `compare_shots` FAIL): TextField, ListView scroll,
 variable Inter weight / Noto SC, flex weights / MainAxisAlignment, HiDPI
 scale-aware golden, Dropdown outside-click dismiss / true overlay+clip,
-Dialog open/close motion, Elevated shadow.
+Dialog open/close motion.
+
+**Elevated shadow:** stacked translucent rounded fills (Card-style
+`BoxShadow(blur=3*elevation, offset=(0,elevation), #33000000)`); no blur
+kernel/FBO. Idle elevation=1 only — hover/press elevation animation deferred.
+Won't move the ~27% headline much (frozen TextField/ListView dominate).
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3

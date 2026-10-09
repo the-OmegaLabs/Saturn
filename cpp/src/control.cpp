@@ -45,6 +45,47 @@ float clamp_radius(float radius) {
   if (radius > kMaxCornerRadius) return kMaxCornerRadius;
   return radius;
 }
+
+// Python containers._draw_shadow: BoxShadow as stacked translucent rounded
+// fills (no blur kernel / FBO). blur_radius / radius eat clamp_radius +
+// kMaxCornerRadius; oversize layers skip via fill_rect layout caps.
+void draw_box_shadow(Renderer& r, const Rect& box, float radius,
+                     float blur_radius, float offset_x, float offset_y,
+                     Color color, float spread = 0.f) {
+  if (!std::isfinite(blur_radius) || !std::isfinite(spread) ||
+      !std::isfinite(offset_x) || !std::isfinite(offset_y) ||
+      !std::isfinite(radius) ||
+      !std::isfinite(box.x) || !std::isfinite(box.y) ||
+      !std::isfinite(box.w) || !std::isfinite(box.h)) {
+    throw std::invalid_argument("draw_box_shadow args must be finite");
+  }
+  if (color.a == 0) return;
+  if (blur_radius < 0.f) blur_radius = 0.f;
+  if (spread < 0.f) spread = 0.f;
+  if (blur_radius > kMaxCornerRadius) blur_radius = kMaxCornerRadius;
+  if (spread > kMaxCornerRadius) spread = kMaxCornerRadius;
+  if (blur_radius <= 0.f && spread <= 0.f && offset_x == 0.f && offset_y == 0.f)
+    return;
+  if (!(box.w > 0.f && box.h > 0.f)) return;
+
+  constexpr int kSteps = 4;
+  for (int j = kSteps; j >= 1; --j) {
+    const float grow = spread + blur_radius * float(j) / float(kSteps);
+    Rect layer{
+      box.x - grow + offset_x,
+      box.y - grow + offset_y,
+      box.w + 2.f * grow,
+      box.h + 2.f * grow};
+    if (!(layer.w > 0.f && layer.h > 0.f)) continue;
+    if (layer.w > float(kMaxLayoutDim) || layer.h > float(kMaxLayoutDim)) continue;
+    const auto a = static_cast<std::uint8_t>(
+        std::lround(float(color.a) / float(j + 1)));
+    if (a == 0) continue;
+    Color c{color.r, color.g, color.b, a};
+    r.fill_rect(layer, c, clamp_radius(radius + grow));
+  }
+}
+
 // Offset of child along cross axis inside parent cross size.
 float cross_offset(CrossAxisAlignment a, float child_cross, float parent_cross) {
   if (parent_cross <= 0.f || child_cross >= parent_cross) return 0.f;
@@ -383,6 +424,16 @@ ElevatedButton::ElevatedButton(std::string label, std::function<void()> on_click
                                std::string icon, ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), std::move(icon), std::move(opt)) {}
 void ElevatedButton::paint_background(Renderer& r) {
+  // M3 elevated idle elevation=1 → Card-style BoxShadow(blur=3*e, offset=(0,e),
+  // #33000000) as stacked translucent fills (Python containers._draw_shadow).
+  // Not gaussian/FBO; frozen TextField/ListView still dominate compare_shots.
+  if (!opt_.disabled) {
+    constexpr float kElevation = 1.f;
+    draw_box_shadow(r, rect_, corner_radius(),
+                    /*blur=*/kElevation * 3.f,
+                    /*ox=*/0.f, /*oy=*/kElevation,
+                    Color{0, 0, 0, 0x33});
+  }
   Color bg = pressed() ? colors::kSurfaceContainerHigh : colors::kSurfaceContainerLow;
   r.fill_rect(rect_, bg, corner_radius());
 }
