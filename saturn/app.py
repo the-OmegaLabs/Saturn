@@ -268,8 +268,10 @@ class App:
                         self._executor, _invoke, handler, event)
                     if inspect.isawaitable(result):
                         await result
-                except Exception:
+                except Exception as e:
+                    # Log handler exceptions but don't crash the event loop
                     import traceback
+                    print(f"Error in event handler: {e}", file=sys.stderr)
                     traceback.print_exc()
 
     def _notify_font_optimize(self, **payload):
@@ -637,9 +639,13 @@ class App:
                         self._last_live_resize_frame = now
                         try:
                             self._resize_frame(*size, present=True, dispatch=True)
-                        except Exception:
+                        except (RuntimeError, ValueError, AttributeError) as e:
                             # ctypes callbacks must never leak exceptions into SDL.
+                            # RuntimeError: renderer/window destroyed
+                            # ValueError: invalid size
+                            # AttributeError: component not initialized
                             import traceback
+                            print(f"Resize frame error: {e}", file=sys.stderr)
                             traceback.print_exc()
                 return 1
 
@@ -788,8 +794,10 @@ class App:
 def _swallow(fn, *args):
     try:
         return fn(*args)
-    except Exception:
+    except Exception as e:
+        # Used for cleanup operations that shouldn't crash the app
         import traceback
+        print(f"Cleanup error in {fn.__name__}: {e}", file=sys.stderr)
         traceback.print_exc()
 
 
@@ -798,8 +806,10 @@ def _report_async_error(future):
         return
     try:
         future.result()
-    except Exception:
+    except Exception as e:
+        # Async task errors should be reported, not silently dropped
         import traceback
+        print(f"Async task error: {e}", file=sys.stderr)
         traceback.print_exc()
 
 
@@ -819,9 +829,16 @@ def run(main, *, backend: Renderer | None = None, title: str = "saturn", gpu: st
     app = App(main, backend, title=title, gpu=gpu)
     try:
         app.start()
-    except Exception:
+    except KeyboardInterrupt:
+        # User interrupted with Ctrl+C - clean shutdown
         app.close()
         app.run_until_closed()
+    except Exception as e:
+        # Unexpected errors during startup should be visible
+        import traceback
+        print(f"Saturn startup error: {e}", file=sys.stderr)
+        traceback.print_exc()
+        raise
         raise
     app.run_until_closed()
     return app
@@ -842,8 +859,10 @@ def run_thread(main, *, backend: Renderer | None = None, title: str = "saturn",
     def serve():
         try:
             app.start()
-        except Exception:
+        except Exception as e:
+            # Daemon thread errors should be logged
             import traceback
+            print(f"Saturn thread error: {e}", file=sys.stderr)
             traceback.print_exc()
             app.close()
             app.run_until_closed()
