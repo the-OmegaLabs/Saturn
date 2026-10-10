@@ -12,27 +12,43 @@ _font_lock = threading.RLock()
 
 @contextmanager
 def render_context(page):
+    """Isolate page theme and font configuration for Web session rendering.
+
+    IMPORTANT: This context manager temporarily modifies global text module state.
+    The modification is protected by _font_lock and restored in finally block,
+    but concurrent Web sessions will still serialize on this lock.
+
+    Future improvement: Move font state to ContextVar for true isolation.
+    See issue #3 in code quality analysis.
+    """
     # pygame measurement is retained initially; configuration is restored after
     # each synchronous layout pass. No lock is held across application awaits.
     with _font_lock:
+        # Save current global state
         before = (dict(text.registered_fonts), dict(text._font_sources), text.default_family)
         fonts = {k: str(Path(v) if Path(v).is_file() else Path("assets")/v) for k, v in page.fonts.items()}
         switched = fonts != text.registered_fonts or page._theme_key[1] != text.default_family
+
         if switched:
+            # Temporarily modify global font state for this session
             text.registered_fonts.clear()
             text.registered_fonts.update(fonts)
             text._font_sources.clear()
             text._font_sources.update(fonts)
             text.default_family = page._theme_key[1]
             text.invalidate_fonts()
+
+        # Set theme colors in ContextVar (this IS properly isolated)
         dark, _, seed, expressive = page._theme_key
         roles = dict(colors.EXPRESSIVE_LIGHT) if expressive and not dark else {}
         if seed is not None and colors.parse_color(seed)[:3] == (63, 81, 181):
             roles.update(colors.INDIGO_DARK if dark else colors.INDIGO_LIGHT)
         token = colors._render_colors.set((dark, roles))
+
         try:
             yield
         finally:
+            # Always restore state, even if exception occurred
             colors._render_colors.reset(token)
             if switched:
                 text.registered_fonts.clear()
@@ -76,14 +92,18 @@ def build_scene(session, view):
             font_labels[family] = label
             return label
         fonts["SaturnDefault"] = session.runtime.resources.register(text.INTER)
-        fonts["SaturnCJK"] = session.runtime.resources.register(text.NOTO_REGULAR)
-        font_labels[family] = "SaturnDefault,SaturnCJK,sans-serif"
+        if text.NOTO_REGULAR is not None:
+            fonts["SaturnCJK"] = session.runtime.resources.register(text.NOTO_REGULAR)
+        font_labels[family] = ("SaturnDefault,SaturnCJK,sans-serif"
+                               if text.NOTO_REGULAR is not None else "SaturnDefault,sans-serif")
         return font_labels[family]
     def add(identifier, kind, bounds, **props):
         node = dict(id=identifier, kind=kind, bounds=list(bounds), **props)
         nodes[identifier] = node
         order.append(identifier)
     def icon_font():
+        if text.ICON_FONT_PATH is None:
+            return 'sans-serif'
         if 'SaturnIcons' not in fonts:
             fonts['SaturnIcons'] = session.runtime.resources.register(text.ICON_FONT_PATH)
         return 'SaturnIcons'
