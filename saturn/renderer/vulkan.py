@@ -633,7 +633,8 @@ class _VulkanSwapchain(SoftwareRenderer):
         if self._device is not None:
             try:
                 vk.vkDeviceWaitIdle(self._device)
-            except Exception:
+            except RuntimeError:
+                # Device already destroyed or in error state
                 pass
             self._destroy_swapchain_resources()
             for handle, destroy in (
