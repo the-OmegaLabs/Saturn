@@ -101,7 +101,10 @@ class NativeWindow:
                     # changes, flashing a ghost title bar even though
                     # WM_NCCALCSIZE removed it. The window owns every pixel,
                     # so the non-client area is never painted.
-                    return 0
+                    # WM_NCACTIVATE must return TRUE to allow deactivation;
+                    # FALSE prevents focus switching to an owned Subpage,
+                    # so its non-client resize interaction cannot start.
+                    return 1 if message == 0x0086 else 0
                 if message == 0x0046 and self.owner.always_on_bottom:
                     position = ctypes.cast(lparam, ctypes.POINTER(_WindowPos)).contents
                     position.after = 1  # HWND_BOTTOM
