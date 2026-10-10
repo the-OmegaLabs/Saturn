@@ -33,9 +33,11 @@ $dist = Join-Path $root "dist"
 function Invoke-Step {
     param([string]$Name, [scriptblock]$Action)
     Write-Host "==> $Name" -ForegroundColor Cyan
+    # A PowerShell-only step does not update this native-command exit code.
+    # Clear any failure left by the shell before checking this step's action.
+    $global:LASTEXITCODE = 0
     & $Action
-    # Cmdlets leave $LASTEXITCODE untouched; only native commands set it.
-    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+    if ($LASTEXITCODE -ne 0) {
         throw "$Name failed with exit code $LASTEXITCODE"
     }
 }
