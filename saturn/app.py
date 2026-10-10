@@ -227,10 +227,7 @@ class App:
             title=self._title, size=self.physical_size_for_logical(*self._outer_size),
             resizable=True, opengl=self._backend is Renderer.OPENGL,
             vulkan=self._backend is Renderer.VULKAN, allow_high_dpi=True,
-            hidden=True)
-        # The window is shown after its first styled frame; creating it
-        # visible would flash the default caption before main() applies
-        # settings like title_bar_hidden.
+            hidden=False)
         self._pixel_ratio = _window_pixel_ratio(self._window.handle)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
