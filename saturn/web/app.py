@@ -184,10 +184,12 @@ class WebRuntime:
         session.enqueue(normalize_handlers(session.on_connect), event, view)
         try:
             await self.refresh(view)
-        except Exception:
+        except (RuntimeError, AttributeError) as e:
+            # RuntimeError: session/view already closed
+            # AttributeError: invalid session state
             await self.disconnect(view)
             self.tokens.pop(view.token, None)
-            raise
+            raise RuntimeError(f"Failed to refresh view during connect: {e}") from e
         return view
 
     async def refresh(self, view):
