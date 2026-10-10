@@ -381,12 +381,14 @@ class GLRenderer(Renderer):
         self.vsync_active = self._configure_vsync(vsync)
 
     def activate(self):
-        if sys.platform=='win32':
-            self._gpu_binding.activate()
-            return
+        # SDL validates the current window before swapping its buffers.
+        # Switching only WGL leaves SDL pointing at the last-created child,
+        # so the parent's draws succeed but its window.flip() is rejected.
         if self._context_sdl.SDL_GL_GetCurrentContext() != self._native_gl_context:
             if self._context_sdl.SDL_GL_MakeCurrent(self._native_sdl_window, self._native_gl_context) != 0:
                 raise RuntimeError("Cannot activate the window's OpenGL context")
+        if sys.platform=='win32':
+            self._gpu_binding.activate()
 
     def _configure_vsync(self, enabled):
         if self._gpu_binding.render_rc:

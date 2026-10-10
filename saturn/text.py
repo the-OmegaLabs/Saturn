@@ -134,8 +134,19 @@ def set_default_family(family):
         invalidate_fonts()
 
 
+def _font_cache_locations():
+    locations = [Path.home() / ".cache" / "saturn" / "font-cache"]
+    try:
+        locations.append(Path(tempfile.gettempdir()) / "saturn-font-cache")
+    except OSError:
+        # Some hosts have no writable temp directory. WOFF decoding can
+        # still return an in-memory font when neither cache is writable.
+        pass
+    return locations
+
+
 def _font_cache_directory():
-    return Path(tempfile.gettempdir()) / "saturn-font-cache" / "downloads"
+    return _font_cache_locations()[-1] / "downloads"
 
 
 def _download_font(source, destination):
@@ -236,8 +247,8 @@ def _decode_woff2(path: str, modified_ns: int, size: int):
 
     digest = hashlib.sha256(f"{path}:{modified_ns}:{size}".encode()).hexdigest()[:20]
     name = f"{Path(path).stem}.{digest}.ttf"
-    for directory in (Path.home() / ".cache" / "saturn" / "font-cache",
-                      Path(tempfile.gettempdir()) / "saturn-font-cache"):
+    locations = _font_cache_locations()
+    for directory in locations:
         cached = directory / name
         if cached.is_file():
             return str(cached)
@@ -254,8 +265,7 @@ def _decode_woff2(path: str, modified_ns: int, size: int):
     except Exception as exc:
         raise ValueError(f"cannot decode WOFF2 font: {path}") from exc
 
-    for directory in (Path.home() / ".cache" / "saturn" / "font-cache",
-                      Path(tempfile.gettempdir()) / "saturn-font-cache"):
+    for directory in locations:
         try:
             directory.mkdir(parents=True, exist_ok=True)
             cached = directory / name

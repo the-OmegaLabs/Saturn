@@ -80,10 +80,9 @@ def build(page):
         child.padding = 20
         child.bgcolor = BACKGROUND
         child.horizontal_alignment = st.CrossAxisAlignment.STRETCH
-        refresh_editor(child)
+        build_editor_controls(child)
 
-    def refresh_editor(child):
-        child.clean()
+    def build_editor_controls(child):
         key = current[0]
         def change(name):
             def handler(e):
@@ -123,6 +122,12 @@ def build(page):
         child.add(st.ListView(controls=controls,spacing=8,expand=True),
                   st.TextButton('Close',on_click=lambda e:child.close()))
 
+    def refresh_editor(child):
+        if not child or child.closed:
+            return
+        child.clean()
+        build_editor_controls(child)
+
     def select_preset(key):
         if key not in PRESETS:
             raise ValueError(f'Unknown Orb preset: {key}')
@@ -157,6 +162,7 @@ def build(page):
             child.show()
             child.to_front()
         return child
+
     page.add(heading(page,'Orb GLSL','13 effects / GPU'),
         st.Row(preset,primary('Edit orb',lambda e:open_screen()),st.TextButton('Reset',on_click=lambda e:reset()),spacing=12),
         frame,error,caption('Orb · MIT · LerSent001. Particle Ribbons uses instanced GPU particles and glass refraction.'))
