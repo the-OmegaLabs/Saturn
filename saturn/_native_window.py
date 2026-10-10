@@ -81,9 +81,9 @@ class NativeWindow:
                     from .window import WindowEventType
                     event_type = NativeWindow._window_event_type = WindowEventType
                 if message == 0x0083 and wparam and self.owner.title_bar_hidden:
-                    # WM_NCCALCSIZE: remove title bar but keep resize borders
-                    # for resizable windows. This allows custom title bar content
-                    # while preserving native resize behavior.
+                    # WM_NCCALCSIZE: hand the entire window to the client area.
+                    # For resizable windows, WM_NCHITTEST will provide manual
+                    # border hit testing to enable resizing.
                     rect = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
                     if self.user32.IsZoomed(hwnd):
                         # A maximized thickframe window extends past the
@@ -94,10 +94,6 @@ class NativeWindow:
                         rect.top += self.user32.GetSystemMetrics(33) + added
                         rect.right -= self.user32.GetSystemMetrics(32) + added
                         rect.bottom -= self.user32.GetSystemMetrics(33) + added
-                    elif self.owner.resizable:
-                        # Remove only the title bar height, keep resize borders
-                        # SM_CYCAPTION (4) is the caption bar height
-                        rect.top += self.user32.GetSystemMetrics(4)
                     return 0
                 if (message in (0x0086, 0x0085)  # WM_NCACTIVATE, WM_NCPAINT
                         and (self.owner.title_bar_hidden or self.owner.frameless)):
@@ -186,11 +182,10 @@ class NativeWindow:
                              (0x10000, owner.maximizable),
                              (0x40000, owner.resizable and not owner.frameless),
                              (0xC00000, not owner.frameless),  # Keep caption for DWM animations
-                             # The buttons live on the title bar; keeping
-                             # WS_SYSMENU on a caption-less window makes DWM
-                             # paint a ghost title bar on focus changes.
-                             (0x80000, not (owner.title_bar_buttons_hidden
-                                            or owner.title_bar_hidden))):
+                             # Keep WS_SYSMENU for resizable windows even with hidden title bar
+                             # to ensure resize operations work correctly
+                             (0x80000, (not owner.title_bar_buttons_hidden and not owner.title_bar_hidden)
+                                       or (owner.resizable and owner.title_bar_hidden))):
             style = (style | bit) if enabled else (style & ~bit)
         self.set_style(self.hwnd, -16, style)
         extended = self.get_style(self.hwnd, -20)
