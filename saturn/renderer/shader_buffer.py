@@ -80,9 +80,10 @@ def prepare_buffer(renderer, buffer_pass, layout, width, height, offset):
             framebuffer = vk.vkCreateFramebuffer(renderer._device, vk.VkFramebufferCreateInfo(
                 renderPass=renderer._buffer_render_pass, attachmentCount=1, pAttachments=[texture[2]],
                 width=size[0], height=size[1], layers=1), None)
-        except Exception:
+        except RuntimeError as e:
+            # Vulkan framebuffer creation failed
             renderer._release_texture(texture)
-            raise
+            raise RuntimeError(f"Failed to create shader buffer framebuffer: {e}") from e
         target = renderer._shader_buffers[target_key] = size, texture, framebuffer
     renderer._shader_buffers.move_to_end(target_key)
     active_targets = {id(draw[0]) for draw in renderer._shader_buffer_draws}

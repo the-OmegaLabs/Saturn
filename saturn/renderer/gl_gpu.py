@@ -100,9 +100,11 @@ class GLGPUBinding:
             return
         try:
             self._create(devices[self.index][0])
-        except Exception:
+        except (RuntimeError, OSError) as e:
+            # RuntimeError: GPU context creation failed
+            # OSError: driver error
             self.close()
-            raise
+            raise RuntimeError(f"Failed to create GPU context for {self.names[self.index]}: {e}") from e
 
     def function(self, name, result, *args):
         address = self.gl.wglGetProcAddress(name.encode('ascii'))
@@ -238,9 +240,11 @@ class GLGPUBinding:
             ctx.disable(gl.BLEND)
             self._texture.use(0)
             self._vao.render(gl.TRIANGLES,vertices=3)
-        except Exception:
+        except (RuntimeError, AttributeError) as e:
+            # RuntimeError: OpenGL operation failed
+            # AttributeError: context/resource not initialized
             self.activate()
-            raise
+            raise RuntimeError(f"GPU blit operation failed: {e}") from e
 
     def close(self):
         if not hasattr(self,'gl'):

@@ -155,8 +155,10 @@ class NativeWindow:
                 if message == 0x0084 and self.owner.ignore_mouse_events:
                     return -1  # WM_NCHITTEST / HTTRANSPARENT
                 return result
-            except Exception:
+            except Exception as e:
+                # Window message callback must never leak exceptions to Windows
                 import traceback
+                print(f"Native window callback error: {e}", file=sys.stderr)
                 traceback.print_exc()
                 return self.comctl.DefSubclassProc(hwnd, message, wparam, lparam)
 
