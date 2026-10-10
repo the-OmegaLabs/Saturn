@@ -79,12 +79,17 @@ _font_download_lock = threading.RLock()
 font_revision = 0
 
 _font_cache: dict = {}
+_font_cache_lock = threading.RLock()  # ✅ Added thread safety
 _line_surface_cache: OrderedDict = OrderedDict()
 _line_surface_lock = threading.RLock()
 _icon_cache: dict = {}
+_icon_cache_lock = threading.RLock()  # ✅ Added thread safety
 _icon_surface_cache: OrderedDict = OrderedDict()
+_icon_surface_lock = threading.RLock()  # ✅ Added thread safety
 _probe_cache: dict[tuple, _freetype.Font] = {}
+_probe_cache_lock = threading.RLock()  # ✅ Added thread safety
 _cover_cache: dict[tuple, bool] = {}
+_cover_cache_lock = threading.RLock()  # ✅ Added thread safety
 # Generated icon values are Material Symbols codepoints. Use the filled
 # static font instance for the default Icons family.
 # Regular-first async instancing (see module docstring)
@@ -629,11 +634,12 @@ def get_icon_font(px_size: int, outlined: bool = False) -> pygame.font.Font:
     if not pygame.font.get_init():
         pygame.font.init()
     key = (px_size, outlined)
-    f = _icon_cache.get(key)
-    if f is None:
-        f = pygame.font.Font(str(ICON_OUTLINED_PATH if outlined else ICON_FONT_PATH), px_size)
-        _icon_cache[key] = f
-    return f
+    with _icon_cache_lock:
+        f = _icon_cache.get(key)
+        if f is None:
+            f = pygame.font.Font(str(ICON_OUTLINED_PATH if outlined else ICON_FONT_PATH), px_size)
+            _icon_cache[key] = f
+        return f
 
 
 def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
@@ -647,18 +653,19 @@ def render_icon_cached(icon, px_size: int, color) -> pygame.Surface:
     outlined = name.endswith("_OUTLINED")
     rgba = tuple(color)
     key = (int(icon), int(px_size), rgba, outlined)
-    surface = _icon_surface_cache.get(key)
-    if surface is None:
-        rendered = get_icon_font(px_size, outlined).render(chr(int(icon)), True, rgba)
-        bbox = rendered.get_bounding_rect()
-        surface = (rendered.subsurface(bbox).copy()
-                   if bbox.w > 0 and bbox.h > 0 else rendered)
-        _icon_surface_cache[key] = surface
-        if len(_icon_surface_cache) > 256:
-            _icon_surface_cache.popitem(last=False)
-    else:
-        _icon_surface_cache.move_to_end(key)
-    return surface
+    with _icon_surface_lock:
+        surface = _icon_surface_cache.get(key)
+        if surface is None:
+            rendered = get_icon_font(px_size, outlined).render(chr(int(icon)), True, rgba)
+            bbox = rendered.get_bounding_rect()
+            surface = (rendered.subsurface(bbox).copy()
+                       if bbox.w > 0 and bbox.h > 0 else rendered)
+            _icon_surface_cache[key] = surface
+            if len(_icon_surface_cache) > 256:
+                _icon_surface_cache.popitem(last=False)
+        else:
+            _icon_surface_cache.move_to_end(key)
+        return surface
 
 
 # -- segmentation + rendering -----------------------------------------------------

@@ -114,16 +114,22 @@ EXPRESSIVE_LIGHT = {
 }
 
 # set by the active Page's theme_mode; role names resolve against it
+# TODO: Migrate to ThemeManager (see saturn/_theme.py)
+import threading
+
 theme_dark: bool = False
 role_overrides: dict[str, str] = {}  # Theme(color_scheme=...) lands in M3
 
 _system_dark_cache: bool | None = None
+_system_dark_lock = threading.RLock()
+_role_overrides_lock = threading.RLock()
 
 
 def system_prefers_dark() -> bool:
     """Windows app-mode preference, cached between Page preference polls."""
     global _system_dark_cache
-    if _system_dark_cache is None:
+    with _system_dark_lock:
+        if _system_dark_cache is None:
         v = False
         if sys.platform == "win32":
             try:
@@ -133,24 +139,25 @@ def system_prefers_dark() -> bool:
                     v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
             except OSError:
                 pass
-        _system_dark_cache = v
-    return _system_dark_cache
+            _system_dark_cache = v
+        return _system_dark_cache
 
 
 def apply_seed(seed, *, expressive: bool = False) -> None:
     """Apply a supported seed palette to semantic color roles."""
-    role_overrides.clear()
-    if seed is None:
-        if expressive and not theme_dark:
-            role_overrides.update(EXPRESSIVE_LIGHT)
-        return
-    value = getattr(seed, "value", seed)
-    try:
-        rgba = parse_color(value)
-    except (TypeError, ValueError):
-        return
-    if rgba[:3] == (0x3F, 0x51, 0xB5):
-        role_overrides.update(INDIGO_DARK if theme_dark else INDIGO_LIGHT)
+    with _role_overrides_lock:
+        role_overrides.clear()
+        if seed is None:
+            if expressive and not theme_dark:
+                role_overrides.update(EXPRESSIVE_LIGHT)
+            return
+        value = getattr(seed, "value", seed)
+        try:
+            rgba = parse_color(value)
+        except (TypeError, ValueError):
+            return
+        if rgba[:3] == (0x3F, 0x51, 0xB5):
+            role_overrides.update(INDIGO_DARK if theme_dark else INDIGO_LIGHT)
 
 
 def _hex_to_rgba(hex6: str, alpha: int = 255) -> tuple[int, int, int, int]:

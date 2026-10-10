@@ -176,11 +176,14 @@ class Control:
         self._rect = (0.0, 0.0, 0.0, 0.0)  # (x, y, w, h), assigned by layout
 
     def __getattribute__(self, name):
-        if name not in {"_animation_overrides", "__dict__", "__class__"}:
+        if name not in {"_animation_overrides", "__dict__", "__class__", "_animation_lock"}:
             try:
-                overrides = object.__getattribute__(self, "_animation_overrides")
-                if name in overrides:
-                    return overrides[name]
+                lock = object.__getattribute__(self, "_animation_lock")
+                with lock:
+                    overrides = object.__getattribute__(self, "_animation_overrides")
+                    if name in overrides:
+                        # Return deep copy to prevent external modification
+                        return copy.deepcopy(overrides[name])
             except AttributeError:
                 pass
         return object.__getattribute__(self, name)
