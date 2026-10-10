@@ -136,6 +136,11 @@ class Page(Control):
         self._theme_key = None
         self._fonts: dict[str, str] = {}
         self._fonts_snapshot = None
+
+        # Per-page theme manager - replaces global colors.theme_dark
+        from ._theme import ThemeManager, FontManager
+        self._theme_manager = ThemeManager(dark_mode=False)
+        self._font_manager = FontManager(default_family="Inter")
         self.vertical_alignment = MainAxisAlignment.START
         self.horizontal_alignment = CrossAxisAlignment.START
         self.spacing = 10
@@ -256,14 +261,29 @@ class Page(Control):
         self._theme_key = key
         if hasattr(self._app, "_root"):
             self._app._root._active_theme = None
-        colors.theme_dark = dark
-        colors.apply_seed(key[2], expressive=key[3])
+
+        # Use instance theme manager instead of global state
+        self._theme_manager.dark_mode = dark
+        seed = key[2]
+        expressive = key[3]
+        if seed:
+            self._theme_manager.apply_seed(seed)
+
+        # Update legacy global state for backwards compatibility with old code
+        # TODO: Remove once all widgets are migrated to use page._theme_manager
+        self._theme_manager.to_legacy_globals()
+        colors.apply_seed(seed, expressive=expressive)
+
         from . import text
-        text.set_default_family(key[1])
+        font_family = key[1]
+        if font_family:
+            self._font_manager.default_family = font_family
+            text.set_default_family(font_family)
+
         self._sync_native_title_bar()
 
     def _sync_native_title_bar(self):
-        dark = colors.theme_dark
+        dark = self._theme_manager.dark_mode
         brightness = getattr(self.window, "brightness", None)
         if brightness is not None:
             dark = getattr(brightness, "value", brightness) == "dark"

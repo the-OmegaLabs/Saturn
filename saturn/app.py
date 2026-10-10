@@ -336,7 +336,8 @@ class App:
             text.register_fonts(self.page._fonts, on_ready=self._root._mark_all_dirty)
             key = self.page._theme_key
             if self._root._active_theme != key:
-                colors.theme_dark = key[0]
+                # Use page's theme manager instead of global state
+                self.page._theme_manager.to_legacy_globals()
                 colors.apply_seed(key[2], expressive=key[3])
                 text.set_default_family(key[1])
                 self._root._active_theme = key
