@@ -120,11 +120,13 @@ class NativeWindow:
                 if (message == 0x0084 and self.owner.title_bar_hidden
                         and not self.owner.frameless
                         and not self.user32.IsZoomed(hwnd)
-                        and not self.owner.full_screen):
+                        and not self.owner.full_screen
+                        and self.owner.resizable):
                     # WM_NCHITTEST: with WM_NCCALCSIZE handing the whole
                     # window to the client area, DefWindowProc reports
                     # HTCLIENT everywhere and the resize borders die. Point
                     # at the border zones by hand, like a captioned window.
+                    # Only do this if the window is actually resizable.
                     x = ctypes.c_short(lparam & 0xFFFF).value
                     y = ctypes.c_short((lparam >> 16) & 0xFFFF).value
                     rect = wintypes.RECT()
