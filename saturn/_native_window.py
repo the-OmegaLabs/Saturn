@@ -173,10 +173,11 @@ class NativeWindow:
     def apply_styles(self):
         owner = self.owner
         style = self.get_style(self.hwnd, -16)
+        # Keep WS_CAPTION (0xC00000) for DWM animations, remove only for frameless
         for bit, enabled in ((0x20000, owner.minimizable),
                              (0x10000, owner.maximizable),
                              (0x40000, owner.resizable and not owner.frameless),
-                             (0xC00000, not (owner.frameless or owner.title_bar_hidden)),
+                             (0xC00000, not owner.frameless),  # Keep caption for DWM animations
                              # The buttons live on the title bar; keeping
                              # WS_SYSMENU on a caption-less window makes DWM
                              # paint a ghost title bar on focus changes.
@@ -200,6 +201,12 @@ class NativeWindow:
             self.dwm.DwmSetWindowAttribute(self.hwnd, 33,
                                            ctypes.byref(preference),
                                            ctypes.sizeof(preference))
+        # Enable DWM transitions (animations for minimize/maximize/close)
+        # DWMWA_TRANSITIONS_FORCEDISABLED = 3, FALSE = 0 means enabled
+        transitions = ctypes.c_int(0)
+        self.dwm.DwmSetWindowAttribute(self.hwnd, 3,
+                                       ctypes.byref(transitions),
+                                       ctypes.sizeof(transitions))
         if owner.always_on_bottom:
             self.user32.SetWindowPos(self.hwnd, ctypes.c_void_p(1),
                                      0, 0, 0, 0, 0x13)
