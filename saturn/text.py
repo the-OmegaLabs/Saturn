@@ -37,11 +37,21 @@ from pathlib import Path
 
 import pygame
 import pygame.freetype as _freetype
-from saturn_fonts_cjk import BOLD_FONT as NOTO_BOLD
-from saturn_fonts_cjk import REGULAR_FONT as NOTO_REGULAR
-from saturn_fonts_cjk import VARIABLE_FONT as NOTO
-from saturn_icons_material import FILLED_FONT as ICON_FONT_PATH
-from saturn_icons_material import OUTLINED_FONT as ICON_OUTLINED_PATH
+try:
+    from saturn_fonts_cjk import BOLD_FONT as NOTO_BOLD
+    from saturn_fonts_cjk import REGULAR_FONT as NOTO_REGULAR
+    from saturn_fonts_cjk import VARIABLE_FONT as NOTO
+except ModuleNotFoundError as error:
+    if error.name != "saturn_fonts_cjk":
+        raise
+    NOTO = NOTO_REGULAR = NOTO_BOLD = None
+try:
+    from saturn_icons_material import FILLED_FONT as ICON_FONT_PATH
+    from saturn_icons_material import OUTLINED_FONT as ICON_OUTLINED_PATH
+except ModuleNotFoundError as error:
+    if error.name != "saturn_icons_material":
+        raise
+    ICON_FONT_PATH = ICON_OUTLINED_PATH = None
 
 # bundled UI fonts (SIL OFL 1.1; each distribution ships its own license)
 # DEFAULT = Inter (variable; real weights via runtime instancing). CJK
@@ -61,7 +71,7 @@ _STATIC_WEIGHTS: dict[object, dict[int, object]] = {
     str(NOTO): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
     str(NOTO_REGULAR): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
     str(NOTO_BOLD): {400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)},
-}
+} if NOTO is not None else {}
 
 # instancing a big CJK variable font takes seconds; for fonts above this size
 # snap un-shipped weights to the nearest shipped static instead
@@ -317,10 +327,10 @@ def _resolve_font_source(path: str):
         source = _decode_woff2(str(resolved), stat.st_mtime_ns, stat.st_size)
         if resolved == INTER.resolve() and source not in _STATIC_WEIGHTS:
             _STATIC_WEIGHTS[source] = {700: str(INTER_BOLD)}
-        elif resolved == NOTO.resolve() and source not in _STATIC_WEIGHTS:
+        elif NOTO is not None and resolved == NOTO.resolve() and source not in _STATIC_WEIGHTS:
             _STATIC_WEIGHTS[source] = {
                 400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)}
-        elif resolved in (NOTO_REGULAR.resolve(), NOTO_BOLD.resolve()) \
+        elif NOTO is not None and resolved in (NOTO_REGULAR.resolve(), NOTO_BOLD.resolve()) \
                 and source not in _STATIC_WEIGHTS:
             _STATIC_WEIGHTS[source] = {
                 400: str(NOTO_REGULAR), 700: str(NOTO_BOLD)}
@@ -368,7 +378,12 @@ def _instance_weight(path: str, wght: int) -> bytes | None:
         font.save(buf)
         font.close()
         return buf.getvalue()
-    except Exception:
+    except (ImportError, OSError, KeyError) as e:
+        # ImportError: fontTools not available
+        # OSError: file read/write failure
+        # KeyError: invalid font structure
+        import warnings
+        warnings.warn(f"Font instancing failed: {e}", UserWarning)
         return None
 
 
@@ -408,7 +423,12 @@ def _fvar_default_wght(path: str) -> float | None:
                                 value = int.from_bytes(rec[8:12], "big") / 65536.0
                                 break
                         break
-    except Exception:
+    except (OSError, ValueError, IndexError) as e:
+        # OSError: file read failure
+        # ValueError: invalid binary data
+        # IndexError: truncated font table
+        import warnings
+        warnings.warn(f"Failed to read font weight axis: {e}", UserWarning)
         value = None
     _fvar_cache[key] = value
     return value
@@ -562,7 +582,8 @@ def _chain_cached(family, wnum, italic, _default, _revision):
     # fallback for systems without a covering system font.
     links += [("sys", n.strip(), wnum, False)
               for n in CJK_FAMILY.split(",") if n.strip()]
-    links.append(("file", str(NOTO_REGULAR), wnum, False))
+    if NOTO_REGULAR is not None:
+        links.append(("file", str(NOTO_REGULAR), wnum, False))
     out, seen = [], set()
     for link in links:
         key = (link[0], link[1], link[3])
@@ -597,7 +618,9 @@ def _covers(link: tuple, ch: str) -> bool:
         try:
             m = _probe(link).get_metrics(ch)
             v = m is not None and m[0] is not None
-        except Exception:
+        except (RuntimeError, AttributeError) as e:
+            # RuntimeError: font/freetype error
+            # AttributeError: invalid font object
             v = False
         _cover_cache[key] = v
     return v
@@ -647,7 +670,8 @@ def get_icon_font(px_size: int, outlined: bool = False) -> pygame.font.Font:
     with _icon_cache_lock:
         f = _icon_cache.get(key)
         if f is None:
-            f = pygame.font.Font(str(ICON_OUTLINED_PATH if outlined else ICON_FONT_PATH), px_size)
+            path = ICON_OUTLINED_PATH if outlined else ICON_FONT_PATH
+            f = pygame.font.Font(str(path) if path is not None else None, px_size)
             _icon_cache[key] = f
         return f
 

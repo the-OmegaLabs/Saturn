@@ -44,8 +44,11 @@ def _release_gl_resource(resource):
     if resource is not None:
         try:
             resource.release()
-        except Exception:
-            pass
+        except (AttributeError, RuntimeError) as e:
+            # AttributeError: resource doesn't have release method
+            # RuntimeError: OpenGL context is gone
+            import warnings
+            warnings.warn(f"Failed to release GL resource: {e}", ResourceWarning)
 
 RECT_VS = """
 #version 330
@@ -309,11 +312,14 @@ class GLRenderer(Renderer):
             self.gpu_name = self.ctx.info['GL_RENDERER']
             self.gpus = self._gpu_binding.names
             self.gpu_index = self._gpu_binding.index
-        except Exception:
+        except (RuntimeError, KeyError, AttributeError) as e:
+            # RuntimeError: GPU binding creation failed
+            # KeyError: missing GL_RENDERER info
+            # AttributeError: invalid GPU binding
             if self._gpu_binding is not None:
                 self._gpu_binding.close()
             self.ctx.release()
-            raise
+            raise RuntimeError(f"Failed to initialize OpenGL GPU binding: {e}") from e
         library = Path(pygame.__file__).with_name("SDL2.dll")
         self._context_sdl = ctypes.CDLL(str(library) if library.exists() else pygame.base.__file__)
         self._context_sdl.SDL_GL_GetCurrentContext.restype = ctypes.c_void_p
@@ -433,7 +439,9 @@ class GLRenderer(Renderer):
     def _query_size(self):
         try:
             return tuple(self.window.size)
-        except Exception:
+        except (AttributeError, RuntimeError):
+            # AttributeError: window not initialized
+            # RuntimeError: window destroyed
             return (0, 0)
 
     # -- helpers -----------------------------------------------------------
