@@ -130,15 +130,15 @@ def system_prefers_dark() -> bool:
     global _system_dark_cache
     with _system_dark_lock:
         if _system_dark_cache is None:
-        v = False
-        if sys.platform == "win32":
-            try:
-                import winreg
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
-                    v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
-            except OSError:
-                pass
+            v = False
+            if sys.platform == "win32":
+                try:
+                    import winreg
+                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+                        v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
+                except OSError:
+                    pass
             _system_dark_cache = v
         return _system_dark_cache
 
