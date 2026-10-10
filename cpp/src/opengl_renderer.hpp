@@ -10,6 +10,11 @@ public:
   void fill_rect(Rect r, Color c, float radius) override;
   void fill_rects(const Rect* rects, std::size_t count, Color c) override;
   void stroke_rect(Rect r, Color c, float width, float radius) override;
+  void draw_saturn_mark(Rect r, Color c) override;
+  void state_layer(Rect r, Color c, float radius, float hover, float press,
+                   float ripple_x, float ripple_y, float ripple_radius) override;
+  void effect_push(float dx, float dy, float opacity) override;
+  void effect_pop() override;
   void stroke_arc(float cx, float cy, float outer_radius,
                   float start_rad, float sweep_rad, Color c, float width) override;
   void clip_push(Rect r) override;
@@ -17,6 +22,7 @@ public:
   void flip() override;
   void on_resize(int w, int h) override;
   void* create_texture_rgba8(int w, int h, const std::uint8_t* rgba) override;
+  void* create_image_texture_rgba8(int w,int h,const std::uint8_t* rgba) override;
   void destroy_texture(void* tex) override;
   void draw_textured_quads(void* tex, const TexturedQuad* quads, std::size_t count, Color tint,
                            float radius = 0) override;
@@ -30,6 +36,10 @@ private:
   void ensure_arc_pipeline();
   void apply_scissor();
   // stroke_width == 0 -> solid rounded fill; >0 -> inside stroke. Respects scissor.
-  void draw_sdf_rect(Rect r, Color c, float radius, float stroke_width);
+  void draw_sdf_rect(Rect r, Color c, float radius, float stroke_width,
+                     float hover = 0, float press = 0, float ripple_x = 0,
+                     float ripple_y = 0, float ripple_radius = 0,
+                     bool state = false, bool mark = false);
+  void* create_texture(int w,int h,const std::uint8_t* rgba,bool mipmaps);
 };
 }

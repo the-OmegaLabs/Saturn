@@ -22,6 +22,13 @@ public:
   void layout(float width, float height);
   void paint(Renderer& r) override;
   void dispatch_pointer(const PointerEvent& e);
+  void dispatch_key(const KeyEvent& e);
+  void dispatch_text(const TextEvent& e);
+  void dispatch_composition(const CompositionEvent& e);
+  std::optional<Rect> text_input_area() const override;
+  void dispatch_scroll(const ScrollEvent& e);
+  void set_active_menu(Dropdown* menu);
+  void clear_active_menu(Dropdown* menu);
   // Overlay stack (AlertDialog / SnackBar). Budgets are separate: barrier
   // dialogs ≤ kMaxDialogDepth, SnackBars (non-barrier) ≤ kMaxSnackBarQueue —
   // neither steals the other's slots. Ownership transfers to Page; pops are
@@ -30,7 +37,7 @@ public:
   void show_dialog(std::unique_ptr<DialogControl> dialog);
   void pop_dialog(DialogControl* dialog = nullptr);
   // Per-frame: SnackBar deadlines + flush deferred pops.
-  void tick();
+  void tick(double now = motion::now()) override;
 private:
   void flush_pending_dialog_pops();
   bool overlay_contains(Control* root, Control* target) const;
@@ -41,6 +48,14 @@ private:
   bool layout_dirty_ = true;
   // Deepest hit target under page subtree; not owning. Clear before remove if remove lands.
   Control* pointer_capture_ = nullptr;
+  Control* hovered_ = nullptr; // non-owning; cleared before overlay deletion
+  void update_hover(float x, float y);
+  void set_focus(Control* control);
+  void collect_focusable(Control* root, std::vector<Control*>& out) const;
+  bool input_enabled(Control* control) const;
+  void reconcile_input();
+  Control* focused_ = nullptr; // non-owning, cleared before deleting its subtree
+  Dropdown* active_menu_ = nullptr; // non-owning control in the tree, including its close animation
   std::vector<std::unique_ptr<DialogControl>> overlays_;
   std::vector<DialogControl*> pending_pops_;
 };

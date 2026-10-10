@@ -118,7 +118,8 @@ struct Font::Impl {
   mutable std::unordered_map<int, Atlas> atlases;
 
   float scale_for(float px) const {
-    return stbtt_ScaleForPixelHeight(&info, px);
+    // pygame/SDL_ttf font size is em pixels, not ascent-minus-descent height.
+    return stbtt_ScaleForMappingEmToPixels(&info, px);
   }
 
   void metrics(float px, float& asc, float& desc, float& gap) const {
@@ -191,7 +192,8 @@ struct Font::Impl {
     if (at.dim == 0) {
       static_assert(kFontAtlasDim <= int(kMaxLayoutDim), "atlas dim cap");
       at.reset_cpu(kFontAtlasDim);
-      at.bake_px = float(key);
+      // Supersample cached glyphs only, not the framebuffer or every paint call.
+      at.bake_px = std::min(float(key)*2.f,kMaxFontPx);
       // Preload printable ASCII so hello / buttons do not thrash uploads.
       for (std::uint32_t cp = 32; cp < 127; ++cp) ensure_glyph(at, cp);
     }
@@ -232,7 +234,7 @@ Font Font::load_default() {
   std::vector<std::string> candidates;
   if (const char* base = SDL_GetBasePath()) {
     candidates.push_back(std::string(base) + "assets/Inter-Regular.ttf");
-    SDL_free(const_cast<char*>(base));
+    // SDL3 owns its cached base-path string.
   }
   candidates.push_back("assets/Inter-Regular.ttf");
   candidates.push_back("cpp/assets/Inter-Regular.ttf");
@@ -286,7 +288,7 @@ float Font::line_height(float px_size) const {
   px_size = clamp_px(px_size);
   float a, d, g;
   impl_->metrics(px_size, a, d, g);
-  return a + d + g;
+  return float(std::nearbyint(px_size*10.f/7.f));
 }
 
 void Font::draw(Renderer& r, float x, float y, std::string_view text, Color color, float px_size) const {
@@ -308,6 +310,7 @@ void Font::draw(Renderer& r, float x, float y, std::string_view text, Color colo
   float asc = 0, desc = 0, gap = 0;
   impl_->metrics(px_size, asc, desc, gap);
   const float baseline = y + asc;
+  const float glyph_scale = px_size/at.bake_px;
 
   std::vector<TexturedQuad> quads;
   quads.reserve(std::min(text.size(), kMaxFillRects));
@@ -319,13 +322,14 @@ void Font::draw(Renderer& r, float x, float y, std::string_view text, Color colo
     const GlyphInfo& g = impl_->ensure_glyph(at, cp);
     if (g.w > 0 && g.h > 0) {
       TexturedQuad q;
-      q.dst = Rect{cx + g.xoff, baseline + g.yoff, float(g.w), float(g.h)};
+      q.dst = Rect{cx + g.xoff*glyph_scale, baseline + g.yoff*glyph_scale,
+                   float(g.w)*glyph_scale, float(g.h)*glyph_scale};
       q.uv = Rect{float(g.x), float(g.y), float(g.w), float(g.h)};
       quads.push_back(q);
       if (quads.size() > kMaxFillRects)
         throw std::runtime_error("font draw exceeds kMaxFillRects");
     }
-    cx += g.advance;
+    cx += g.advance*glyph_scale;
   }
   // Glyphs may have been added after first ensure_tex - re-upload if dropped.
   if (!at.tex || at.owner != &r) tex = impl_->ensure_tex(r, at);

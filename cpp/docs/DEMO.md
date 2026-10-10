@@ -1,9 +1,89 @@
-# C++ demo pixel parity
+# C++ demo behavior and experience parity
 
-Goal: first shippable C++ demo matches Python `examples/demo.py`
-against a **Windows true-OpenGL** golden (not Mesa soft GL).
+Goal: first shippable C++ demo matches the Python version's **animations,
+interaction logic, and user experience**, using `examples/demo.py` and its
+control implementations as the reference. Screenshots are a coarse visual
+gate for layout, colors, sizing, and missing controls; pixel-perfect rendering,
+screenshot equality, and a fixed framebuffer size are not required.
 
-## Contract — three sizes, do not collapse
+## Acceptance
+
+- Animation: match applicable Python state transitions, durations, easing,
+  and interruption/reversal behavior. Cover hover/press feedback, toggles,
+  menus, and dialog/SnackBar motion where Python implements them.
+- Input: match pointer capture/release/cancellation, drag and scroll behavior,
+  focus, keyboard navigation, text editing/submission, and disabled states
+  where supported by Python. Verify state changes and callback order/payloads.
+- Demo flows: the four buttons share an incrementing click count; Name input
+  reports changes and submission; Checkbox, Slider, Switch, and Dropdown
+  report their Python-equivalent values. Dialog Cancel/Delete close the
+  dialog; SnackBar action/duration/dismissal follow Python behavior.
+- Complete controls: TextField editing and the 30-item scrollable ListView
+  are required demo experiences, not placeholders that can remain frozen.
+- Usability: retain readable text, sensible layout and hit targets, correct
+  clipping/overlays, and consistent behavior after resize or DPI changes.
+  Platform-specific rasterization or window decoration differences are allowed.
+- Verification: replay the same event sequences against Python and C++;
+  check state/callback traces and compare animation samples over time. Also
+  capture idle screenshots and require broadly comparable layout/control
+  regions. A static screenshot alone cannot establish behavioral parity.
+
+Keep the existing bounds, ownership, and untrusted-input constraints.
+No Software/Vulkan/web backend is added by this goal change.
+
+## Current Progress (2026-10-10)
+
+- `motion.hpp`: deterministic scalar tweens, the same eight Material/linear
+  curves and endpoint clamping as Python; continuous retarget/reversal.
+- Button hover/press alpha + clipped moving ripple, elevated hover/press
+  shadow, Checkbox value animation, Switch position/color/size + drag, Slider
+  handle-width/state-layer motion.
+- Dropdown no longer expands layout. Its page-level menu has reveal,
+  staggered item alpha, close animation, outside dismissal, keyboard selection,
+  and capped scrolling. Dialog/SnackBar now animate in/out before removal.
+- Bounded UTF-8 TextField editing/selection/submission, Tab navigation, button
+  keyboard activation; 30-row ListView with clipping, wheel, scrollbar dragging
+  and Material scrollbar fade. Clipboard, IME preedit/commit, and word navigation
+  are implemented; native candidate-window behavior still needs manual testing.
+- Font sizes use em pixels and Text uses Python's 10/7 line box. Images default
+  to Fill; the brand logo explicitly uses Contain. Renderer layout coordinates
+  stay logical under HiDPI; framebuffer readback is no longer fixed to 944x761.
+- Verified: Release build, `saturn_behavior` CTest, 64 easing samples plus
+  9 Switch / 8 button / 10 Dialog+SnackBar / 58 Checkbox+Slider+field+menu+scrollbar
+  / 80 interrupted/reversed samples against actual Python classes.
+- Idle screenshots: `cpp/build/Release/demo-python-idle.png` vs
+  `demo-aligned.png`, 944x761; mean absolute RGB error 0.9189, fraction above
+  channel tolerance 12 = 0.013940. Raster/font-weight differences remain.
+- Verified GPU motion: 36 fixed-time OpenGL frames, 112 control-region checks
+  and 9 temporal-change checks. Modal close scroll blocking, disabled-ancestor
+  cancellation, scrollbar drag and timeout dismissal have behavior regressions.
+- AA update: vector `SaturnLogo`, pixel-derivative shape coverage, premultiplied
+  image filtering/mipmaps and 2x cached glyphs (see CPP_GUIDE.md). After AA,
+  idle mean RGB error = 0.9949, fraction above tolerance 12 = 0.015067.
+- Not yet proven: full focus/disabled appearance/cancellation equivalence,
+  native IME candidate UI and Unicode word classes, and HiDPI runtime validation.
+  The goal remains active; these checks do not establish full completion.
+
+```bash
+cmake -S cpp -B cpp/build -DBUILD_TESTING=ON
+cmake --build cpp/build --config Release
+ctest --test-dir cpp/build -C Release --output-on-failure
+python cpp/tools/verify_motion.py cpp/build/Release/saturn_behavior_tests.exe
+python cpp/tools/capture_python_demo.py cpp/build/Release/demo-python-idle.png
+python cpp/tools/compare_shots.py cpp/build/Release/demo-python-idle.png cpp/build/Release/demo-aligned.png --tol 12 --max-avg 2 --max-diff-frac .03
+```
+
+## Historical Snapshot
+
+The remaining sections record the earlier skeleton and explain size/cap
+contracts. Current progress above supersedes "frozen", "no animation", and
+fixed pixel-check statements below; they are not the current acceptance goal.
+
+## Existing size setup (legacy screenshot diagnostic)
+
+The existing demo/screenshot code still has the following size checks.
+These describe current implementation, **not** the new milestone's acceptance
+criteria; do not extend them into a pixel-matching requirement.
 
 | Name | Size | Meaning |
 |------|------|---------|
@@ -15,7 +95,7 @@ against a **Windows true-OpenGL** golden (not Mesa soft GL).
 outer, then `client_size_for_outer` subtracts the measured Win32 frame
 (~16×39) → client **944×761**. SDL3 `SDL_CreateWindow(w,h)` sizes the
 **logical client** directly — so `CreateWindow(960,800)` shots **960×800**
-and mismatches the golden. `saturn_demo` therefore opens at
+and differs from the historical screenshot. `saturn_demo` currently opens at
 `kDemoClientWidth/Height` (**944×761** logical), not the Python outer numbers.
 
 **Logical vs pixel (HiDPI):**
@@ -25,27 +105,27 @@ and mismatches the golden. `saturn_demo` therefore opens at
   GL viewport + `SATURN_SHOT` use this.
 - At **100% DPI**, logical client == pixel drawable (**coincidence**, not
   identity). Under HiDPI, pixels = client × scale: `pin_client` can still
-  pass while the shot pixel contract fails loud. That is intentional until
-  scale-aware golden is handled — **do not claim「本机已对齐」**.
+  pass while the legacy shot pixel contract fails loud. This is a diagnostic
+  limitation to remove when updating the screenshot path, not intended
+  HiDPI behavior or a reason to reject otherwise correct interaction.
 - No `Window::width()`/`height()` aliases and no `requested_*` API — call
   `client_*` (layout) or `drawable_*` (GL/shot) explicitly. Ctor `w`,`h` is
   the logical-client intent; after `pin_client`, `client_*` is the live size.
 
 Constants live in `include/saturn/demo_size.hpp` (not `colors.hpp`).
 
-- **Golden (pinned):** `.static/shots/demo-opengl-win-944x761.png`
-  (DESKTOP Windows, `--backend opengl`, `SATURN_SHOT`). Do **not** replace
-  with Mesa soft-GL `demo-opengl-960x800.png`. Do **not** rename the golden
-  to claim 960×800.
+- **Historical screenshot:** `.static/shots/demo-opengl-win-944x761.png`
+  (DESKTOP Windows, `--backend opengl`, `SATURN_SHOT`). It may help diagnose
+  visual regressions; matching it is not required for completion.
 - Theme: `ThemeMode.DARK`, `Colors.SURFACE` background, Material baseline dark
   tokens in `include/saturn/colors.hpp`.
-- Hard blockers before claiming pixel parity: bundled TTF metrics (Inter; see
-  `saturn::Font` — not 5x7 bitmap), same-backend golden, Row/Column expand/align later.
+- Text uses `saturn::Font` (not 5x7 bitmap) for readable metrics and layout.
 - Font: `cpp/assets/Inter-Regular.ttf` (OFL, instanced from Python's Inter variable
   at wght=400). Override with `SATURN_FONT_PATH`. Hello/demo fail loud if missing.
 
 ## Skeleton (`saturn_demo`)
-Layout register cut toward `examples/demo.py` — **not** pixel parity.
+Partial implementation of `examples/demo.py` — **not yet** animation,
+interaction, or experience parity.
 Has: SURFACE page, brand header (logo `Image` 52×40 CONTAIN + PRIMARY tint +
 title 28 + `v0.1.0` 12), status 13, two 440px panels (pad 20 / radius 16),
 button row spacing 8: `ElevatedButton` (demo passes **Material ADD**
@@ -64,8 +144,8 @@ Cancel `TextButton` + Delete `FilledButton`) via `Page::show_dialog`;
 Right panel: `ListView TBD` until scroll caps land with security review.
 
 **ProgressRing:** `stroke_arc` angular SDF (round caps) for track + progress;
-track gap matches Python default (4). Finite value clamp stays. Remaining
-parity noise is AA / HiDPI, not the old disc-segment fake.
+track gap matches Python default (4). Finite value clamp stays. AA / HiDPI
+raster differences alone do not block the new milestone.
 
 **TextureImage:** shared PNG decode + GPU upload + destroy used by `Image`,
 `IconButton`, Checkbox check, Elevated leading — one lifetime, fail-loud caps.
@@ -85,20 +165,22 @@ barrier `AlertDialog` ≤ `kMaxDialogDepth=8`, non-barrier `SnackBar` ≤
 `SnackBar` bottom bar (INVERSE_SURFACE); duration `(0, kMaxSnackBarDurationMs]`;
 with action label persists until Undo (Python default). Overlay is simple —
 no animation; true menu overlay/clip depth still deferred for Dropdown.
-**Pixel debt:** title/content/message are single-line `measure`+`draw` (long
+**Usability gap:** title/content/message are single-line `measure`+`draw` (long
 text clips; not Python multi-line card wrap). TextField/ListView still frozen.
 
-**Still deferred** (expect `compare_shots` FAIL): TextField, ListView scroll,
-variable Inter weight / Noto SC, flex weights / MainAxisAlignment, HiDPI
-scale-aware golden, Dropdown outside-click dismiss / true overlay+clip,
-Dialog open/close motion.
+**Required behavior/experience gaps:** TextField editing/submission, ListView
+scroll, Dropdown outside-click dismiss / true overlay+clip, Python-equivalent
+focus/keyboard behavior, control state animations, and Dialog open/close motion.
+Flex weights / MainAxisAlignment, text wrapping/font coverage, and HiDPI handling
+must be addressed where they affect usability. Verify Python behavior before
+implementing each transition; do not invent motion to match a still image.
 
 **Elevated shadow:** ambient+key ≈ `painting.draw_shadow` (α=28/40;
 blur=`max(1,round(...))`, dy=`round(0.5e)` — Python3 banker’s; e=1 → blur 2/1, dy=0) via
 stacked translucent fills; no blur kernel/FBO. Idle elevation=1 only —
 hover/press animation deferred.
-Not Card `BoxShadow(blur=3*e)`. Won't move the ~27% headline much (frozen
-TextField/ListView dominate).
+Not Card `BoxShadow(blur=3*e)`. Prioritize Python-equivalent hover/press
+transitions over reducing screenshot-difference percentages.
 
 ```bash
 cmake -S cpp -B cpp/build -DCMAKE_PREFIX_PATH=/path/to/SDL3
@@ -119,17 +201,13 @@ window happens to be 960×800 outer or 944×761. When armed it checks:
 1. logical client == `kDemoClient*` (944×761)
 2. shot pixels == `kDemoGoldenPixel*` (944×761 at scale=1)
 
-Compare (expect FAIL until widgets catch up; size must already be 944×761
-at 100% DPI):
-
-```bash
-python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png cpp_skeleton.png \
-  --diff-out /tmp/demo-diff.png
-```
-
 `saturn_hello` remains the minimal Text + FilledButton smoke (no contract).
 
-## Compare
+## Optional Screenshot Diagnostic
+This compares static rendering only. PASS is not behavioral acceptance;
+FAIL does not by itself block the milestone. The legacy size check above
+still applies when taking demo screenshots.
+
 ```bash
 python3 cpp/tools/compare_shots.py .static/shots/demo-opengl-win-944x761.png path/to/cpp_shot.png \
   --diff-out /tmp/demo-diff.png

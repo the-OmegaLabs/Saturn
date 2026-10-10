@@ -2,6 +2,10 @@
 
 Synced with group agreement (Saturn room). Update when constraints change.
 
+Current animation/input progress and verification evidence are recorded in
+DEMO.md (2026-10-10). Older phase-status entries below are historical where
+they say TextField/ListView are frozen or motion is deferred.
+
 ## Non-goals (phase 1-4)
 - Parallel Software / Vulkan backends
 - `saturn.web` port
@@ -14,6 +18,9 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - Web (future): auth, origins, max_message_bytes, resume token lifetime first-class
 
 ## Quality
+- Match Python animations, interaction logic, and user experience; screenshots
+  are a coarse visual regression gate, while pixel-perfect equality is not
+  required (see DEMO.md).
 - Do not copy Python `**base` / Unpack sticker pattern
 - Explicit options + nullable size contracts written once
 - Hello before API width
@@ -117,7 +124,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
   `draw_textured_quads`. Caps: `kMaxFontPx`, `kMaxFontFileBytes`, `kMaxPathBytes`, `kFontAtlasDim`.
 - `Text` defaults to 16px; `FilledButton` uses M3 label 14px / PRIMARY / ON_PRIMARY. `run()` calls `Font::load_default()` and
   **fails loud** if missing (`SATURN_FONT_PATH` or `assets/Inter-Regular.ttf` next to exe).
-- 5x7 `bitmap_font.hpp` is **not** for pixel parity (kept as emergency reference only).
+- 5x7 `bitmap_font.hpp` is not suitable for demo text layout/readability (kept as emergency reference only).
 
 ## Dialog / SnackBar
 - `DialogControl` overlay base; `Page::show_dialog` / `pop_dialog` / `tick`.
@@ -127,7 +134,7 @@ Synced with group agreement (Saturn room). Update when constraints change.
   until after pointer dispatch (action `on_click` cannot UAF the button).
 - `AlertDialog`: barrier scrim (`kScrim`) + card `SURFACE_CONTAINER_HIGH`;
   actions ≤ `kMaxDialogActions`; title/content > `kMaxTextBytes` → throw.
-  Title/content single-line paint is pixel debt vs Python wrap (see DEMO.md).
+  Title/content single-line paint is a usability gap vs Python wrap (see DEMO.md).
 - `TextButton`: no fill / PRIMARY label (dialog Cancel).
 - `SnackBar`: non-barrier bottom bar; `INVERSE_SURFACE` / `ON_INVERSE_SURFACE`;
   duration in `(0, kMaxSnackBarDurationMs]`; action present → persist until
@@ -135,9 +142,14 @@ Synced with group agreement (Saturn room). Update when constraints change.
 - TextField / ListView still frozen. No open/close motion yet.
 
 ## Next goal (not done)
-- First C++ demo should pixel-match Python `examples/demo.py` (screenshot compare against
-  Windows true-GL golden `demo-opengl-win-944x761.png`). Size contract: Python outer 960x800
-  (`kDemoOuter*`), SDL logical client 944x761 (`kDemoClient*`), shot pixels 944x761 at
-  100% DPI (`kDemoGoldenPixel*` — see `demo_size.hpp` / DEMO.md). Logical != pixel under
-  HiDPI; do not claim machine alignment. Full control port / parity pixels are **not** claimed.
-  `expand`/`CrossAxisAlignment` landed on Row/Column; MainAxisAlignment / flex weights still deferred.
+- First C++ demo must match Python `examples/demo.py` animations, interaction
+  logic, and user experience. Verify event sequences, state/callback results,
+  timing/easing/interruption, focus/input, scrolling, and overlay dismissal.
+- TextField / ListView and control/menu/dialog motion are required work, not
+  permanently frozen placeholders. Current implementation is incomplete.
+- Screenshots are tolerant visual diagnostics for broad layout/control parity,
+  not a pixel-perfect completion metric.
+  Existing `demo_size.hpp` / screenshot checks remain legacy implementation;
+  logical layout/input dimensions must stay distinct from framebuffer pixels.
+- `expand`/`CrossAxisAlignment` landed on Row/Column; MainAxisAlignment / flex
+  weights still deferred. Prioritize layout work where it affects usability.

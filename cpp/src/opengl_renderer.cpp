@@ -60,6 +60,7 @@ using PFNGLTEXIMAGE2DPROC = void (*)(unsigned, int, int, int, int, int, unsigned
 using PFNGLTEXPARAMETERIPROC = void (*)(unsigned, unsigned, int);
 using PFNGLACTIVETEXTUREPROC = void (*)(unsigned);
 using PFNGLBLENDFUNCPROC = void (*)(unsigned, unsigned);
+using PFNGLGENERATEMIPMAPPROC = void (*)(unsigned);
 
 constexpr unsigned kArrBuf = 0x8892;
 constexpr unsigned kDynamicDraw = 0x88E8;
@@ -73,7 +74,8 @@ constexpr unsigned kFalse = 0;
 constexpr unsigned kTexture2D = 0x0DE1;
 constexpr unsigned kRGBA = 0x1908;
 constexpr unsigned kUnsignedByte = 0x1401;
-constexpr unsigned kNearest = 0x2600;
+constexpr unsigned kLinear = 0x2601;
+constexpr unsigned kLinearMipmapLinear = 0x2703;
 constexpr unsigned kClampToEdge = 0x812F;
 constexpr unsigned kTexture0 = 0x84C0;
 constexpr unsigned kTexMinFilter = 0x2801;
@@ -82,6 +84,7 @@ constexpr unsigned kTexWrapS = 0x2802;
 constexpr unsigned kTexWrapT = 0x2803;
 constexpr unsigned kBlend = 0x0BE2;
 constexpr unsigned kSrcAlpha = 0x0302;
+constexpr unsigned kOne = 1;
 constexpr unsigned kOneMinusSrcAlpha = 0x0303;
 constexpr int kRgba8 = 0x8058; // GL_RGBA8
 
@@ -124,6 +127,7 @@ struct GlApi {
   PFNGLTEXPARAMETERIPROC texParameteri = nullptr;
   PFNGLACTIVETEXTUREPROC activeTexture = nullptr;
   PFNGLBLENDFUNCPROC blendFunc = nullptr;
+  PFNGLGENERATEMIPMAPPROC generateMipmap = nullptr;
   bool loaded = false;
 
   void load_all() {
@@ -167,6 +171,7 @@ struct GlApi {
     texParameteri = reinterpret_cast<PFNGLTEXPARAMETERIPROC>(L("glTexParameteri"));
     activeTexture = reinterpret_cast<PFNGLACTIVETEXTUREPROC>(L("glActiveTexture"));
     blendFunc = reinterpret_cast<PFNGLBLENDFUNCPROC>(L("glBlendFunc"));
+    generateMipmap = reinterpret_cast<PFNGLGENERATEMIPMAPPROC>(L("glGenerateMipmap"));
     loaded = genVertexArrays && createShader && createProgram && drawArrays &&
              enableVertexAttribArray && vertexAttribPointer &&
              enable && disable && scissor &&
@@ -185,6 +190,15 @@ struct OpenGLRenderer::Impl {
   SDL_Window* window = nullptr;
   SDL_GLContext ctx = nullptr;
   int w = 0, h = 0;
+  int logical_w = 0, logical_h = 0;
+  struct Effect { float x = 0, y = 0, alpha = 1; };
+  std::vector<Effect> effects;
+  Effect effect() const { return effects.empty() ? Effect{} : effects.back(); }
+  Rect transform(Rect r) const {
+    const auto e = effect();
+    r.x += e.x; r.y += e.y;
+    return r;
+  }
   unsigned vao = 0, vbo = 0, prog = 0;
   int u_color = -1, u_viewport = -1;
   bool pipeline = false;
@@ -197,6 +211,7 @@ struct OpenGLRenderer::Impl {
   unsigned sdf_vao = 0, sdf_vbo = 0, sdf_prog = 0;
   int u_sdf_viewport = -1, u_sdf_rect = -1, u_sdf_radius = -1;
   int u_sdf_stroke = -1, u_sdf_color = -1;
+  int u_sdf_state = -1, u_sdf_alphas = -1, u_sdf_ripple = -1, u_sdf_mark = -1;
   bool sdf_pipeline = false;
   // Angular SDF stroked arc (round caps). Shares no program with rect SDF.
   unsigned arc_vao = 0, arc_vbo = 0, arc_prog = 0;
@@ -254,15 +269,17 @@ float sdRoundBox(vec2 p, vec2 b, float r) {
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 void main() {
-  vec4 c = texture(uTex, vUV) * uTint;
+  // Premultiplied upload avoids transparent-edge halos during filtering.
+  vec4 c = texture(uTex, vUV);
+  c.rgb *= uTint.rgb * uTint.a;
+  c.a *= uTint.a;
   if (uRadius > 0.0) {
     vec2 center = uRect.xy + uRect.zw * 0.5;
     vec2 halfSize = uRect.zw * 0.5;
     float r = min(uRadius, min(halfSize.x, halfSize.y));
     float d = sdRoundBox(vPos - center, halfSize, r);
-    float aa = 1.0;
-    float mask = 1.0 - smoothstep(-aa, aa, d);
-    c.a *= mask;
+    float mask = clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0);
+    c *= mask;
     if (c.a <= 0.001) discard;
   }
   frag = c;
@@ -287,27 +304,66 @@ uniform vec4 uRect;
 uniform float uRadius;
 uniform float uStrokeWidth;
 uniform vec4 uColor;
+uniform float uState;
+uniform vec2 uAlphas;
+uniform vec4 uRipple;
+uniform float uMark;
 in vec2 vPos;
 out vec4 frag;
 float sdRoundBox(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
+float coverage(float distance) {
+  return clamp(0.5 - distance / max(fwidth(distance), 1e-5), 0.0, 1.0);
+}
+float ellipseDistance(vec2 p, vec2 axes) {
+  float k0 = length(p / axes);
+  float k1 = length(p / (axes * axes));
+  return k0 * (k0 - 1.0) / max(k1, 1e-5);
+}
+float markCoverage(vec2 p) {
+  // .static/saturn-mark-white.svg: viewBox 44 54 104 84.
+  vec2 orbit = p - vec2(96.0, 98.0);
+  const float c = 0.9659258263, s = 0.2588190451;
+  orbit = vec2(c*orbit.x - s*orbit.y, s*orbit.x + c*orbit.y);
+  float ring = ellipseDistance(orbit, vec2(47.0, 12.5));
+  // The ellipse distance approximation is only reliable near its boundary.
+  // Suppress its medial-axis derivative spikes; the stroke lies above k0=.8.
+  float nearRing = step(0.65, length(orbit / vec2(47.0, 12.5)));
+  float planet = length(p - vec2(94.0, 96.0)) - 32.5;
+  float rear = coverage(abs(ring) - 2.5) * nearRing;
+  float body = coverage(planet - 2.5);
+  float rim = coverage(abs(planet) - 2.5);
+  float base = max(rear * (1.0 - body), rim);
+  float halfOrbit = coverage(-orbit.y);
+  float front = coverage(abs(ring) - 2.5) * nearRing * halfOrbit;
+  float gap = coverage(abs(ring) - 2.7) * nearRing * halfOrbit;
+  return clamp(base * (1.0 - gap) + front, 0.0, 1.0);
+}
 void main() {
   vec2 center = uRect.xy + uRect.zw * 0.5;
   vec2 halfSize = uRect.zw * 0.5;
   float r = min(uRadius, min(halfSize.x, halfSize.y));
   float d = sdRoundBox(vPos - center, halfSize, r);
-  float aa = 1.0;
   float alpha;
   if (uStrokeWidth <= 0.0) {
-    alpha = 1.0 - smoothstep(-aa, aa, d);
+    alpha = coverage(d);
   } else {
-    float outer = 1.0 - smoothstep(-aa, aa, d);
-    float inner = 1.0 - smoothstep(-aa, aa, d + uStrokeWidth);
+    float outer = coverage(d);
+    float inner = coverage(d + uStrokeWidth);
     alpha = clamp(outer - inner, 0.0, 1.0);
   }
+  if (uMark > 0.0) {
+    vec2 p = (vPos - uRect.xy) / uRect.zw * vec2(104.0, 84.0) + vec2(44.0, 54.0);
+    alpha = markCoverage(p);
+  }
   if (alpha <= 0.001) discard;
+  if (uState > 0.0) {
+    float ripple = coverage(length(vPos - uRipple.xy) - uRipple.z);
+    float press = uAlphas.y * ripple;
+    alpha *= press + uAlphas.x * (1.0 - press);
+  }
   frag = vec4(uColor.rgb, uColor.a * alpha);
 }
 )";
@@ -342,7 +398,6 @@ void main() {
   float inner = max(outer - sw, 0.0);
   float mid = (outer + inner) * 0.5;
   float halfStroke = (outer - inner) * 0.5;
-  float aa = 1.0;
   float r = length(p);
   float dRad = abs(r - mid) - halfStroke;
   float sweep = clamp(uSweep, 0.0, TAU);
@@ -359,7 +414,7 @@ void main() {
     float dSec = (rel <= sweep) ? dRad : 1e5;
     d = min(dSec, min(dCap0, dCap1));
   }
-  float alpha = 1.0 - smoothstep(-aa, aa, d);
+  float alpha = clamp(0.5 - d / max(fwidth(d), 1e-5), 0.0, 1.0);
   if (alpha <= 0.001) discard;
   frag = vec4(uColor.rgb, uColor.a * alpha);
 }
@@ -375,6 +430,7 @@ OpenGLRenderer::OpenGLRenderer(void* sdl_window) : impl_(std::make_unique<Impl>(
     throw std::runtime_error(SDL_GetError());
   }
   SDL_GetWindowSizeInPixels(impl_->window, &impl_->w, &impl_->h);
+  SDL_GetWindowSize(impl_->window, &impl_->logical_w, &impl_->logical_h);
   glViewport(0, 0, impl_->w, impl_->h);
   impl_->gl.load_all();
 }
@@ -585,6 +641,10 @@ void OpenGLRenderer::ensure_sdf_pipeline() {
     impl_->u_sdf_radius = g.getUniformLocation(impl_->sdf_prog, "uRadius");
     impl_->u_sdf_stroke = g.getUniformLocation(impl_->sdf_prog, "uStrokeWidth");
     impl_->u_sdf_color = g.getUniformLocation(impl_->sdf_prog, "uColor");
+    impl_->u_sdf_state = g.getUniformLocation(impl_->sdf_prog, "uState");
+    impl_->u_sdf_alphas = g.getUniformLocation(impl_->sdf_prog, "uAlphas");
+    impl_->u_sdf_ripple = g.getUniformLocation(impl_->sdf_prog, "uRipple");
+    impl_->u_sdf_mark = g.getUniformLocation(impl_->sdf_prog, "uMark");
     g.useProgram(0);
     impl_->sdf_pipeline = true;
   } catch (...) {
@@ -677,10 +737,12 @@ void OpenGLRenderer::apply_scissor() {
     r.w = (std::max)(0.f, x2 - r.x);
     r.h = (std::max)(0.f, y2 - r.y);
   }
-  int sx = int(std::floor(r.x));
-  int sy = int(std::floor(impl_->h - (r.y + r.h)));
-  int sw = int(std::ceil(r.w));
-  int sh = int(std::ceil(r.h));
+  const float scale_x = float(impl_->w)/std::max(1,impl_->logical_w);
+  const float scale_y = float(impl_->h)/std::max(1,impl_->logical_h);
+  int sx = int(std::floor(r.x*scale_x));
+  int sy = int(std::floor(impl_->h - (r.y + r.h)*scale_y));
+  int sw = int(std::ceil((r.x+r.w)*scale_x))-sx;
+  int sh = int(std::ceil(impl_->h-r.y*scale_y))-sy;
   if (sw <= 0 || sh <= 0) {
     g.enable(kScissorTest);
     g.scissor(0, 0, 0, 0);
@@ -738,12 +800,16 @@ void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
     if (!(r.w > 0 && r.h > 0)) continue;
     if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h)) continue;
     if (r.w > kMaxLayoutDim || r.h > kMaxLayoutDim) continue;
-    append_rect(impl_->scratch, r);
+    append_rect(impl_->scratch, impl_->transform(r));
   }
   if (impl_->scratch.empty()) return;
 
   auto& g = impl_->gl;
   apply_scissor();
+  if (g.enable && g.blendFunc) {
+    g.enable(kBlend);
+    g.blendFunc(kSrcAlpha,kOneMinusSrcAlpha);
+  }
   g.bindVertexArray(impl_->vao);
   g.bindBuffer(kArrBuf, impl_->vbo);
   const std::size_t floats = impl_->scratch.size();
@@ -753,29 +819,47 @@ void OpenGLRenderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
   }
   g.bufferSubData(kArrBuf, 0, ptrdiff_t(floats * sizeof(float)), impl_->scratch.data());
   g.useProgram(impl_->prog);
-  g.uniform2f(impl_->u_viewport, float(impl_->w), float(impl_->h));
-  g.uniform4f(impl_->u_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
+  g.uniform2f(impl_->u_viewport, float(impl_->logical_w), float(impl_->logical_h));
+  g.uniform4f(impl_->u_color, c.r / 255.f, c.g / 255.f, c.b / 255.f,
+              c.a / 255.f * impl_->effect().alpha);
   g.drawArrays(GL_TRIANGLES, 0, int(floats / 2));
   g.useProgram(0);
 }
 
 void* OpenGLRenderer::create_texture_rgba8(int w, int h, const std::uint8_t* rgba) {
+  return create_texture(w,h,rgba,false);
+}
+void* OpenGLRenderer::create_image_texture_rgba8(int w,int h,const std::uint8_t* rgba) {
+  return create_texture(w,h,rgba,true);
+}
+void* OpenGLRenderer::create_texture(int w,int h,const std::uint8_t* rgba,bool mipmaps) {
   if (!impl_ || !impl_->ctx || !rgba || w <= 0 || h <= 0) return nullptr;
   if (static_cast<std::size_t>(w) > kMaxLayoutDim || static_cast<std::size_t>(h) > kMaxLayoutDim)
     return nullptr;
+  const std::size_t pixels = std::size_t(w)*std::size_t(h);
+  if (pixels > kMaxScreenshotPixels) throw std::invalid_argument("texture pixel cap exceeded");
   SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
   auto& g = impl_->gl;
   g.load_all();
   if (!g.genTextures || !g.bindTexture || !g.texImage2D || !g.texParameteri) return nullptr;
+  if (mipmaps && !g.generateMipmap) throw std::runtime_error("image filtering requires glGenerateMipmap");
+  std::vector<std::uint8_t> premultiplied(pixels*4);
+  for (std::size_t i = 0; i < pixels*4; i += 4) {
+    const unsigned alpha = rgba[i+3];
+    for (std::size_t channel = 0; channel < 3; ++channel)
+      premultiplied[i+channel] = std::uint8_t((unsigned(rgba[i+channel])*alpha+127)/255);
+    premultiplied[i+3] = std::uint8_t(alpha);
+  }
   unsigned id = 0;
   g.genTextures(1, &id);
   if (!id) return nullptr;
   g.bindTexture(kTexture2D, id);
-  g.texParameteri(kTexture2D, kTexMinFilter, int(kNearest));
-  g.texParameteri(kTexture2D, kTexMagFilter, int(kNearest));
+  g.texParameteri(kTexture2D, kTexMinFilter, int(mipmaps ? kLinearMipmapLinear : kLinear));
+  g.texParameteri(kTexture2D, kTexMagFilter, int(kLinear));
   g.texParameteri(kTexture2D, kTexWrapS, int(kClampToEdge));
   g.texParameteri(kTexture2D, kTexWrapT, int(kClampToEdge));
-  g.texImage2D(kTexture2D, 0, kRgba8, w, h, 0, kRGBA, kUnsignedByte, rgba);
+  g.texImage2D(kTexture2D, 0, kRgba8, w, h, 0, kRGBA, kUnsignedByte, premultiplied.data());
+  if (mipmaps) g.generateMipmap(kTexture2D);
   g.bindTexture(kTexture2D, 0);
   auto* rec = new Impl::GpuTexture{id, w, h};
   impl_->textures.push_back(rec);
@@ -821,16 +905,17 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
   apply_scissor();
   if (g.enable && g.blendFunc) {
     g.enable(kBlend);
-    g.blendFunc(kSrcAlpha, kOneMinusSrcAlpha);
+    g.blendFunc(kOne, kOneMinusSrcAlpha);
   }
   if (g.activeTexture) g.activeTexture(kTexture0);
   g.bindTexture(kTexture2D, rec->id);
   g.bindVertexArray(impl_->tex_vao);
   g.bindBuffer(kArrBuf, impl_->tex_vbo);
   g.useProgram(impl_->tex_prog);
-  g.uniform2f(impl_->u_tex_viewport, float(impl_->w), float(impl_->h));
+  g.uniform2f(impl_->u_tex_viewport, float(impl_->logical_w), float(impl_->logical_h));
   g.uniform2f(impl_->u_tex_size, float(rec->w), float(rec->h));
-  g.uniform4f(impl_->u_tint, tint.r / 255.f, tint.g / 255.f, tint.b / 255.f, tint.a / 255.f);
+  g.uniform4f(impl_->u_tint, tint.r / 255.f, tint.g / 255.f, tint.b / 255.f,
+              tint.a / 255.f * impl_->effect().alpha);
   if (g.uniform1i && impl_->u_sampler >= 0) g.uniform1i(impl_->u_sampler, 0);
 
   auto upload_and_draw = [&](const std::vector<float>& verts) {
@@ -856,7 +941,7 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
       if (!std::isfinite(q.uv.x) || !std::isfinite(q.uv.y) ||
           !std::isfinite(q.uv.w) || !std::isfinite(q.uv.h)) continue;
       if (q.dst.w > kMaxLayoutDim || q.dst.h > kMaxLayoutDim) continue;
-      append_textured(impl_->scratch, q.dst, q.uv);
+      append_textured(impl_->scratch, impl_->transform(q.dst), q.uv);
     }
     upload_and_draw(impl_->scratch);
   } else {
@@ -872,11 +957,12 @@ void OpenGLRenderer::draw_textured_quads(void* tex, const TexturedQuad* quads, s
       float qr = rad;
       float half_min = 0.5f * (std::min)(q.dst.w, q.dst.h);
       if (qr > half_min) qr = half_min;
+      const Rect dst = impl_->transform(q.dst);
       if (g.uniform4f && impl_->u_tex_rect >= 0)
-        g.uniform4f(impl_->u_tex_rect, q.dst.x, q.dst.y, q.dst.w, q.dst.h);
+        g.uniform4f(impl_->u_tex_rect, dst.x, dst.y, dst.w, dst.h);
       g.uniform1f(impl_->u_tex_radius, qr);
       impl_->scratch.clear();
-      append_textured(impl_->scratch, q.dst, q.uv);
+      append_textured(impl_->scratch, dst, q.uv);
       upload_and_draw(impl_->scratch);
     }
   }
@@ -891,6 +977,9 @@ void OpenGLRenderer::stroke_rect(Rect r, Color c, float width, float radius) {
   if (radius < 0.f) radius = 0.f;
   draw_sdf_rect(r, c, radius, width);
 }
+void OpenGLRenderer::draw_saturn_mark(Rect r,Color c) {
+  draw_sdf_rect(r,c,0,0,0,0,0,0,0,false,true);
+}
 
 void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
                                 float start_rad, float sweep_rad, Color c,
@@ -901,6 +990,8 @@ void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
   if (!(outer_radius > 0.f) || !(width > 0.f)) return;
   if (!impl_ || !impl_->ctx) return;
 
+  cx += impl_->effect().x;
+  cy += impl_->effect().y;
   float sweep = sweep_rad;
   float start = start_rad;
   if (sweep < 0.f) {
@@ -947,23 +1038,40 @@ void OpenGLRenderer::stroke_arc(float cx, float cy, float outer_radius,
   g.bindBuffer(kArrBuf, impl_->arc_vbo);
   g.bufferSubData(kArrBuf, 0, ptrdiff_t(sizeof(verts)), verts);
   g.useProgram(impl_->arc_prog);
-  g.uniform2f(impl_->u_arc_viewport, float(impl_->w), float(impl_->h));
+  g.uniform2f(impl_->u_arc_viewport, float(impl_->logical_w), float(impl_->logical_h));
   g.uniform2f(impl_->u_arc_center, cx, cy);
   g.uniform1f(impl_->u_arc_outer, outer);
   g.uniform1f(impl_->u_arc_stroke, sw);
   g.uniform1f(impl_->u_arc_start, start);
   g.uniform1f(impl_->u_arc_sweep, sweep);
-  g.uniform4f(impl_->u_arc_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
+  g.uniform4f(impl_->u_arc_color, c.r / 255.f, c.g / 255.f, c.b / 255.f,
+              c.a / 255.f * impl_->effect().alpha);
   g.drawArrays(GL_TRIANGLES, 0, 6);
   g.useProgram(0);
 }
 
-void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_width) {
+void OpenGLRenderer::state_layer(Rect r, Color c, float radius, float hover, float press,
+                                float x, float y, float ripple_radius) {
+  if (!std::isfinite(radius) || !std::isfinite(hover) || !std::isfinite(press) ||
+      !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(ripple_radius))
+    throw std::invalid_argument("state_layer arguments must be finite");
+  if (ripple_radius < 0 || ripple_radius > 2*float(kMaxLayoutDim))
+    throw std::invalid_argument("state_layer ripple radius out of bounds");
+  draw_sdf_rect(r, c, std::max(0.f, radius), 0,
+                std::clamp(hover, 0.f, 1.f), std::clamp(press, 0.f, 1.f),
+                x, y, ripple_radius, true);
+}
+void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_width,
+                                  float hover, float press, float ripple_x,
+                                  float ripple_y, float ripple_radius, bool state,bool mark) {
   if (!impl_ || !impl_->ctx) return;
   if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h))
     throw std::invalid_argument("sdf rect must be finite");
   if (!(r.w > 0.f && r.h > 0.f)) return;
   if (r.w > kMaxLayoutDim || r.h > kMaxLayoutDim) return;
+  r = impl_->transform(r);
+  ripple_x += impl_->effect().x;
+  ripple_y += impl_->effect().y;
 
   float rad = radius;
   if (rad > kMaxCornerRadius) rad = kMaxCornerRadius;
@@ -981,7 +1089,13 @@ void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_w
 
   SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
   ensure_sdf_pipeline();
-  if (!impl_->sdf_pipeline) return;
+  if (!impl_->sdf_pipeline) {
+    if (state || mark) throw std::runtime_error("analytic shape pipeline unavailable");
+    return;
+  }
+  if (state && (impl_->u_sdf_state < 0 || impl_->u_sdf_alphas < 0 || impl_->u_sdf_ripple < 0))
+    throw std::runtime_error("state layer uniforms unavailable");
+  if (mark && impl_->u_sdf_mark < 0) throw std::runtime_error("Saturn mark uniform unavailable");
 
   // Pad 1px for AA fringe (outside rect edge).
   const float pad = 1.f;
@@ -1003,11 +1117,16 @@ void OpenGLRenderer::draw_sdf_rect(Rect r, Color c, float radius, float stroke_w
   g.bindBuffer(kArrBuf, impl_->sdf_vbo);
   g.bufferSubData(kArrBuf, 0, ptrdiff_t(sizeof(verts)), verts);
   g.useProgram(impl_->sdf_prog);
-  g.uniform2f(impl_->u_sdf_viewport, float(impl_->w), float(impl_->h));
+  g.uniform2f(impl_->u_sdf_viewport, float(impl_->logical_w), float(impl_->logical_h));
   g.uniform4f(impl_->u_sdf_rect, r.x, r.y, r.w, r.h);
   g.uniform1f(impl_->u_sdf_radius, rad);
   g.uniform1f(impl_->u_sdf_stroke, sw);
-  g.uniform4f(impl_->u_sdf_color, c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f);
+  g.uniform4f(impl_->u_sdf_color, c.r / 255.f, c.g / 255.f, c.b / 255.f,
+              c.a / 255.f * impl_->effect().alpha);
+  g.uniform1f(impl_->u_sdf_state, state ? 1.f : 0.f);
+  g.uniform1f(impl_->u_sdf_mark, mark ? 1.f : 0.f);
+  g.uniform2f(impl_->u_sdf_alphas, hover, press);
+  g.uniform4f(impl_->u_sdf_ripple, ripple_x, ripple_y, ripple_radius, 0);
   g.drawArrays(GL_TRIANGLES, 0, 6);
   g.useProgram(0);
 }
@@ -1018,7 +1137,7 @@ void OpenGLRenderer::clip_push(Rect r) {
     throw std::runtime_error("clip stack exceeds kMaxClipDepth");
   if (!std::isfinite(r.x) || !std::isfinite(r.y) || !std::isfinite(r.w) || !std::isfinite(r.h))
     throw std::invalid_argument("clip rect must be finite");
-  impl_->clips.push_back(r);
+  impl_->clips.push_back(impl_->transform(r));
   if (impl_->ctx) {
     SDL_GL_MakeCurrent(impl_->window, impl_->ctx);
     apply_scissor();
@@ -1040,6 +1159,7 @@ void OpenGLRenderer::flip() {
 }
 
 void OpenGLRenderer::on_resize(int w, int h) {
+  SDL_GetWindowSize(impl_->window, &impl_->logical_w, &impl_->logical_h);
   if (w < 0 || h < 0) return;
   if (static_cast<std::size_t>(w) > kMaxLayoutDim || static_cast<std::size_t>(h) > kMaxLayoutDim) return;
   impl_->w = w; impl_->h = h;
@@ -1048,6 +1168,21 @@ void OpenGLRenderer::on_resize(int w, int h) {
     glViewport(0, 0, w, h);
     apply_scissor();
   }
+}
+void OpenGLRenderer::effect_push(float dx, float dy, float opacity) {
+  if (!std::isfinite(dx) || !std::isfinite(dy) || !std::isfinite(opacity) ||
+      std::abs(dx) > kMaxLayoutDim || std::abs(dy) > kMaxLayoutDim)
+    throw std::invalid_argument("invalid renderer effect");
+  if (impl_->effects.size() >= kMaxClipDepth) throw std::runtime_error("effect stack too deep");
+  auto e = impl_->effect();
+  e.x += dx; e.y += dy; e.alpha *= std::clamp(opacity,0.f,1.f);
+  if (std::abs(e.x) > 2*kMaxLayoutDim || std::abs(e.y) > 2*kMaxLayoutDim)
+    throw std::invalid_argument("accumulated renderer translation out of bounds");
+  impl_->effects.push_back(e);
+}
+void OpenGLRenderer::effect_pop() {
+  if (impl_->effects.empty()) throw std::runtime_error("effect stack underflow");
+  impl_->effects.pop_back();
 }
 
 bool OpenGLRenderer::read_pixels_rgba(std::vector<std::uint8_t>* out, int* out_w, int* out_h) {

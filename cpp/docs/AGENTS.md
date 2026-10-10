@@ -4,6 +4,10 @@ Audience: coding agents. Humans: skim constraints only.
 
 ## Goal
 Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes later; **no** lossless port promise. Prefer agent-parseable structure over pretty prose in code.
+Match the Python version's animations, interaction logic, and user experience.
+Screenshots should be broadly comparable for layout and visual regressions;
+pixel-perfect equality is not required.
+Public C++ usage and current rendering/AA design: CPP_GUIDE.md.
 
 ## Locked constraints (do not reopen without user + review)
 1. Stack: SDL3 window/events → `Renderer` abstract → **OpenGL only** this phase. No Software/Vulkan/web in tree yet.
@@ -11,7 +15,7 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 3. Bounds: text/input buffers, event queues, layout allocations have explicit caps (see `saturn/limits.hpp`, including `kMaxTextLen` / `kMaxFillRects` / `kMaxCornerRadius` / `kMaxStrokeWidth`). Unconstrained layout sizes (`nullopt`) must not allocate unbounded memory.
 4. Untrusted inputs: fonts, images, FilePicker paths, GLSL - validate format + path escape before pipeline. Custom shaders = untrusted.
 5. `ControlOptions`: explicit struct. Open fields (`data`, urls) typed or opaque - never `any`/`void*` dump without tag.
-6. Hello shipped; next milestone is pixel-parity `examples/demo.py` (DEMO.md). Still no Software/Vulkan/web.
+6. Hello shipped; next milestone is animation, interaction, and experience parity with Python `examples/demo.py` and its controls (DEMO.md). Still no Software/Vulkan/web.
 7. Do not vendor giant icon/gen dumps or treat Python Windows-only behavior as truth.
 
 ## Phase map
@@ -23,7 +27,7 @@ Rewrite Saturn desktop core in C++. API may resemble Python Saturn/Flet shapes l
 | 4 | `Text` + `FilledButton` - hello |
 | 5 | `Row` / `Column` / `Container` |
 | 6 | more controls as needed |
-| 7 | Pixel-parity `examples/demo.py` (see DEMO.md) |
+| 7 | Python demo animation, interaction, and experience parity (see DEMO.md) |
 
 ## Layout
 ```
@@ -35,7 +39,7 @@ cpp/
   third_party/      stb_truetype.h
   docs/             agent + design notes (this file)
 ```
-- Pixel parity needs TTF (`saturn::Font`), not `bitmap_font`. Set `SATURN_FONT_PATH` if the
+- Readable text and usable text layout need TTF (`saturn::Font`), not `bitmap_font`. Set `SATURN_FONT_PATH` if the
   bundled file is not copied next to the exe.
 
 ## Code style for agents

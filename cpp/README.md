@@ -16,3 +16,8 @@ build\Release\saturn_hello.exe
 
 Hello uses bundled `assets/Inter-Regular.ttf` (copied next to the exe on build).
 Override with env `SATURN_FONT_PATH`. Missing font → `run()` throws (no silent bitmap fallback).
+# C++ Usage
+
+See [docs/CPP_GUIDE.md](docs/CPP_GUIDE.md) for the native rendering stack,
+antialiasing, ownership conventions and typed API examples.
+Build `saturn_counter` for a runnable usage example.

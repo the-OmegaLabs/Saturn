@@ -13,6 +13,14 @@ public:
   // Throws if count > kMaxFillRects.
   virtual void fill_rects(const Rect* rects, std::size_t count, Color c);
   virtual void stroke_rect(Rect r, Color c, float width = 1, float radius = 0) = 0;
+  // Single GPU shape matching .static/saturn-mark-white.svg; sharp at any scale.
+  virtual void draw_saturn_mark(Rect r, Color c);
+  // Hover + moving radial ripple, clipped to the rounded component silhouette.
+  virtual void state_layer(Rect r, Color c, float radius, float hover, float press,
+                           float ripple_x, float ripple_y, float ripple_radius);
+  // Bounded nested translation/opacity for menu and dialog motion.
+  virtual void effect_push(float dx, float dy, float opacity);
+  virtual void effect_pop();
   // Stroked circular arc (outer radius, stroke inward). Angles in radians;
   // sweep normalized to (0, 2π]. Round endpoint caps. Non-finite args throw.
   // Default no-op (OpenGL implements). width/radius soft-capped like stroke_rect.
@@ -25,6 +33,8 @@ public:
 
   // Optional GPU textures (OpenGL owns). Defaults: create->nullptr, destroy/draw no-op.
   virtual void* create_texture_rgba8(int w, int h, const std::uint8_t* rgba);
+  // Images may opt into one-time GPU mipmaps; font atlases stay base-level only.
+  virtual void* create_image_texture_rgba8(int w, int h, const std::uint8_t* rgba);
   virtual void destroy_texture(void* tex);
   // uv in TexturedQuad is pixel-space of the texture. Throws if count > kMaxFillRects.
   // Optional corner radius (SDF mask, same caps as fill_rect). radius<=0 = sharp.

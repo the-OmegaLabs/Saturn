@@ -3,6 +3,7 @@
 #include "saturn/limits.hpp"
 #include <SDL3/SDL.h>
 #include <atomic>
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 
@@ -17,7 +18,7 @@ struct Window::Impl {
   int client_w = 0, client_h = 0;       // logical (SDL_GetWindowSize); post-pin source of truth
   int drawable_w = 0, drawable_h = 0;   // pixels (GetWindowSizeInPixels)
   bool resized = false;
-  std::vector<PointerEvent> pointers;
+  std::vector<InputEvent> inputs;
 };
 
 namespace {
@@ -137,24 +138,60 @@ bool Window::poll_quit() {
         impl_->resized = true;
       }
     }
+    auto queue = [&](InputEvent event) {
+      if (impl_->inputs.size() < kMaxEventQueue) impl_->inputs.push_back(std::move(event));
+    };
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
       if (e.button.button == SDL_BUTTON_LEFT) {
-        PointerEvent pe;
-        pe.x = float(e.button.x);
-        pe.y = float(e.button.y);
-        pe.down = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
-        pe.up = e.type == SDL_EVENT_MOUSE_BUTTON_UP;
-        if (impl_->pointers.size() < kMaxEventQueue) impl_->pointers.push_back(pe);
+        SDL_CaptureMouse(e.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+        queue(PointerEvent{e.button.x, e.button.y,
+              e.type == SDL_EVENT_MOUSE_BUTTON_DOWN, e.type == SDL_EVENT_MOUSE_BUTTON_UP});
       }
     }
-    if (e.type == SDL_EVENT_MOUSE_MOTION) {
-      if (e.motion.state & SDL_BUTTON_LMASK) {
-        PointerEvent pe;
-        pe.x = float(e.motion.x);
-        pe.y = float(e.motion.y);
-        pe.move = true;
-        if (impl_->pointers.size() < kMaxEventQueue) impl_->pointers.push_back(pe);
+    if (e.type == SDL_EVENT_MOUSE_MOTION)
+      queue(PointerEvent{e.motion.x, e.motion.y, false, false, true});
+    if (e.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+      SDL_CaptureMouse(false);
+      queue(PointerEvent{0, 0, false, false, false, true});
+    }
+    if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE)
+      queue(PointerEvent{-1,-1,false,false,true});
+    if (e.type == SDL_EVENT_TEXT_INPUT && e.text.text) {
+      const std::string text(e.text.text);
+      if (text.size() <= kMaxTextLen) queue(TextEvent{text});
+    }
+    if (e.type == SDL_EVENT_TEXT_EDITING && e.edit.text) {
+      const std::string text(e.edit.text);
+      if (text.size() <= kMaxTextLen) queue(CompositionEvent{text,e.edit.start,e.edit.length});
+    }
+    if (e.type == SDL_EVENT_KEY_DOWN) {
+      KeyEvent key;
+      key.shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
+      key.control = (e.key.mod & SDL_KMOD_CTRL) != 0;
+      switch (e.key.key) {
+        case SDLK_TAB: key.key = Key::Tab; break;
+        case SDLK_RETURN: case SDLK_KP_ENTER: key.key = Key::Enter; break;
+        case SDLK_SPACE: key.key = Key::Space; break;
+        case SDLK_BACKSPACE: key.key = Key::Backspace; break;
+        case SDLK_DELETE: key.key = Key::Delete; break;
+        case SDLK_LEFT: key.key = Key::Left; break;
+        case SDLK_RIGHT: key.key = Key::Right; break;
+        case SDLK_UP: key.key = Key::Up; break;
+        case SDLK_DOWN: key.key = Key::Down; break;
+        case SDLK_HOME: key.key = Key::Home; break;
+        case SDLK_END: key.key = Key::End; break;
+        case SDLK_A: key.key = Key::A; break;
+        case SDLK_C: key.key = Key::C; break;
+        case SDLK_X: key.key = Key::X; break;
+        case SDLK_V: key.key = Key::V; break;
+        case SDLK_ESCAPE: key.key = Key::Escape; break;
+        default: break;
       }
+      queue(key);
+    }
+    if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+      const float direction = e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -1.f : 1.f;
+      queue(ScrollEvent{e.wheel.mouse_x, e.wheel.mouse_y, e.wheel.y * direction});
     }
   }
   return false;
@@ -168,14 +205,23 @@ bool Window::consume_resized(int* out_drawable_w, int* out_drawable_h) {
   return true;
 }
 
-std::vector<PointerEvent> Window::take_pointer_events() {
-  std::vector<PointerEvent> out;
-  out.swap(impl_->pointers);
+std::vector<InputEvent> Window::take_input_events() {
+  std::vector<InputEvent> out;
+  out.swap(impl_->inputs);
   return out;
 }
 
 void Window::set_title(const std::string& title) {
   if (impl_->win) SDL_SetWindowTitle(impl_->win, title.c_str());
+}
+void Window::set_text_input_area(std::optional<Rect> area) {
+  if (!area) {
+    if (SDL_TextInputActive(impl_->win)) SDL_StopTextInput(impl_->win);
+    return;
+  }
+  SDL_Rect rect{int(area->x),int(area->y),std::max(1,int(area->w)),std::max(1,int(area->h))};
+  SDL_SetTextInputArea(impl_->win,&rect,0);
+  if (!SDL_TextInputActive(impl_->win)) SDL_StartTextInput(impl_->win);
 }
 int Window::client_width() const { return impl_->client_w; }
 int Window::client_height() const { return impl_->client_h; }

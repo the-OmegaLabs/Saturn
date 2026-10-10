@@ -1,5 +1,6 @@
 #pragma once
 #include "events.hpp"
+#include "types.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,8 +17,9 @@ public:
   bool poll_quit();
   // Reports drawable (pixel) size after a resize; null out_* allowed as dirty flag.
   bool consume_resized(int* out_drawable_w, int* out_drawable_h);
-  std::vector<PointerEvent> take_pointer_events();
+  std::vector<InputEvent> take_input_events();
   void set_title(const std::string& title);
+  void set_text_input_area(std::optional<Rect> area);
 
   // LOGICAL client size (SDL_GetWindowSize). Matches pointer event coords;
   // use for layout / hit-testing.

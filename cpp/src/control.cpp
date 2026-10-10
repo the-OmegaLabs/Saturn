@@ -138,7 +138,7 @@ Size measure_button_label(const std::string& label, bool has_icon,
                           OptionalSize max_w, OptionalSize max_h) {
   Size text = default_font().measure(label, kLabelFontPx);
   float w = text.w + 2.f * kPadH;
-  if (has_icon) w += kLeadingIconPx + kIconGap;
+  if (has_icon) w += kLeadingIconPx + kIconGap - 8;
   Size s{w, kHeight};
   if (max_w && s.w > *max_w) s.w = *max_w;
   if (max_h && s.h > *max_h) s.h = *max_h;
@@ -151,6 +151,7 @@ void paint_centered_label(Renderer& r, const Rect& rect, const std::string& labe
   float content_w = text.w;
   if (leading) content_w += kLeadingIconPx + kIconGap;
   float x = rect.x + (rect.w - content_w) * 0.5f;
+  if (leading) x -= 4;
   float ty = rect.y + (rect.h - text.h) * 0.5f;
   if (leading) {
     Rect idst{x, rect.y + (rect.h - kLeadingIconPx) * 0.5f,
@@ -284,7 +285,7 @@ void* TextureImage::ensure_texture(Renderer& r) {
     throw std::runtime_error("image not loaded: " + path_);
   if (tex_ && tex_r_ == &r) return tex_;
   release_texture();
-  tex_ = r.create_texture_rgba8(src_w_, src_h_, rgba_.data());
+  tex_ = r.create_image_texture_rgba8(src_w_, src_h_, rgba_.data());
   if (!tex_)
     throw std::runtime_error("create_texture_rgba8 failed: " + path_);
   tex_r_ = &r;
@@ -299,7 +300,10 @@ void TextureImage::draw(Renderer& r, Rect dst, Color tint, float radius) {
 }
 
 Control::Control(ControlOptions opt) : opt_(std::move(opt)) {}
-void Control::set_options(ControlOptions opt) { opt_ = std::move(opt); }
+void Control::set_options(ControlOptions opt) {
+  opt_ = std::move(opt);
+  if (page_) page_->update();
+}
 const ControlOptions& Control::options() const { return opt_; }
 void Control::set_expand(bool expand) {
   opt_.expand = expand;
@@ -344,6 +348,7 @@ bool Control::hit_test(float x, float y) const {
   return x >= rect_.x && y >= rect_.y && x < rect_.x + rect_.w && y < rect_.y + rect_.h;
 }
 Control* Control::hit_target(float x, float y) {
+  if (!opt_.visible || opt_.disabled) return nullptr;
   for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
     Control* c = it->get();
     if (!c || !c->opt_.visible || c->opt_.disabled) continue;
@@ -353,6 +358,23 @@ Control* Control::hit_target(float x, float y) {
   return nullptr;
 }
 void Control::on_pointer(const PointerEvent&) {}
+void Control::on_focus(bool) {}
+void Control::on_key(const KeyEvent&) {}
+void Control::on_text(const TextEvent&) {}
+void Control::on_composition(const CompositionEvent&) {}
+bool Control::on_scroll(const ScrollEvent&) { return false; }
+void Control::on_hover(bool) {}
+Control* Control::hover_target(float x, float y) {
+  if (!opt_.visible || opt_.disabled) return nullptr;
+  for (auto it = children_.rbegin(); it != children_.rend(); ++it)
+    if (*it)
+      if (Control* t = (*it)->hover_target(x, y)) return t;
+  return accepts_hover() && hit_test(x, y) ? this : nullptr;
+}
+void Control::tick(double now) {
+  animation_time_ = now;
+  for (auto& child : children_) if (child) child->tick(now);
+}
 
 ColorBox::ColorBox(Color color, ControlOptions opt) : Control(std::move(opt)), color_(color) {}
 void ColorBox::paint(Renderer& r) {
@@ -383,6 +405,7 @@ float Text::size() const { return size_; }
 Size Text::intrinsic(OptionalSize max_w, OptionalSize) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
   Size s = default_font().measure(value_, size_);
+  s.h = default_font().line_height(size_);
   if (max_w && s.w > *max_w) s.w = *max_w;
   return s;
 }
@@ -394,16 +417,79 @@ void Text::paint(Renderer& r) {
 
 Pressable::Pressable(std::function<void()> on_click, ControlOptions opt)
   : Control(std::move(opt)), on_click_(std::move(on_click)) {}
+void Pressable::tick(double now) {
+  Control::tick(now);
+  state_layer_.tick(now);
+}
+SaturnLogo::SaturnLogo(Color color, ControlOptions opt)
+    : Control(std::move(opt)), color_(color) {
+  if (!opt_.width) opt_.width = 52.f;
+  if (!opt_.height) opt_.height = 40.f;
+}
+Size SaturnLogo::intrinsic(OptionalSize max_w,OptionalSize max_h) const {
+  return Control::intrinsic(max_w,max_h);
+}
+void SaturnLogo::paint(Renderer& r) {
+  if (!opt_.visible || rect_.w <= 0 || rect_.h <= 0) return;
+  const float scale = std::min(rect_.w/104.f,rect_.h/84.f);
+  const float w = 104*scale,h = 84*scale;
+  r.draw_saturn_mark({rect_.x+(rect_.w-w)/2,rect_.y+(rect_.h-h)/2,w,h},color_);
+}
+void Pressable::on_hover(bool on) {
+  hovered_ = on;
+  state_layer_.set_hover(on, animation_time_);
+}
+void Pressable::on_focus(bool focused) { focused_ = focused; }
+void Pressable::on_key(const KeyEvent& e) {
+  if (!opt_.visible || opt_.disabled) return;
+  if (e.key == Key::Enter || e.key == Key::Space) {
+    auto click = on_click_;
+    if (click) click();
+  }
+}
+void Pressable::on_pressed(float x, float y) {
+  state_layer_.press(x, y, animation_time_);
+}
+void Pressable::on_released() { state_layer_.release(animation_time_); }
+void Pressable::paint_state_layer(Renderer& r, Rect box, Color color, float radius) {
+  if (opt_.disabled || box.w <= 0 || box.h <= 0) return;
+  if (focused()) {
+    Color focus = color;
+    focus.a = std::uint8_t(py_round(255*.12));
+    r.fill_rect(box,focus,radius);
+  }
+  const float hover = float(state_layer_.hover.value(animation_time_));
+  const float press = float(state_layer_.press_alpha.value(animation_time_));
+  if (hover <= 0 && press <= 0) return;
+  const float p = float(state_layer_.ripple.value(animation_time_));
+  const float ox = std::clamp(state_layer_.origin_x, box.x, box.x + box.w);
+  const float oy = std::clamp(state_layer_.origin_y, box.y, box.y + box.h);
+  const float rx = ox + (box.x + box.w/2 - ox)*p;
+  const float ry = oy + (box.y + box.h/2 - oy)*p;
+  float end = 0;
+  for (float x : {box.x, box.x + box.w})
+    for (float y : {box.y, box.y + box.h})
+      end = std::max(end, std::hypot(rx-x, ry-y));
+  end += 10;
+  const float start = .1f * std::max(box.w, box.h);
+  r.state_layer(box, color, radius, hover, press, rx, ry, start+(end-start)*p);
+}
 void Pressable::on_pointer(const PointerEvent& e) {
+  if (e.cancel) {
+    if (pressed_) on_released();
+    pressed_ = false;
+    return;
+  }
   if (!opt_.visible || opt_.disabled) return;
   if (e.down && hit_test(e.x, e.y)) {
     pressed_ = true;
-    if (page_) page_->update();
+    on_pressed(e.x, e.y);
     return;
   }
   if (e.up) {
     // Snapshot before on_click_: dialog action may pop_dialog and destroy this.
     const bool fire = pressed_ && hit_test(e.x, e.y);
+    if (pressed_) on_released();
     pressed_ = false;
     Page* p = page_;
     auto click = on_click_;
@@ -436,6 +522,7 @@ Size ButtonBase::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
 void ButtonBase::paint(Renderer& r) {
   if (!opt_.visible) return;
   paint_background(r);
+  paint_state_layer(r, rect_, content_color(), corner_radius_);
   paint_centered_label(r, rect_, label_, leading_.get(), content_color());
 }
 bool ButtonBase::hit_test(float x, float y) const {
@@ -446,26 +533,33 @@ FilledButton::FilledButton(std::string label, std::function<void()> on_click,
                            ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
 void FilledButton::paint_background(Renderer& r) {
-  Color bg = pressed() ? colors::kPrimaryContainer : colors::kPrimary;
-  r.fill_rect(rect_, bg, corner_radius());
+  r.fill_rect(rect_, colors::kPrimary, corner_radius());
 }
 Color FilledButton::content_color() const {
-  return pressed() ? colors::kOnPrimaryContainer : colors::kOnPrimary;
+  return colors::kOnPrimary;
 }
 
 ElevatedButton::ElevatedButton(std::string label, std::function<void()> on_click,
                                std::string icon, ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), std::move(icon), std::move(opt)) {}
 void ElevatedButton::paint_background(Renderer& r) {
-  // M3 elevated idle elevation=1 → painting.draw_shadow (ambient+key),
-  // approximated with stacked translucent fills (no FBO). Not Card
-  // BoxShadow(blur=3*e). Frozen TextField/ListView still dominate shots.
   if (!opt_.disabled) {
-    constexpr float kElevation = 1.f;
-    draw_elevation_shadow(r, rect_, corner_radius(), kElevation);
+    draw_elevation_shadow(r, rect_, corner_radius(),
+                          float(elevation_.value(animation_time_)));
   }
-  Color bg = pressed() ? colors::kSurfaceContainerHigh : colors::kSurfaceContainerLow;
-  r.fill_rect(rect_, bg, corner_radius());
+  r.fill_rect(rect_, colors::kSurfaceContainerLow, corner_radius());
+}
+void ElevatedButton::on_hover(bool on) {
+  Pressable::on_hover(on);
+  elevation_.animate(on ? 3 : 1, 150, motion::Curve::Emphasized, animation_time_);
+}
+void ElevatedButton::on_pressed(float x, float y) {
+  Pressable::on_pressed(x, y);
+  elevation_.animate(1, 150, motion::Curve::Emphasized, animation_time_);
+}
+void ElevatedButton::on_released() {
+  Pressable::on_released();
+  elevation_.animate(hovered() ? 3 : 1, 150, motion::Curve::Emphasized, animation_time_);
 }
 Color ElevatedButton::content_color() const { return colors::kPrimary; }
 
@@ -473,9 +567,6 @@ OutlinedButton::OutlinedButton(std::string label, std::function<void()> on_click
                                ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
 void OutlinedButton::paint_background(Renderer& r) {
-  if (pressed()) {
-    r.fill_rect(rect_, colors::kSurfaceContainer, corner_radius());
-  }
   r.stroke_rect(rect_, colors::kOutlineVariant, kStrokeW, corner_radius());
 }
 Color OutlinedButton::content_color() const { return colors::kOnSurfaceVariant; }
@@ -484,9 +575,7 @@ TextButton::TextButton(std::string label, std::function<void()> on_click,
                        ControlOptions opt)
   : ButtonBase(std::move(label), std::move(on_click), "", std::move(opt)) {}
 void TextButton::paint_background(Renderer& r) {
-  if (pressed()) {
-    r.fill_rect(rect_, colors::kSurfaceContainer, corner_radius());
-  }
+  (void)r;
 }
 Color TextButton::content_color() const { return colors::kPrimary; }
 
@@ -505,15 +594,13 @@ Size IconButton::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
 void IconButton::paint(Renderer& r) {
   if (!opt_.visible) return;
   const float radius = std::min(rect_.w, rect_.h) * 0.5f;
-  if (pressed()) {
-    r.fill_rect(rect_, colors::kPrimaryContainer, radius);
-  }
+  paint_state_layer(r, rect_, colors::kOnSurfaceVariant, radius);
   const float side = kIconPx;
   Rect dst{
     rect_.x + (rect_.w - side) * 0.5f,
     rect_.y + (rect_.h - side) * 0.5f,
     side, side};
-  Color fg = pressed() ? colors::kOnPrimaryContainer : colors::kOnSurface;
+  Color fg = colors::kOnSurfaceVariant;
   image_.draw(r, dst, fg);
 }
 bool IconButton::hit_test(float x, float y) const {
@@ -524,20 +611,26 @@ bool IconButton::hit_test(float x, float y) const {
 Checkbox::Checkbox(std::string label, bool value,
                    std::function<void(bool)> on_change, ControlOptions opt)
   : Pressable([this]() {
-      value_ = !value_;
-      if (page_) page_->update();
+      set_value(!value_);
       if (on_change_) on_change_(value_);
     }, std::move(opt)),
     label_(std::move(label)), value_(value),
-    on_change_(std::move(on_change)), check_icon_("icons/check.png") {
+    value_progress_(value ? 1 : 0), on_change_(std::move(on_change)),
+    check_icon_("icons/check.png") {
   if (label_.size() > kMaxTextBytes) label_.resize(kMaxTextBytes);
+  state_layer_.ripple_ms = 450;
+  state_layer_.press_ms = 105;
+  state_layer_.minimum_ms = 225;
+  state_layer_.fade_ms = 375;
 }
 bool Checkbox::value() const { return value_; }
 void Checkbox::set_value(bool v) {
   if (value_ == v) return;
   value_ = v;
+  value_progress_.animate(v ? 1 : 0, v ? 350 : 150,
+      v ? motion::Curve::EmphasizedDecelerate : motion::Curve::EmphasizedAccelerate,
+      animation_time_);
   if (page_) page_->update();
-  if (on_change_) on_change_(value_);
 }
 Size Checkbox::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   if (opt_.width || opt_.height) return Control::intrinsic(opt_.width, opt_.height);
@@ -548,8 +641,6 @@ Size Checkbox::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
     w += kLabelGap + t.w;
     if (t.h > h) h = t.h;
   }
-  // Match Python toggle row height comfort (~40) when labeled.
-  if (!label_.empty() && h < 40.f) h = 40.f;
   Size s{w, h};
   if (max_w && s.w > *max_w) s.w = *max_w;
   if (max_h && s.h > *max_h) s.h = *max_h;
@@ -559,16 +650,29 @@ void Checkbox::paint(Renderer& r) {
   if (!opt_.visible) return;
   const float box_y = rect_.y + (rect_.h - kBox) * 0.5f;
   const Rect box{rect_.x, box_y, kBox, kBox};
-  if (value_) {
-    r.fill_rect(box, colors::kPrimary, kBoxRadius);
-    const float side = kCheckPx;
+  paint_state_layer(r, {box.x+kBox/2-20, box.y+kBox/2-20, 40, 40},
+                    value_ ? colors::kPrimary : colors::kOnSurface, 20);
+  const float progress = float(value_progress_.value(animation_time_));
+  if (progress > 0) {
+    const float scale = .6f + .4f*progress;
+    const float selected_size = kBox*scale;
+    Color fill = colors::kPrimary;
+    fill.a = std::uint8_t(std::lround(255 * std::min(1.f, progress*3)));
+    r.fill_rect({box.x+(kBox-selected_size)/2, box.y+(kBox-selected_size)/2,
+                 selected_size, selected_size}, fill, kBoxRadius);
+    const float side = kCheckPx*scale;
     Rect idst{
       box.x + (kBox - side) * 0.5f,
       box.y + (kBox - side) * 0.5f,
       side, side};
-    check_icon_.draw(r, idst, colors::kOnPrimary);
-  } else {
-    r.stroke_rect(box, colors::kOnSurfaceVariant, 2.f, kBoxRadius);
+    Color icon = colors::kOnPrimary;
+    icon.a = fill.a;
+    check_icon_.draw(r, idst, icon);
+  }
+  if (progress < 1) {
+    Color outline = colors::kOnSurfaceVariant;
+    outline.a = std::uint8_t(std::lround(255*(1-progress)));
+    r.stroke_rect(box, outline, 2.f, kBoxRadius);
   }
   if (!label_.empty()) {
     Size t = default_font().measure(label_, kLabelPx);
@@ -579,7 +683,7 @@ void Checkbox::paint(Renderer& r) {
 }
 Slider::Slider(float min_v, float max_v, int divisions,
                std::function<void(float)> on_change, ControlOptions opt)
-  : Control(std::move(opt)), min_(min_v), max_(max_v), divisions_(divisions),
+  : Pressable({},std::move(opt)), min_(min_v), max_(max_v), divisions_(divisions),
     on_change_(std::move(on_change)) {
   if (!(std::isfinite(min_) && std::isfinite(max_)) || max_ < min_)
     throw std::invalid_argument("Slider min/max invalid");
@@ -601,7 +705,7 @@ float Slider::value_from_x(float x) const {
   float v = min_ + k * (max_ - min_);
   if (divisions_ > 0 && max_ > min_) {
     const float step = (max_ - min_) / float(divisions_);
-    v = min_ + std::round((v - min_) / step) * step;
+    v = min_ + float(py_round((v - min_) / step)) * step;
   }
   if (v < min_) v = min_;
   if (v > max_) v = max_;
@@ -632,7 +736,7 @@ void Slider::paint(Renderer& r) {
   const float span = (max_ > min_) ? (max_ - min_) : 1.f;
   const float k = (value_ - min_) / span;
   const float thumb_x = track_x + track_w * k;
-  const float handle_w = 4.f;
+  const float handle_w = std::clamp(4-2*float(thumb_press_.value(animation_time_)),2.f,4.f);
   const float gap = handle_w * 0.5f + 6.f;
   Color active = colors::kPrimary;
   Color inactive = colors::kSecondaryContainer;
@@ -642,12 +746,17 @@ void Slider::paint(Renderer& r) {
   if (active_w > 8.f) {
     r.fill_rect(Rect{track_x, cy - 8.f, active_w, 16.f}, active,
                 std::min(8.f, active_w * 0.5f));
+    if (active_w >= 20)
+      r.fill_rect({active_end-10,cy-8,10,16},active,2);
   }
   const float inactive_x = std::min(track_x + track_w, thumb_x + gap);
   const float inactive_w = track_x + track_w - inactive_x;
   if (inactive_w > 8.f) {
     r.fill_rect(Rect{inactive_x, cy - 8.f, inactive_w, 16.f}, inactive,
                 std::min(8.f, inactive_w * 0.5f));
+    if (inactive_w >= 20)
+      r.fill_rect({inactive_x,cy-8,10,16},inactive,2);
+    r.fill_rect({track_x+track_w-10,cy-2,4,4},active,2);
   }
   if (divisions_ > 1) {
     for (int step = 1; step < divisions_; ++step) {
@@ -658,13 +767,20 @@ void Slider::paint(Renderer& r) {
       }
     }
   }
+  paint_state_layer(r,{thumb_x-20,cy-20,40,40},active,20);
   r.fill_rect(Rect{thumb_x - handle_w * 0.5f, cy - 22.f, handle_w, 44.f},
               active, handle_w * 0.5f);
 }
 void Slider::on_pointer(const PointerEvent& e) {
+  if (e.cancel) {
+    if (dragging_) on_released();
+    dragging_ = false;
+    return;
+  }
   if (!opt_.visible || opt_.disabled) return;
   if (e.down && hit_test(e.x, e.y)) {
     dragging_ = true;
+    on_pressed(e.x,e.y);
     apply_value(value_from_x(e.x));
   }
   if (e.move && dragging_) {
@@ -672,6 +788,7 @@ void Slider::on_pointer(const PointerEvent& e) {
   }
   if (e.up) {
     if (dragging_) apply_value(value_from_x(e.x));
+    if (dragging_) on_released();
     dragging_ = false;
   }
 }
@@ -735,6 +852,7 @@ void Image::paint(Renderer& r) {
   }
   float dw = float(src_w) * scale;
   float dh = float(src_h) * scale;
+  if (fit_ == Fit::Fill) { dw = rect_.w; dh = rect_.h; }
   if (dw > float(kMaxLayoutDim)) dw = float(kMaxLayoutDim);
   if (dh > float(kMaxLayoutDim)) dh = float(kMaxLayoutDim);
   Rect dst{
@@ -747,11 +865,11 @@ void Image::paint(Renderer& r) {
 
 Switch::Switch(bool value, std::function<void(bool)> on_change, ControlOptions opt)
   : Pressable([this]() {
-      value_ = !value_;
-      if (page_) page_->update();
+      set_value(!value_);
       if (on_change_) on_change_(value_);
     }, std::move(opt)),
-    value_(value), on_change_(std::move(on_change)) {
+    value_(value), on_change_(std::move(on_change)),
+    position_(value ? 1 : 0), color_(value ? 1 : 0), size_(value ? 1 : 0) {
   if (!opt_.width) opt_.width = kTrackW;
   if (!opt_.height) opt_.height = kHeight;
 }
@@ -759,8 +877,72 @@ bool Switch::value() const { return value_; }
 void Switch::set_value(bool v) {
   if (value_ == v) return;
   value_ = v;
+  animate_value();
   if (page_) page_->update();
-  if (on_change_) on_change_(value_);
+}
+void Slider::on_pressed(float x,float y) {
+  state_layer_.ripple_ms = 450; state_layer_.press_ms = 105;
+  state_layer_.minimum_ms = 225; state_layer_.fade_ms = 375;
+  Pressable::on_pressed(x,y);
+  thumb_press_.animate(1,100,motion::Curve::EmphasizedDecelerate,animation_time_);
+}
+void Slider::on_released() {
+  Pressable::on_released();
+  thumb_press_.animate(0,100,motion::Curve::EmphasizedAccelerate,animation_time_);
+}
+void Slider::on_key(const KeyEvent& e) {
+  if (opt_.disabled || !opt_.visible) return;
+  const float step = (max_-min_)/(divisions_ ? divisions_ : 20);
+  if (e.key == Key::Home) apply_value(min_);
+  else if (e.key == Key::End) apply_value(max_);
+  else if (e.key == Key::Left || e.key == Key::Down) apply_value(value_-step);
+  else if (e.key == Key::Right || e.key == Key::Up) apply_value(value_+step);
+}
+void Switch::animate_value() {
+  const double target = value_ ? 1 : 0;
+  position_.animate(target, 300, motion::Curve::SwitchOvershoot, animation_time_);
+  color_.animate(target, 67, motion::Curve::Linear, animation_time_);
+  size_.animate(target, 250, motion::Curve::Standard, animation_time_);
+}
+void Switch::on_pressed(float x, float y) {
+  Pressable::on_pressed(x, y);
+  thumb_press_.animate(1, 75, motion::Curve::StandardAccelerate, animation_time_);
+  drag_start_x_ = x;
+  drag_start_progress_ = position_.value(animation_time_);
+  dragged_ = false;
+}
+void Switch::on_released() {
+  Pressable::on_released();
+  thumb_press_.animate(0, 100, motion::Curve::StandardDecelerate, animation_time_);
+}
+void Switch::on_pointer(const PointerEvent& e) {
+  if (e.cancel) {
+    if (dragged_) animate_value();
+    dragged_ = false;
+    Pressable::on_pointer(e);
+    return;
+  }
+  if (!opt_.visible || opt_.disabled) return;
+  if (e.move && pressed()) {
+    const float delta = e.x - drag_start_x_;
+    if (std::abs(delta) < 2 && !dragged_) return;
+    dragged_ = true;
+    const double p = std::clamp(drag_start_progress_ + delta / 20, 0.0, 1.0);
+    position_.reset(p); color_.reset(p); size_.reset(p);
+    return;
+  }
+  if (e.up && pressed() && dragged_) {
+    const bool selected = position_.value(animation_time_) >= .5;
+    const bool changed = selected != value_;
+    value_ = selected;
+    animate_value();
+    on_released();
+    set_pressed(false);
+    dragged_ = false;
+    if (changed && on_change_) on_change_(value_);
+    return;
+  }
+  Pressable::on_pointer(e);
 }
 Size Switch::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   Size s{opt_.width.value_or(kTrackW), opt_.height.value_or(kHeight)};
@@ -776,17 +958,26 @@ void Switch::paint(Renderer& r) {
   const float track_y = rect_.y + (rect_.h - track_h) * 0.5f;
   const Rect track{track_x, track_y, track_w, track_h};
   const float radius = track_h * 0.5f;
-  if (value_) {
-    r.fill_rect(track, colors::kPrimary, radius);
-  } else {
-    r.fill_rect(track, colors::kSurfaceContainerHighest, radius);
-    r.stroke_rect(track, colors::kOutline, 2.f, radius);
-  }
-  // Thumb: off r=8 centered at x+16; on r=12 centered at x+(w-16).
-  const float thumb_r = value_ ? 12.f : 8.f;
-  const float tx = value_ ? (track_x + track_w - 16.f) : (track_x + 16.f);
+  const float p = float(position_.value(animation_time_));
+  const float cp = float(color_.value(animation_time_));
+  const float sp = float(size_.value(animation_time_));
+  auto mix = [cp](Color a, Color b) {
+    auto channel = [cp](int a, int b) { return std::uint8_t(py_round(a+(b-a)*cp)); };
+    return Color{channel(a.r,b.r), channel(a.g,b.g), channel(a.b,b.b), channel(a.a,b.a)};
+  };
+  float thumb_r = 8+4*sp;
+  thumb_r += (14-thumb_r)*float(thumb_press_.value(animation_time_));
+  const float tx = track_x + 16 + 20*p;
   const float ty = track_y + track_h * 0.5f;
-  Color thumb = value_ ? colors::kOnPrimary : colors::kOutline;
+  paint_state_layer(r, {tx-20, ty-20, 40, 40},
+                    value_ ? colors::kPrimary : colors::kOnSurface, 20);
+  r.fill_rect(track, mix(colors::kSurfaceContainerHighest, colors::kPrimary), radius);
+  if (cp < 1) {
+    Color outline = colors::kOutline;
+    outline.a = std::uint8_t(py_round(255*(1-cp)));
+    r.stroke_rect(track, outline, 2, radius);
+  }
+  Color thumb = mix(colors::kOutline, colors::kOnPrimary);
   r.fill_rect(Rect{tx - thumb_r, ty - thumb_r, thumb_r * 2.f, thumb_r * 2.f},
               thumb, thumb_r);
 }
@@ -892,9 +1083,60 @@ void Dropdown::set_value(std::string key) {
 }
 
 void Dropdown::set_open(bool open) {
-  if (open_ == open) return;
+  if (open_ == open && !(open && menu_closing_)) return;
   open_ = open;
+  if (open) {
+    menu_closing_ = false;
+    menu_close_at_ = -1;
+    if (page_) page_->set_active_menu(this);
+    menu_progress_.animate(1,300,motion::Curve::Emphasized,animation_time_);
+    menu_timeline_.animate(1,300,motion::Curve::Linear,animation_time_);
+  } else {
+    menu_closing_ = true;
+    menu_close_at_ = animation_time_+.15;
+    menu_progress_.animate(.35,150,motion::Curve::EmphasizedAccelerate,animation_time_);
+    menu_timeline_.animate(0,150,motion::Curve::Linear,animation_time_);
+  }
   if (page_) page_->update();
+}
+void Dropdown::tick(double now) {
+  Control::tick(now);
+  if (menu_closing_ && now >= menu_close_at_) {
+    menu_closing_ = false;
+    menu_progress_.reset(0); menu_timeline_.reset(0);
+    if (page_) page_->clear_active_menu(this);
+  }
+}
+void Dropdown::on_hover(bool on) {
+  hover_progress_.animate(on ? 1 : 0,150,motion::Curve::Standard,animation_time_);
+}
+void Dropdown::on_focus(bool on) {
+  focus_progress_.animate(on ? 1 : 0,150,motion::Curve::Standard,animation_time_);
+}
+void Dropdown::pick_option(int index) {
+  if (index < 0 || index >= int(options_.size())) return;
+  const auto& o = options_[std::size_t(index)];
+  value_ = o.key;
+  selected_text_ = o.text.empty() ? o.key : o.text;
+  set_open(false);
+  if (on_select_) on_select_(value_);
+}
+void Dropdown::on_key(const KeyEvent& e) {
+  if (e.key == Key::Escape) set_open(false);
+  else if (e.key == Key::Enter || e.key == Key::Space) {
+    if (open_) pick_option(keyboard_index_);
+    else set_open(true);
+  } else if (e.key == Key::Down || e.key == Key::Up) {
+    if (!open_) set_open(true);
+    else if (!options_.empty()) keyboard_index_ = std::clamp(
+        keyboard_index_+(e.key == Key::Down ? 1 : -1),0,int(options_.size())-1);
+  }
+}
+bool Dropdown::on_scroll(const ScrollEvent& e) {
+  if (!open_ || !menu_hit_test(e.x,e.y) || !std::isfinite(e.delta_y)) return false;
+  menu_offset_ = std::clamp(menu_offset_-e.delta_y*40,0.f,
+      std::max(0.f,kItemHeight*float(options_.size())-menu_rect().h));
+  return true;
 }
 
 Rect Dropdown::field_rect() const {
@@ -902,15 +1144,26 @@ Rect Dropdown::field_rect() const {
 }
 
 Rect Dropdown::menu_rect() const {
-  const float h = kItemHeight * float(options_.size());
-  return Rect{rect_.x, rect_.y + kFieldHeight, rect_.w, h};
+  const Rect page = page_ ? page_->rect() : Rect{0,0,float(kMaxLayoutDim),float(kMaxLayoutDim)};
+  const float w = std::min(rect_.w,page.w);
+  const float h = std::min({kItemHeight*float(options_.size()),320.f,std::max(0.f,page.h-8)});
+  const float x = std::clamp(rect_.x,page.x,std::max(page.x,page.x+page.w-w));
+  float y = rect_.y+kFieldHeight+4;
+  if (y+h > page.y+page.h) y = std::max(page.y,rect_.y-h-4);
+  return {x,y,w,h};
+}
+bool Dropdown::menu_hit_test(float x,float y) const {
+  if (!open_ || menu_closing_) return false;
+  const Rect m = menu_rect();
+  const float h = m.h*float(menu_progress_.value(animation_time_));
+  return x >= m.x && x < m.x+m.w && y >= m.y && y < m.y+h;
 }
 
 int Dropdown::hit_option(float x, float y) const {
   if (!open_ || options_.empty()) return -1;
   const Rect m = menu_rect();
-  if (!(x >= m.x && y >= m.y && x < m.x + m.w && y < m.y + m.h)) return -1;
-  const int idx = static_cast<int>((y - m.y) / kItemHeight);
+  if (!menu_hit_test(x,y)) return -1;
+  const int idx = static_cast<int>((y - m.y+menu_offset_) / kItemHeight);
   if (idx < 0 || idx >= static_cast<int>(options_.size())) return -1;
   return idx;
 }
@@ -918,8 +1171,6 @@ int Dropdown::hit_option(float x, float y) const {
 Size Dropdown::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
   float w = opt_.width.value_or(kDefaultWidth);
   float h = kFieldHeight;
-  if (open_ && !options_.empty())
-    h += kItemHeight * float(options_.size());
   if (opt_.height) h = *opt_.height;
   if (max_w && w > *max_w) w = *max_w;
   if (max_h && h > *max_h) h = *max_h;
@@ -933,13 +1184,14 @@ Size Dropdown::intrinsic(OptionalSize max_w, OptionalSize max_h) const {
 void Dropdown::paint(Renderer& r) {
   if (!opt_.visible) return;
   const Rect field = field_rect();
-  // Closed field: SURFACE_CONTAINER_HIGHEST fill, OUTLINE_VARIANT stroke (M3-ish).
-  Color fill = pressed_ && press_option_ == -2
-                   ? colors::kSurfaceContainerHigh
-                   : colors::kSurfaceContainerHighest;
-  r.fill_rect(field, fill, kRadius);
-  r.stroke_rect(field, open_ ? colors::kPrimary : colors::kOutlineVariant,
-                open_ ? 2.f : 1.f, kRadius);
+  const float focus = float(focus_progress_.value(animation_time_));
+  const float hover = float(hover_progress_.value(animation_time_));
+  auto mix = [](Color a, Color b, float p) {
+    auto c = [p](int a,int b) { return std::uint8_t(py_round(a+(b-a)*p)); };
+    return Color{c(a.r,b.r),c(a.g,b.g),c(a.b,b.b),c(a.a,b.a)};
+  };
+  r.stroke_rect(field,mix(mix(colors::kOutline,colors::kOnSurface,.25f*hover),
+                         colors::kPrimary,focus),1+focus,kRadius);
 
   const std::string& shown =
       selected_text_.empty() ? hint_ : selected_text_;
@@ -950,22 +1202,38 @@ void Dropdown::paint(Renderer& r) {
   float ty = field.y + (field.h - t.h) * 0.5f;
   default_font().draw(r, tx, ty, shown, fg, kTextPx);
 
-  // Trailing chevron affordance (text, not Material icon — simple popup).
-  const char* chev = open_ ? "^" : "v";
-  Size cv = default_font().measure(chev, kTextPx);
-  default_font().draw(r, field.x + field.w - kPadH - cv.w,
-                      field.y + (field.h - cv.h) * 0.5f, chev,
-                      colors::kOnSurfaceVariant, kTextPx);
-
-  if (!open_ || options_.empty()) return;
-  const Rect menu = menu_rect();
-  r.fill_rect(menu, colors::kSurfaceContainer, kRadius);
-  r.stroke_rect(menu, colors::kOutlineVariant, 1.f, kRadius);
+  // Chevron built from capped solid segments, independent of font glyph metrics.
+  const float cx = field.x+field.w-28, cy = field.y+field.h/2;
+  for (int i = 0; i < 6; ++i) {
+    const float dy = open_ ? -float(i)*.8f+2 : float(i)*.8f-2;
+    r.fill_rect({cx-5+float(i),cy+dy,2,2},colors::kOnSurfaceVariant,1);
+    r.fill_rect({cx+4-float(i),cy+dy,2,2},colors::kOnSurfaceVariant,1);
+  }
+}
+void Dropdown::paint_menu(Renderer& r) {
+  if ((!open_ && !menu_closing_) || options_.empty() || !opt_.visible || opt_.disabled) return;
+  Rect menu = menu_rect();
+  const float progress = float(menu_progress_.value(animation_time_));
+  const float timeline = float(menu_timeline_.value(animation_time_));
+  Rect visible = menu;
+  visible.h *= progress;
+  r.effect_push(0,0,std::min(1.f,timeline*(menu_closing_ ? 3 : 10)));
+  draw_elevation_shadow(r,visible,kRadius,8);
+  r.fill_rect(visible,colors::kSurfaceContainer,kRadius);
+  r.effect_pop();
+  r.clip_push(visible);
   for (std::size_t i = 0; i < options_.size(); ++i) {
-    const Rect row{menu.x, menu.y + kItemHeight * float(i), menu.w, kItemHeight};
-    if (press_option_ == static_cast<int>(i)) {
-      r.fill_rect(row, colors::kSurfaceContainerHigh, 0.f);
-    }
+    const Rect row{menu.x, menu.y + kItemHeight * float(i)-menu_offset_, menu.w, kItemHeight};
+    if (row.y+row.h < visible.y || row.y > visible.y+visible.h) continue;
+    const float count = float(options_.size());
+    float alpha;
+    if (menu_closing_) {
+      const float delay = 50+50*(count-1-float(i))/count;
+      alpha = 1-std::clamp(((1-timeline)*150-delay)/50,0.f,1.f);
+    } else alpha = std::clamp((timeline-.5f*float(i)/count)/.5f,0.f,1.f);
+    r.effect_push(0,0,alpha);
+    if (press_option_ == int(i))
+      r.fill_rect(row,colors::kSurfaceContainerHigh,0);
     const std::string& label =
         options_[i].text.empty() ? options_[i].key : options_[i].text;
     Size lt = default_font().measure(label, kTextPx);
@@ -973,20 +1241,19 @@ void Dropdown::paint(Renderer& r) {
                                             : colors::kOnSurface;
     default_font().draw(r, row.x + kPadH,
                         row.y + (row.h - lt.h) * 0.5f, label, lfg, kTextPx);
+    r.effect_pop();
   }
+  r.clip_pop();
 }
 
 bool Dropdown::hit_test(float x, float y) const {
   if (!opt_.visible) return false;
   if (hit_round_rect(x, y, field_rect(), kRadius)) return true;
-  if (open_ && !options_.empty()) {
-    const Rect m = menu_rect();
-    return x >= m.x && y >= m.y && x < m.x + m.w && y < m.y + m.h;
-  }
   return false;
 }
 
 void Dropdown::on_pointer(const PointerEvent& e) {
+  if (e.cancel) { pressed_ = false; press_option_ = -1; return; }
   if (!opt_.visible || opt_.disabled) return;
   if (e.down) {
     const int opt_i = hit_option(e.x, e.y);
@@ -1009,19 +1276,13 @@ void Dropdown::on_pointer(const PointerEvent& e) {
     pressed_ = false;
     press_option_ = -1;
     if (was == -2 && hit_round_rect(e.x, e.y, field_rect(), kRadius)) {
-      open_ = !open_;
-      if (page_) page_->update();
+      set_open(!open_);
       return;
     }
     if (was >= 0) {
       const int now = hit_option(e.x, e.y);
       if (now == was) {
-        const auto& o = options_[static_cast<std::size_t>(was)];
-        value_ = o.key;
-        selected_text_ = o.text.empty() ? o.key : o.text;
-        open_ = false;
-        if (page_) page_->update();
-        if (on_select_) on_select_(value_);
+        pick_option(was);
         return;
       }
     }
@@ -1040,7 +1301,15 @@ void require_text_bytes(const std::string& s, const char* what) {
 DialogControl::DialogControl(bool barrier, bool modal)
   : Control({}), barrier_(barrier), modal_(modal) {}
 void DialogControl::on_shown() {}
-void DialogControl::tick() {}
+void DialogControl::begin_dismiss() {
+  closing_ = true;
+  close_at_ = animation_time_;
+}
+Control* DialogControl::hit_target(float x,float y) {
+  if (closing_) return barrier() && hit_test(x,y) ? this : nullptr;
+  return Control::hit_target(x,y);
+}
+void DialogControl::tick(double now) { Control::tick(now); }
 void DialogControl::dismiss() {
   if (page_) page_->pop_dialog(this);
 }
@@ -1059,6 +1328,19 @@ AlertDialog::AlertDialog(std::string title, std::string content,
     add_child(std::move(a));
   }
 }
+void AlertDialog::on_shown() {
+  closing_ = false;
+  reveal_.reset(0); timeline_.reset(0);
+  reveal_.animate(1,300,motion::Curve::Emphasized,animation_time_);
+  timeline_.animate(1,300,motion::Curve::Linear,animation_time_);
+}
+void AlertDialog::begin_dismiss() {
+  if (closing_) return;
+  closing_ = true;
+  close_at_ = animation_time_+.15;
+  reveal_.animate(.35,150,motion::Curve::EmphasizedAccelerate,animation_time_);
+  timeline_.animate(0,150,motion::Curve::Linear,animation_time_);
+}
 
 bool AlertDialog::point_in_card(float x, float y) const {
   return x >= card_rect_.x && y >= card_rect_.y &&
@@ -1072,6 +1354,8 @@ void AlertDialog::layout() {
                                  : default_font().measure(title_, kTitlePx);
   Size content_sz = content_.empty() ? Size{0, 0}
                                      : default_font().measure(content_, kContentPx);
+  if (!title_.empty()) title_sz.h = default_font().line_height(kTitlePx);
+  if (!content_.empty()) content_sz.h = default_font().line_height(kContentPx);
 
   float actions_w = 0.f;
   float actions_h = 0.f;
@@ -1092,10 +1376,9 @@ void AlertDialog::layout() {
   if (card_w > float(kMaxLayoutDim)) card_w = float(kMaxLayoutDim);
 
   float card_h = 0.f;
-  if (!title_.empty()) card_h += kPad + title_sz.h;
-  if (!content_.empty()) card_h += kPad + content_sz.h;
-  if (actions_h > 0.f) card_h += kPad + actions_h;
-  card_h += kPad; // bottom pad
+  if (!title_.empty()) card_h += 2*kPad + title_sz.h;
+  if (!content_.empty()) card_h += 2*kPad + content_sz.h;
+  if (actions_h > 0.f) card_h += 2*kPad + actions_h;
   if (card_h > avail_h) card_h = avail_h;
   if (card_h > float(kMaxLayoutDim)) card_h = float(kMaxLayoutDim);
 
@@ -1123,23 +1406,45 @@ void AlertDialog::layout() {
 
 void AlertDialog::paint(Renderer& r) {
   if (!opt_.visible) return;
-  r.fill_rect(rect_, colors::kScrim, 0.f);
-  r.fill_rect(card_rect_, colors::kSurfaceContainerHigh, kRadius);
-  r.clip_push(card_rect_);
+  const float reveal = float(reveal_.value(animation_time_));
+  const float timeline = float(timeline_.value(animation_time_));
+  Color scrim = colors::kScrim;
+  scrim.a = std::uint8_t(py_round(scrim.a*timeline));
+  r.fill_rect(rect_,scrim);
+  Rect visible = card_rect_;
+  visible.h *= .35f+.65f*reveal;
+  const float dy = -50*(1-reveal);
+  const float card_alpha = std::min(1.f,timeline*(closing_ ? 3 : 10));
+  const float content_alpha = closing_ ?
+      std::clamp((timeline-1.f/3)/(2.f/3),0.f,1.f) :
+      std::clamp((timeline-.1f)/.4f,0.f,1.f);
+  const float action_alpha = closing_ ? content_alpha :
+      std::clamp((timeline-.3f)/.3f,0.f,1.f);
+  r.effect_push(0,dy,1);
+  r.effect_push(0,0,card_alpha);
+  draw_elevation_shadow(r,visible,kRadius,6);
+  r.fill_rect(visible,colors::kSurfaceContainerHigh,kRadius);
+  r.effect_pop();
+  r.clip_push(visible);
+  r.effect_push(0,0,content_alpha);
 
   float y = card_rect_.y + kPad;
   if (!title_.empty()) {
     Size ts = default_font().measure(title_, kTitlePx);
     default_font().draw(r, card_rect_.x + kPad, y, title_, colors::kOnSurface,
                         kTitlePx);
-    y += ts.h + kPad;
+    y += default_font().line_height(kTitlePx) + 2*kPad;
   }
   if (!content_.empty()) {
     default_font().draw(r, card_rect_.x + kPad, y, content_,
                         colors::kOnSurfaceVariant, kContentPx);
   }
-  Control::paint(r); // action buttons
+  r.effect_pop();
+  r.effect_push(0,0,action_alpha);
+  Control::paint(r);
+  r.effect_pop();
   r.clip_pop();
+  r.effect_pop();
 }
 
 bool AlertDialog::hit_test(float x, float y) const {
@@ -1149,7 +1454,7 @@ bool AlertDialog::hit_test(float x, float y) const {
 }
 
 void AlertDialog::on_pointer(const PointerEvent& e) {
-  if (!opt_.visible || opt_.disabled) return;
+  if (!opt_.visible || opt_.disabled || closing_) return;
   // Scrim / card chrome click: dismiss unless modal. Action buttons are hit
   // as children via hit_target, so they never reach here.
   if (e.down && !modal() && !point_in_card(e.x, e.y)) {
@@ -1180,17 +1485,26 @@ SnackBar::SnackBar(std::string message, std::string action_label,
 }
 
 void SnackBar::on_shown() {
+  closing_ = false;
+  reveal_.reset(0);
+  reveal_.animate(1,250,motion::Curve::Standard,animation_time_);
   has_deadline_ = false;
   // With an action label, persist until action / explicit pop (Python).
   if (!action_label_.empty()) return;
-  deadline_ = std::chrono::steady_clock::now() +
-              std::chrono::milliseconds(duration_ms_);
+  deadline_ = animation_time_+duration_ms_/1000.0;
   has_deadline_ = true;
 }
+void SnackBar::begin_dismiss() {
+  if (closing_) return;
+  closing_ = true;
+  close_at_ = animation_time_+.2;
+  reveal_.animate(0,200,motion::Curve::StandardAccelerate,animation_time_);
+}
 
-void SnackBar::tick() {
+void SnackBar::tick(double now) {
+  DialogControl::tick(now);
   if (!has_deadline_) return;
-  if (std::chrono::steady_clock::now() >= deadline_) {
+  if (now >= deadline_) {
     has_deadline_ = false;
     dismiss();
   }
@@ -1210,8 +1524,7 @@ void SnackBar::layout() {
   float inner_w = std::max(0.f, rect_.w - 2.f * kMargin);
   float bar_w = inner_w;
   if (bar_w > float(kMaxLayoutDim)) bar_w = float(kMaxLayoutDim);
-  float content_h = std::max(msg.h, action_h);
-  float bar_h = std::max(kMinH, content_h + 2.f * kPad);
+  float bar_h = std::max(kMinH, msg.h+2*kPad);
   if (bar_h > float(kMaxLayoutDim)) bar_h = float(kMaxLayoutDim);
   float bx = rect_.x + kMargin + (inner_w - bar_w) * 0.5f;
   float by = rect_.y + rect_.h - kMargin - bar_h;
@@ -1228,12 +1541,16 @@ void SnackBar::layout() {
 
 void SnackBar::paint(Renderer& r) {
   if (!opt_.visible) return;
-  r.fill_rect(bar_rect_, colors::kInverseSurface, kRadius);
+  const float reveal = float(reveal_.value(animation_time_));
+  r.effect_push(0,(1-reveal)*48,std::min(1.f,reveal*4));
+  draw_elevation_shadow(r,bar_rect_,0,6);
+  r.fill_rect(bar_rect_, colors::kInverseSurface, 0);
   Size msg = default_font().measure(message_, kTextPx);
   float tx = bar_rect_.x + kPad;
   float ty = bar_rect_.y + (bar_rect_.h - msg.h) * 0.5f;
   default_font().draw(r, tx, ty, message_, colors::kOnInverseSurface, kTextPx);
   Control::paint(r);
+  r.effect_pop();
 }
 
 bool SnackBar::hit_test(float x, float y) const {

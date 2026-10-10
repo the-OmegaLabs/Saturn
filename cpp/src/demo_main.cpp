@@ -26,15 +26,14 @@ std::unique_ptr<saturn::Container> make_panel(
   return panel;
 }
 
-// brand_header — logo Image 52x40 CONTAIN + PRIMARY tint.
+// Brand mark stays vector-sharp at any DPI, contained in a 52x40 logical box.
 std::unique_ptr<saturn::Row> brand_header(const char* title, const char* detail) {
   auto header = std::make_unique<saturn::Row>(12.f);
   header->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
   saturn::ControlOptions logo_opt;
   logo_opt.width = 52.f;
   logo_opt.height = 40.f;
-  auto logo = std::make_unique<saturn::Image>("saturn-logo-transparent.png", logo_opt);
-  logo->set_tint(saturn::colors::kPrimary);
+  auto logo = std::make_unique<saturn::SaturnLogo>(saturn::colors::kPrimary,logo_opt);
   header->add(std::move(logo));
   header->add(std::make_unique<saturn::Text>(
       title, saturn::colors::kOnSurface, 28.f));
@@ -63,8 +62,9 @@ int main() {
         saturn::Text* status_ptr = status.get();
         page.add(std::move(status));
 
-        auto on_click = [status_ptr]() {
-          status_ptr->set_value("last event: click");
+        auto on_click = [status_ptr, n = std::make_shared<int>(0)]() {
+          // Shared counter belongs to all four callback copies.
+          status_ptr->set_value("last event: click #" + std::to_string(++*n));
         };
 
         // Inventory: Row spacing=8 — Elevated | Filled | Outlined | IconButton.
@@ -84,10 +84,15 @@ int main() {
         // Inventory: Row spacing=12 — TextField (frozen) + Checkbox("agree").
         auto check_row = std::make_unique<saturn::Row>(12.f);
         check_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
+        check_row->add(std::make_unique<saturn::TextField>(
+            "Name", [status_ptr](const std::string& value) {
+              status_ptr->set_value("name='" + value + "'");
+            }, [status_ptr](const std::string& value) {
+              status_ptr->set_value("submitted '" + value + "'");
+            }));
         check_row->add(std::make_unique<saturn::Checkbox>(
             "agree", false, [status_ptr](bool v) {
-              status_ptr->set_value(v ? "last event: checkbox on"
-                                     : "last event: checkbox off");
+              status_ptr->set_value(v ? "agree=true" : "agree=false");
             }));
 
         // Inventory: Row spacing=12 — Slider + Switch + ProgressRing.
@@ -95,13 +100,12 @@ int main() {
         slider_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
         slider_row->add(std::make_unique<saturn::Slider>(
             0.f, 100.f, 10, [status_ptr](float v) {
-              status_ptr->set_value("last event: slider " +
+              status_ptr->set_value("slider=" +
                                    std::to_string(static_cast<int>(v + 0.5f)));
             }));
         slider_row->add(std::make_unique<saturn::Switch>(
             false, [status_ptr](bool v) {
-              status_ptr->set_value(v ? "last event: switch on"
-                                     : "last event: switch off");
+              status_ptr->set_value(v ? "switch=true" : "switch=false");
             }));
         slider_row->add(std::make_unique<saturn::ProgressRing>(0.6f));
 
@@ -116,7 +120,7 @@ int main() {
         drop_row->add(std::make_unique<saturn::Dropdown>(
             "dropdown...", std::move(opts),
             [status_ptr](const std::string& key) {
-              status_ptr->set_value("last event: select " + key);
+              status_ptr->set_value("select=" + key);
             },
             drop_opt));
         saturn::ControlOptions img_opt;
@@ -130,7 +134,7 @@ int main() {
         dlg_row->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
         saturn::Page* page_ptr = &page;
         dlg_row->add(std::make_unique<saturn::ElevatedButton>(
-            "Dialog", [page_ptr, status_ptr]() {
+            "Dialog", [page_ptr]() {
               std::vector<std::unique_ptr<saturn::Control>> actions;
               actions.push_back(std::make_unique<saturn::TextButton>(
                   "Cancel", [page_ptr]() { page_ptr->pop_dialog(); }));
@@ -139,17 +143,13 @@ int main() {
               page_ptr->show_dialog(std::make_unique<saturn::AlertDialog>(
                   "Confirm", "Delete this item permanently?",
                   std::move(actions)));
-              status_ptr->set_value("last event: dialog");
             }));
         dlg_row->add(std::make_unique<saturn::ElevatedButton>(
-            "SnackBar", [page_ptr, status_ptr]() {
+            "SnackBar", [page_ptr]() {
               page_ptr->show_dialog(std::make_unique<saturn::SnackBar>(
                   "Saved!", "Undo",
-                  [status_ptr]() {
-                    status_ptr->set_value("last event: snack undo");
-                  },
+                  std::function<void()>{},
                   3000));
-              status_ptr->set_value("last event: snackbar");
             }));
 
         auto left_body = std::make_unique<saturn::Column>(16.f);
@@ -158,17 +158,25 @@ int main() {
         left_body->add(std::move(slider_row));
         left_body->add(std::move(drop_row));
         left_body->add(std::move(dlg_row));
-        // Deferred: TextField (frozen).
-        left_body->add(std::make_unique<saturn::Text>(
-            "TextField TBD", saturn::colors::kOnSurfaceVariant, 13.f));
-
-        // ListView deferred until scroll buffer caps with reviewer.
         auto right_body = std::make_unique<saturn::Column>(4.f);
-        right_body->add(std::make_unique<saturn::Text>(
-            "ListView TBD", saturn::colors::kOnSurfaceVariant, 13.f));
+        saturn::ControlOptions list_opt;
+        list_opt.width = 400.f;
+        list_opt.height = 260.f;
+        auto list = std::make_unique<saturn::ListView>(4.f, list_opt);
+        for (int i = 0; i < 30; ++i) {
+          auto item = std::make_unique<saturn::Container>();
+          item->set_padding(8);
+          item->set_corner_radius(6);
+          item->set_bgcolor(i % 2 ? saturn::colors::kSurfaceContainerLow :
+                                   saturn::colors::kSurfaceContainer);
+          item->add(std::make_unique<saturn::Text>(
+              "list item " + std::to_string(i), saturn::colors::kOnSurface, 13.f));
+          list->add(std::move(item));
+        }
+        right_body->add(std::move(list));
 
         auto panels = std::make_unique<saturn::Row>(24.f);
-        panels->set_cross_axis_alignment(saturn::CrossAxisAlignment::Start);
+        panels->set_cross_axis_alignment(saturn::CrossAxisAlignment::Center);
         panels->add(make_panel("Controls", std::move(left_body)));
         panels->add(make_panel("Scrollable list", std::move(right_body)));
         page.add(std::move(panels));

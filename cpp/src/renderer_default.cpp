@@ -3,6 +3,17 @@
 #include <cmath>
 #include <stdexcept>
 namespace saturn {
+void Renderer::draw_saturn_mark(Rect, Color) {
+  throw std::runtime_error("Saturn mark unsupported");
+}
+void* Renderer::create_image_texture_rgba8(int w,int h,const std::uint8_t* rgba) {
+  return create_texture_rgba8(w,h,rgba);
+}
+void Renderer::state_layer(Rect, Color, float, float, float, float, float, float) {
+  throw std::runtime_error("state_layer unsupported");
+}
+void Renderer::effect_push(float, float, float) { throw std::runtime_error("effects unsupported"); }
+void Renderer::effect_pop() { throw std::runtime_error("effects unsupported"); }
 void Renderer::fill_rects(const Rect* rects, std::size_t count, Color c) {
   if (count > kMaxFillRects)
     throw std::runtime_error("fill_rects exceeds kMaxFillRects");

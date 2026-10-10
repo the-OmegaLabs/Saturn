@@ -55,14 +55,23 @@ int App::run() {
   int frame = 0;
 
   while (!impl_->window.poll_quit()) {
+    impl_->page.tick();
     if (impl_->window.consume_resized(nullptr, nullptr) || impl_->page.layout_dirty()) {
       impl_->page.layout(float(impl_->window.client_width()),
                          float(impl_->window.client_height()));
     }
-    for (const auto& pe : impl_->window.take_pointer_events()) {
-      impl_->page.dispatch_pointer(pe);
+    for (const auto& event : impl_->window.take_input_events()) {
+      std::visit([&](const auto& e) {
+        using T = std::decay_t<decltype(e)>;
+        if constexpr (std::is_same_v<T, PointerEvent>) impl_->page.dispatch_pointer(e);
+        else if constexpr (std::is_same_v<T, KeyEvent>) impl_->page.dispatch_key(e);
+        else if constexpr (std::is_same_v<T, TextEvent>) impl_->page.dispatch_text(e);
+        else if constexpr (std::is_same_v<T, CompositionEvent>) impl_->page.dispatch_composition(e);
+        else impl_->page.dispatch_scroll(e);
+      }, event);
     }
     impl_->page.tick(); // SnackBar duration + deferred dialog pops
+    impl_->window.set_text_input_area(impl_->page.text_input_area());
     r.clear(impl_->page.bgcolor());
     impl_->page.paint(r);
 
@@ -86,16 +95,7 @@ int App::run() {
               std::to_string(kDemoClientHeight) +
               " (SDL CreateWindow sizes client; Python DEMO_* are outer)");
         }
-        // Pixel golden is 944x761 at scale=1. HiDPI (pixels != client) fails
-        // loud until scale-aware golden is handled — not silently ignored.
-        if (sw != kDemoGoldenPixelWidth || sh != kDemoGoldenPixelHeight) {
-          throw std::runtime_error(
-              "SATURN_SHOT demo contract mismatch: framebuffer pixels " +
-              std::to_string(sw) + "x" + std::to_string(sh) +
-              " != golden pixels " + std::to_string(kDemoGoldenPixelWidth) + "x" +
-              std::to_string(kDemoGoldenPixelHeight) +
-              " (at 100% DPI pixels==client 944x761; HiDPI needs scale handling)");
-        }
+        // Readback follows actual framebuffer pixels; DPI does not gate usability.
       }
       if (!write_png_rgba(shot, sw, sh, rgba.data()))
         throw std::runtime_error("failed to write SATURN_SHOT png");

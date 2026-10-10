@@ -1,11 +1,13 @@
 #pragma once
 #include "types.hpp"
 #include "events.hpp"
+#include "motion.hpp"
 #include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 namespace saturn {
 class Page;
@@ -29,8 +31,19 @@ public:
   virtual void paint(Renderer& r);
   virtual bool hit_test(float x, float y) const;
   // Deepest visible enabled control under (x,y); children back-to-front, then self.
-  Control* hit_target(float x, float y);
+  virtual Control* hit_target(float x, float y);
+  virtual Control* hover_target(float x, float y);
+  virtual bool accepts_hover() const { return false; }
+  virtual void on_hover(bool on);
+  virtual void tick(double now);
   virtual void on_pointer(const PointerEvent& e);
+  virtual bool focusable() const { return false; }
+  virtual void on_focus(bool focused);
+  virtual void on_key(const KeyEvent& e);
+  virtual void on_text(const TextEvent& e);
+  virtual void on_composition(const CompositionEvent& e);
+  virtual std::optional<Rect> text_input_area() const { return {}; }
+  virtual bool on_scroll(const ScrollEvent& e);
   void set_rect(Rect rect);
   Rect rect() const;
 protected:
@@ -42,6 +55,7 @@ protected:
   Control* parent_ = nullptr;
   Rect rect_{};
   std::vector<std::unique_ptr<Control>> children_;
+  double animation_time_ = motion::now();
 };
 
 // Shared PNG decode + GPU upload + destroy. Used by Image, IconButton,
@@ -76,13 +90,27 @@ private:
 class Pressable : public Control {
 public:
   void on_pointer(const PointerEvent& e) override;
+  bool accepts_hover() const override { return true; }
+  void on_hover(bool on) override;
+  void tick(double now) override;
+  bool focusable() const override { return true; }
+  void on_focus(bool focused) override;
+  void on_key(const KeyEvent& e) override;
 protected:
   Pressable(std::function<void()> on_click, ControlOptions opt = {});
   bool pressed() const { return pressed_; }
   void set_pressed(bool v) { pressed_ = v; }
+  bool hovered() const { return hovered_; }
+  bool focused() const { return focused_; }
+  virtual void on_pressed(float x, float y);
+  virtual void on_released();
+  void paint_state_layer(Renderer& r, Rect bounds, Color color, float radius);
+  motion::StateLayer state_layer_;
 private:
   std::function<void()> on_click_;
   bool pressed_ = false;
+  bool hovered_ = false;
+  bool focused_ = false;
 };
 
 // M3 labeled button skeleton: measure / paint label(+optional leading PNG) /
@@ -134,6 +162,82 @@ private:
   float size_ = 16.f;
 };
 
+// Brand vector mark. No bitmap decode/upload; renderer draws an analytic GPU shape.
+class SaturnLogo final : public Control {
+public:
+  explicit SaturnLogo(Color color, ControlOptions opt = {});
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+private:
+  Color color_;
+};
+
+// Single-line UTF-8 editor. Owns bounded text; callbacks receive the current value.
+class TextField final : public Control {
+public:
+  TextField(std::string label, std::function<void(const std::string&)> on_change = {},
+            std::function<void(const std::string&)> on_submit = {}, ControlOptions opt = {});
+  const std::string& value() const { return value_; }
+  void set_value(std::string value);
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void paint(Renderer& r) override;
+  bool accepts_hover() const override { return true; }
+  bool focusable() const override { return true; }
+  void on_hover(bool on) override;
+  void on_focus(bool on) override;
+  void on_pointer(const PointerEvent& e) override;
+  void on_key(const KeyEvent& e) override;
+  void on_text(const TextEvent& e) override;
+  void on_composition(const CompositionEvent& e) override;
+  std::optional<Rect> text_input_area() const override;
+  // Host clipboard operations; callbacks own any captured state.
+  void set_clipboard_handlers(std::function<std::string()> read,
+                              std::function<bool(std::string_view)> write);
+private:
+  void replace_selection(std::string text);
+  void move_caret(std::size_t position, bool extend);
+  float caret_x(std::size_t position) const;
+  void reveal_caret();
+  std::string label_, value_;
+  std::string composition_;
+  std::size_t composition_start_ = 0, composition_end_ = 0;
+  std::function<std::string()> clipboard_read_;
+  std::function<bool(std::string_view)> clipboard_write_;
+  std::function<void(const std::string&)> on_change_, on_submit_;
+  std::size_t caret_ = 0, anchor_ = 0;
+  float scroll_x_ = 0;
+  double blink_started_ = 0;
+  bool focused_ = false, selecting_ = false;
+  motion::Tween focus_, hover_, label_progress_;
+};
+
+// Owns capped children; draws visible rows directly with no scroll tile cache.
+class ListView final : public Control {
+public:
+  explicit ListView(float spacing = 4, ControlOptions opt = {});
+  void add(std::unique_ptr<Control> child);
+  float scroll_offset() const { return offset_; }
+  Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
+  void layout() override;
+  void paint(Renderer& r) override;
+  Control* hit_target(float x, float y) override;
+  Control* hover_target(float x, float y) override;
+  bool on_scroll(const ScrollEvent& e) override;
+  bool accepts_hover() const override { return true; }
+  void on_hover(bool on) override;
+  void on_pointer(const PointerEvent& e) override;
+  void tick(double now) override;
+private:
+  Rect thumb_rect() const;
+  void set_offset(float offset);
+  void activate_scrollbar();
+  float spacing_ = 4, offset_ = 0, content_height_ = 0;
+  float drag_y_ = 0, drag_offset_ = 0;
+  bool hovered_ = false, dragging_ = false;
+  double hide_at_ = -1;
+  motion::Tween scrollbar_alpha_, scrollbar_width_{8};
+};
+
 // M3 filled: PRIMARY idle / PRIMARY_CONTAINER pressed.
 class FilledButton final : public ButtonBase {
 public:
@@ -152,9 +256,14 @@ class ElevatedButton final : public ButtonBase {
 public:
   ElevatedButton(std::string label, std::function<void()> on_click,
                  std::string icon_path = "", ControlOptions opt = {});
+  void on_hover(bool on) override;
 protected:
+  void on_pressed(float x, float y) override;
+  void on_released() override;
   void paint_background(Renderer& r) override;
   Color content_color() const override;
+private:
+  motion::Tween elevation_{1};
 };
 
 // M3 outlined: no fill (pressed SURFACE_CONTAINER), OUTLINE_VARIANT stroke.
@@ -199,11 +308,13 @@ private:
 // otherwise clamp_radius / kMaxCornerRadius (no unbounded path).
 class Image final : public Control {
 public:
+  enum class Fit { Fill, Contain };
   explicit Image(std::string path, ControlOptions opt = {}, float border_radius = 0.f);
   void set_tint(Color c);
   void clear_tint();
   void set_border_radius(float radius);
   float border_radius() const;
+  void set_fit(Fit fit) { fit_ = fit; }
   bool loaded() const;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
@@ -212,6 +323,7 @@ private:
   bool has_tint_ = false;
   Color tint_{255, 255, 255, 255};
   float border_radius_ = 0.f;
+  Fit fit_ = Fit::Fill;
 };
 
 // M3 Checkbox: 18×18 box radius 2, active PRIMARY, optional label.
@@ -233,6 +345,7 @@ public:
 private:
   std::string label_;
   bool value_ = false;
+  motion::Tween value_progress_;
   std::function<void(bool)> on_change_;
   TextureImage check_icon_;
 };
@@ -240,7 +353,7 @@ private:
 // M3 Slider: intrinsic ~300×48, active PRIMARY. Click + drag (pointer move
 // while captured). divisions>0 snaps to steps; ctor rejects divisions outside
 // [0, kMaxSliderDivisions]. set_value / apply_value reject non-finite.
-class Slider final : public Control {
+class Slider final : public Pressable {
 public:
   static constexpr float kDefaultWidth = 300.f;
   static constexpr float kDefaultHeight = 48.f;
@@ -251,11 +364,14 @@ public:
   float min_value() const { return min_; }
   float max_value() const { return max_; }
   int divisions() const { return divisions_; }
+  void on_key(const KeyEvent& e) override;
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
   void on_pointer(const PointerEvent& e) override;
 private:
   float value_from_x(float x) const;
+  void on_pressed(float x, float y) override;
+  void on_released() override;
   void apply_value(float v);
   float min_ = 0.f;
   float max_ = 100.f;
@@ -263,6 +379,7 @@ private:
   float value_ = 0.f;
   std::function<void(float)> on_change_;
   bool dragging_ = false;
+  motion::Tween thumb_press_;
 };
 
 // M3 Switch: track 52×32 inside 52×40 hit box; no label required.
@@ -278,9 +395,17 @@ public:
   void set_value(bool v);
   Size intrinsic(OptionalSize max_w, OptionalSize max_h) const override;
   void paint(Renderer& r) override;
+  void on_pointer(const PointerEvent& e) override;
 private:
+  void animate_value();
+  void on_pressed(float x, float y) override;
+  void on_released() override;
   bool value_ = false;
   std::function<void(bool)> on_change_;
+  motion::Tween position_, color_, size_, thumb_press_;
+  float drag_start_x_ = 0;
+  double drag_start_progress_ = 0;
+  bool dragged_ = false;
 };
 
 // M3 ProgressRing: default 40×40, stroke 4, color PRIMARY. value in [0,1].
@@ -306,10 +431,8 @@ struct DropdownOption {
   std::string text;
 };
 
-// Simple M3-ish dropdown: closed field (hint or selected text) + inline popup
-// list when open (no animation / no page overlay). options capped by
+// Outlined field + animated page-level popup. Options capped by
 // kMaxDropdownOptions; hint/key/text > kMaxTextBytes throw (no truncate).
-// TextField/ListView still frozen elsewhere.
 class Dropdown final : public Control {
 public:
   static constexpr float kDefaultWidth = 180.f;
@@ -330,7 +453,17 @@ public:
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
   void on_pointer(const PointerEvent& e) override;
+  bool accepts_hover() const override { return true; }
+  bool focusable() const override { return true; }
+  void on_hover(bool on) override;
+  void on_focus(bool on) override;
+  void on_key(const KeyEvent& e) override;
+  bool on_scroll(const ScrollEvent& e) override;
+  void tick(double now) override;
+  void paint_menu(Renderer& r);
+  bool menu_hit_test(float x, float y) const;
 private:
+  void pick_option(int index);
   Rect field_rect() const;
   Rect menu_rect() const;
   int hit_option(float x, float y) const; // -1 none
@@ -342,6 +475,11 @@ private:
   bool open_ = false;
   bool pressed_ = false;
   int press_option_ = -1; // -2 = field, -1 = none, >=0 = option index
+  motion::Tween menu_progress_, menu_timeline_, focus_progress_, hover_progress_;
+  bool menu_closing_ = false;
+  double menu_close_at_ = -1;
+  float menu_offset_ = 0;
+  int keyboard_index_ = 0;
 };
 
 
@@ -353,11 +491,17 @@ public:
   bool modal() const { return modal_; }
   // Called once when pushed onto the page overlay stack.
   virtual void on_shown();
+  virtual void begin_dismiss();
+  bool closing() const { return closing_; }
+  bool ready_to_remove() const { return closing_ && animation_time_ >= close_at_; }
+  Control* hit_target(float x, float y) override;
   // Per-frame; SnackBar uses this for duration auto-dismiss.
-  virtual void tick();
+  void tick(double now) override;
 protected:
   DialogControl(bool barrier, bool modal = false);
   void dismiss();
+  bool closing_ = false;
+  double close_at_ = -1;
 private:
   bool barrier_ = true;
   bool modal_ = false;
@@ -372,7 +516,7 @@ public:
   static constexpr float kInset = 40.f;
   static constexpr float kRadius = 28.f;
   static constexpr float kTitlePx = 24.f;
-  static constexpr float kContentPx = 14.f;
+  static constexpr float kContentPx = 16.f;
   static constexpr float kMinCardW = 280.f;
   static constexpr float kActionGap = 8.f;
   AlertDialog(std::string title, std::string content,
@@ -382,11 +526,14 @@ public:
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
   void on_pointer(const PointerEvent& e) override;
+  void on_shown() override;
+  void begin_dismiss() override;
 private:
   bool point_in_card(float x, float y) const;
   std::string title_;
   std::string content_;
   Rect card_rect_{};
+  motion::Tween reveal_, timeline_;
 };
 
 // M3 SnackBar: bottom bar (INVERSE_SURFACE), optional action TextButton.
@@ -397,7 +544,7 @@ private:
 class SnackBar final : public DialogControl {
 public:
   static constexpr float kPad = 24.f;
-  static constexpr float kMargin = 16.f;
+  static constexpr float kMargin = 0.f;
   static constexpr float kMinH = 48.f;
   static constexpr float kTextPx = 14.f;
   static constexpr float kRadius = 4.f;
@@ -405,7 +552,8 @@ public:
            std::function<void()> on_action = {},
            int duration_ms = 4000);
   void on_shown() override;
-  void tick() override;
+  void begin_dismiss() override;
+  void tick(double now) override;
   void layout() override;
   void paint(Renderer& r) override;
   bool hit_test(float x, float y) const override;
@@ -415,8 +563,9 @@ private:
   std::function<void()> on_action_;
   int duration_ms_ = 4000;
   bool has_deadline_ = false;
-  std::chrono::steady_clock::time_point deadline_{};
+  double deadline_ = 0;
   Rect bar_rect_{};
+  motion::Tween reveal_;
 };
 
 // Vertical stack. Owns children via unique_ptr; spacing between visible kids.
