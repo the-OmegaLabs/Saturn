@@ -81,19 +81,23 @@ class NativeWindow:
                     from .window import WindowEventType
                     event_type = NativeWindow._window_event_type = WindowEventType
                 if message == 0x0083 and wparam and self.owner.title_bar_hidden:
-                    # WM_NCCALCSIZE: keeping WS_THICKFRAME for resize borders
-                    # otherwise reserves a frame strip the page cannot draw
-                    # into (visible as a band at the top of the window).
+                    # WM_NCCALCSIZE: remove title bar but keep resize borders
+                    # for resizable windows. This allows custom title bar content
+                    # while preserving native resize behavior.
+                    rect = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
                     if self.user32.IsZoomed(hwnd):
                         # A maximized thickframe window extends past the
                         # monitor by the border width; inset the client so
                         # the content stays on-screen.
                         added = self.user32.GetSystemMetrics(92)  # SM_CXPADDEDBORDER
-                        rect = ctypes.cast(lparam, ctypes.POINTER(wintypes.RECT)).contents
                         rect.left += self.user32.GetSystemMetrics(32) + added
                         rect.top += self.user32.GetSystemMetrics(33) + added
                         rect.right -= self.user32.GetSystemMetrics(32) + added
                         rect.bottom -= self.user32.GetSystemMetrics(33) + added
+                    elif self.owner.resizable:
+                        # Remove only the title bar height, keep resize borders
+                        # SM_CYCAPTION (4) is the caption bar height
+                        rect.top += self.user32.GetSystemMetrics(4)
                     return 0
                 if (message in (0x0086, 0x0085)  # WM_NCACTIVATE, WM_NCPAINT
                         and (self.owner.title_bar_hidden or self.owner.frameless)):
