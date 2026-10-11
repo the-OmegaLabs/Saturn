@@ -4,7 +4,7 @@ Native desktop window properties, events, and operating-system handles.
 
 [← API index](./README.md)
 
-Source: [`saturn/window.py`](../../saturn/window.py) (line 125).
+Source: [`saturn/window.py`](../../saturn/window.py) (line 123).
 
 See [Native desktop windows](../window.md) for property behavior, platform limits, handles, and close interception.
 

@@ -145,8 +145,10 @@ class SessionApp:
         view = current_view.get()
         return view.density if view else 1
 
-    def mark_dirty(self):
+    def mark_dirty(self, *, force: bool = False):
         if self.session.closed or not hasattr(self.session, 'page'):
+            return
+        if not force and not getattr(self.session.page, "_auto_update", True):
             return
         self.session.locked = True
         self.session.runtime.schedule(self.session.dirty)
@@ -214,7 +216,7 @@ class WebPage(Page):
             if not Path(source).is_file() and not (Path("assets")/source).is_file():
                 raise FileNotFoundError(source)
 
-    def update(self):
+    def _update_page(self, *, force: bool):
         if not hasattr(self, "_attached_roots"):
             return
         self._apply_theme()
@@ -223,7 +225,7 @@ class WebPage(Page):
         if self.services:
             raise NotImplementedError("Desktop services are not supported by the Web runtime")
         self._layout_dirty = True
-        self._app.mark_dirty()
+        self._app.mark_dirty(force=force)
 
     def open_subpage(self, *args, **kwargs):
         raise NotImplementedError("Native Subpages require a desktop runtime")
@@ -236,7 +238,7 @@ class WebPage(Page):
             return
         dialog.open=True
         self.overlay.append(dialog)
-        self.update()
+        self._update_automatically()
         if isinstance(dialog,SnackBar):
             self._dispatch(dialog.on_visible, WebEvent('visible',dialog,
                 session=self.web.session,client_id=self.web.client_id))
@@ -263,7 +265,7 @@ class WebPage(Page):
         dialog.open=False
         self._dispatch(dialog.on_dismiss, WebEvent('dismiss',dialog,
             session=self.web.session,client_id=self.web.client_id))
-        self.update()
+        self._update_automatically()
 
     def run_task(self, *args, **kwargs):
         raise NotImplementedError("Web background tasks must be owned by the ASGI application's lifespan")

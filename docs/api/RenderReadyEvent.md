@@ -4,7 +4,7 @@ Reports the actual backend and GPU after initialization or software recovery.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 70).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 77).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

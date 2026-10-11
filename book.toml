@@ -1,0 +1,14 @@
+[book]
+title = "The Saturn Book"
+authors = ["Saturn contributors"]
+description = "A practical guide to building applications with Saturn."
+language = "zh-CN"
+src = "docs"
+
+[build]
+build-dir = ".book-output"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/the-OmegaLabs/Saturn"

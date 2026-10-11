@@ -16,6 +16,8 @@ import os
 import sys
 import threading
 
+from .platform import get_platform
+
 # Poll interval: overlay injectors usually strike within a second of the
 # window taking focus, so one second still fires the event before the host
 # dies (GamePP kills ~2-3s after injection).
@@ -65,66 +67,12 @@ def classify(path: str, prefixes: tuple[str, ...]) -> tuple[bool, str | None]:
 
 def snapshot_modules() -> list[str]:
     """Loaded module paths of the current process ([] if unsupported)."""
-    if sys.platform == "win32":
-        return _snapshot_windows()
-    if sys.platform.startswith("linux"):
-        return _snapshot_linux()
-    return []
-
-
-def _snapshot_windows() -> list[str]:
-    import ctypes
-    from ctypes import wintypes
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    psapi = ctypes.WinDLL("psapi", use_last_error=True)
-    # 64-bit pseudo-handle (-1) truncates without explicit signatures.
-    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-    psapi.EnumProcessModulesEx.argtypes = [
-        wintypes.HANDLE, ctypes.POINTER(wintypes.HMODULE), wintypes.DWORD,
-        ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
-    psapi.GetModuleFileNameExW.argtypes = [
-        wintypes.HANDLE, wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
-    psapi.GetModuleFileNameExW.restype = wintypes.DWORD
-
-    handle = kernel32.GetCurrentProcess()
-    LIST_MODULES_ALL = 0x03
-    size = 256
-    for _ in range(4):
-        buf = (wintypes.HMODULE * size)()
-        needed = wintypes.DWORD()
-        if not psapi.EnumProcessModulesEx(handle, buf, ctypes.sizeof(buf),
-                                          ctypes.byref(needed), LIST_MODULES_ALL):
-            return []
-        count = needed.value // ctypes.sizeof(wintypes.HMODULE)
-        if count <= size:
-            out = []
-            for i in range(count):
-                name = ctypes.create_unicode_buffer(512)
-                length = psapi.GetModuleFileNameExW(handle, buf[i], name, 512)
-                if length:
-                    out.append(name.value.lower())
-            return out
-        size = count
-    return []
-
-
-def _snapshot_linux() -> list[str]:
-    out = []
-    try:
-        with open("/proc/self/maps", "r", encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                path = line.rstrip("\n").rpartition(" ")[2]
-                if path.startswith("/") and ".so" in os.path.basename(path):
-                    out.append(os.path.realpath(path).lower())
-    except OSError:
-        return []
-    return out
+    return get_platform().snapshot_modules()
 
 
 def start(page, stop: threading.Event) -> threading.Thread | None:
     """Run the watchdog until `stop` is set; None when scanning is unsupported."""
-    if not (sys.platform == "win32" or sys.platform.startswith("linux")):
+    if not get_platform().supports("module_watch"):
         return None
     prefixes = allow_prefixes()
     baseline = snapshot_modules()

@@ -4,7 +4,7 @@ Native edge or corner used to start resizing a window.
 
 [← API index](./README.md)
 
-Source: [`saturn/window.py`](../../saturn/window.py) (line 34).
+Source: [`saturn/window.py`](../../saturn/window.py) (line 32).
 
 **Base class:** `Enum`
 

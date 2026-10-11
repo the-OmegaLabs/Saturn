@@ -4,7 +4,7 @@ Shows ongoing activity with an animated shape.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 42).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 47).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.LoadingIndicator(value=None, *, color=None, bgcolor=None, contained=False, **base)
+saturn.LoadingIndicator(value=None, *, color=None, bgcolor=None, contained=False, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -45,6 +45,6 @@ saturn.LoadingIndicator(value=None, *, color=None, bgcolor=None, contained=False
 | `color` | `—` | `None` | Color of foreground content, text, or drawing. |
 | `bgcolor` | `—` | `None` | Background color of the control or container. |
 | `contained` | `—` | `False` | Place the loading indicator on a container background. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

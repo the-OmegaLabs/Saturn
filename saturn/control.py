@@ -213,14 +213,18 @@ class Control:
             self._prepare_animation_tree(time.perf_counter())
             self.page._layout_dirty = True
             self.page._animation_scan_needed = True
-            if hasattr(self.page, "repaint"):
+            if hasattr(self.page, "_request_auto_update"):
+                self.page._request_auto_update()
+            elif hasattr(self.page, "repaint"):
                 self.page.repaint()
             else:
                 self.page.update()
 
     def repaint(self):
         if self.page is not None:
-            if hasattr(self.page, "repaint"):
+            if hasattr(self.page, "_request_auto_update"):
+                self.page._request_auto_update()
+            elif hasattr(self.page, "repaint"):
                 self.page.repaint()
             else:
                 self.page.update()
@@ -401,7 +405,10 @@ class Control:
         if self.page is not None:
             if hasattr(self.page, "_active_animations"):
                 self.page._active_animations.add(self)
-            self.page._app.mark_dirty()
+            if hasattr(self.page, "_request_auto_update"):
+                self.page._request_auto_update()
+            else:
+                self.page._app.mark_dirty()
 
     def _prepare_animation_tree(self, now: float):
         self._prepare_animations(now)

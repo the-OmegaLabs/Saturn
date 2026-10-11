@@ -8,6 +8,7 @@ __pycache__/
 .zcode/
 /dist/
 /.build-probe/
+/.book-output/
 
 # scratch artifacts (test screenshots, temp scripts)
 /*.png

@@ -236,7 +236,7 @@ class AnimatedMixin:
     def _schedule_animation_tick(self) -> None:
         """Request next animation frame."""
         if hasattr(self, 'page') and self.page is not None:
-            self.page.repaint()
+            self.page._request_auto_update()
     
     def _tick_animations(self, now: float) -> bool:
         """Update all animations. Override in subclasses.

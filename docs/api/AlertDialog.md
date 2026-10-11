@@ -4,7 +4,7 @@ Displays a modal dialog on the page.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 71).
+Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 75).
 
 ## Preview
 
@@ -31,12 +31,12 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ```
 
-**Base class:** `DialogControl`
+**Base class:** [DialogControl](./DialogControl.md)
 
 ## Constructor parameters
 
 ```python
-saturn.AlertDialog(title=None, content=None, *, actions=None, modal=False, bgcolor=None, open=False, on_dismiss=None, elevation=None, icon=None, title_padding=None, content_padding=None, actions_padding=None, actions_alignment=None, shape=None, inset_padding=None, icon_padding=None, action_button_padding=None, shadow_color=None, icon_color=None, scrollable=False, actions_overflow_button_spacing=None, alignment=None, content_text_style=None, title_text_style=None, clip_behavior='none', semantics_label=None, barrier_color=None, **base)
+saturn.AlertDialog(title=None, content=None, *, actions=None, modal=False, bgcolor=None, open=False, on_dismiss=None, elevation=None, icon=None, title_padding=None, content_padding=None, actions_padding=None, actions_alignment=None, shape=None, inset_padding=None, icon_padding=None, action_button_padding=None, shadow_color=None, icon_color=None, scrollable=False, actions_overflow_button_spacing=None, alignment=None, content_text_style=None, title_text_style=None, clip_behavior='none', semantics_label=None, barrier_color=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -68,6 +68,6 @@ saturn.AlertDialog(title=None, content=None, *, actions=None, modal=False, bgcol
 | `clip_behavior` | `—` | `'none'` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
 | `semantics_label` | `—` | `None` | Accessibility description metadata; native accessibility is not implemented. |
 | `barrier_color` | `—` | `None` | Color for barrier. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

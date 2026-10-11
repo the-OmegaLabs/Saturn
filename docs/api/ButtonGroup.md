@@ -4,7 +4,7 @@ Arranges several buttons as one interactive group.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/button_group.py`](../../saturn/widgets/button_group.py) (line 9).
+Source: [`saturn/widgets/button_group.py`](../../saturn/widgets/button_group.py) (line 13).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.ButtonGroup(*items, controls=None, connected=False, spacing=None, expanded_ratio=0.15, compression_limit=24.0, vertical_alignment=<CrossAxisAlignment.START: 'start'>, **base)
+saturn.ButtonGroup(*items, controls=None, connected=False, spacing=None, expanded_ratio=0.15, compression_limit=24.0, vertical_alignment=<CrossAxisAlignment.START: 'start'>, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -48,6 +48,6 @@ saturn.ButtonGroup(*items, controls=None, connected=False, spacing=None, expande
 | `expanded_ratio` | `—` | `0.15` | Fraction by which a pressed button can grow in width. |
 | `compression_limit` | `—` | `24.0` | Minimum size to which neighboring buttons can shrink. |
 | `vertical_alignment` | `—` | `<CrossAxisAlignment.START: 'start'>` | Alignment on the vertical or cross axis. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

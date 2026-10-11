@@ -4,7 +4,7 @@ One additive instanced GPU pass sampled by a Shader's final fragment; see the Sh
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 25).
+Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 29).
 
 ## Constructor parameters
 

@@ -4,7 +4,7 @@ Editable text input field.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 157).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 161).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.TextField(value: 'str' = '', *, label=None, hint_text=None, password: 'bool' = False, multiline: 'bool' = False, min_lines: 'int | None' = None, max_lines: 'int | None' = None, read_only: 'bool' = False, max_length: 'int | None' = None, shift_enter: 'bool' = False, ignore_up_down_keys=False, show_cursor: 'bool' = True, obscuring_character: 'str' = '•', text_size: 'float | None' = None, on_change=None, on_submit=None, on_focus=None, on_blur=None, on_click=None, on_tap_outside=None, on_selection_change=None, selection=None, autofocus=False, text_align=None, text_vertical_align=None, can_request_focus=True, ignore_pointers=False, enable_interactive_selection=True, input_filter=None, capitalization=None, keyboard_type=None, cursor_color=None, cursor_error_color=None, cursor_width=2.0, cursor_height=None, cursor_radius=None, selection_color=None, filled: 'bool' = False, bgcolor=None, border_color=None, border_radius: 'float | None' = None, border_width=None, focused_border_color=None, focused_border_width=None, border=None, text_style=None, color=None, focused_color=None, focused_bgcolor=None, fill_color=None, focus_color=None, hover_color=None, content_padding=None, dense=None, collapsed=None, label_style=None, hint_style=None, helper=None, helper_style=None, counter=None, counter_style=None, error=None, error_style=None, prefix=None, prefix_style=None, suffix=None, suffix_style=None, icon=None, prefix_icon=None, suffix_icon=None, can_reveal_password: 'bool' = False, on_hover=None, autocorrect=True, enable_suggestions=True, smart_dashes_type=True, smart_quotes_type=True, enable_ime_personalized_learning=True, enable_stylus_handwriting=True, autofill_hints=None, keyboard_brightness=None, **base)
+saturn.TextField(value: 'str' = '', *, label=None, hint_text=None, password: 'bool' = False, multiline: 'bool' = False, min_lines: 'int | None' = None, max_lines: 'int | None' = None, read_only: 'bool' = False, max_length: 'int | None' = None, shift_enter: 'bool' = False, ignore_up_down_keys=False, show_cursor: 'bool' = True, obscuring_character: 'str' = '•', text_size: 'float | None' = None, on_change=None, on_submit=None, on_focus=None, on_blur=None, on_click=None, on_tap_outside=None, on_selection_change=None, selection=None, autofocus=False, text_align=None, text_vertical_align=None, can_request_focus=True, ignore_pointers=False, enable_interactive_selection=True, input_filter=None, capitalization=None, keyboard_type=None, cursor_color=None, cursor_error_color=None, cursor_width=2.0, cursor_height=None, cursor_radius=None, selection_color=None, filled: 'bool' = False, bgcolor=None, border_color=None, border_radius: 'float | None' = None, border_width=None, focused_border_color=None, focused_border_width=None, border=None, text_style=None, color=None, focused_color=None, focused_bgcolor=None, fill_color=None, focus_color=None, hover_color=None, content_padding=None, dense=None, collapsed=None, label_style=None, hint_style=None, helper=None, helper_style=None, counter=None, counter_style=None, error=None, error_style=None, prefix=None, prefix_style=None, suffix=None, suffix_style=None, icon=None, prefix_icon=None, suffix_icon=None, can_reveal_password: 'bool' = False, on_hover=None, autocorrect=True, enable_suggestions=True, smart_dashes_type=True, smart_quotes_type=True, enable_ime_personalized_learning=True, enable_stylus_handwriting=True, autofill_hints=None, keyboard_brightness=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -121,6 +121,6 @@ saturn.TextField(value: 'str' = '', *, label=None, hint_text=None, password: 'bo
 | `enable_stylus_handwriting` | `—` | `True` | Unsupported for non-default requests. Requested enable stylus handwriting option; see the control comparison for supported values and restrictions. |
 | `autofill_hints` | `—` | `None` | Unsupported for non-default requests. Requested autofill hints option; see the control comparison for supported values and restrictions. |
 | `keyboard_brightness` | `—` | `None` | Unsupported for non-default requests. Requested keyboard brightness option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -4,7 +4,7 @@ Displays text with configurable size, weight, and color.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/text.py`](../../saturn/widgets/text.py) (line 16).
+Source: [`saturn/widgets/text.py`](../../saturn/widgets/text.py) (line 20).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weight=None, italic: 'bool' = False, text_align=None, max_lines: 'int | None' = None, no_wrap: 'bool' = False, selectable: 'bool | None' = None, font_family: 'str | None' = None, style=None, bgcolor=None, overflow=<TextOverflow.CLIP: 'clip'>, font_family_fallback=None, on_tap=None, on_selection_change=None, show_selection_cursor=False, enable_interactive_selection=True, selection_cursor_width=2.0, selection_cursor_height=None, selection_cursor_color=None, spans=None, theme_style=None, **base)
+saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weight=None, italic: 'bool' = False, text_align=None, max_lines: 'int | None' = None, no_wrap: 'bool' = False, selectable: 'bool | None' = None, font_family: 'str | None' = None, style=None, bgcolor=None, overflow=<TextOverflow.CLIP: 'clip'>, font_family_fallback=None, on_tap=None, on_selection_change=None, show_selection_cursor=False, enable_interactive_selection=True, selection_cursor_width=2.0, selection_cursor_height=None, selection_cursor_color=None, spans=None, theme_style=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -64,6 +64,6 @@ saturn.Text(value: 'str' = '', *, size: 'float | None' = None, color=None, weigh
 | `selection_cursor_color` | `—` | `None` | Color for selection cursor. |
 | `spans` | `—` | `None` | Unsupported for non-default requests. Requested spans option; see the control comparison for supported values and restrictions. |
 | `theme_style` | `—` | `None` | Unsupported for non-default requests. Requested theme style option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

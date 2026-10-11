@@ -4,7 +4,7 @@ Input control that can be checked independently.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1406).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1416).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Checkbox(label='', *, value=False, label_position=<LabelPosition.RIGHT: 'right'>, label_style=None, tristate=False, autofocus=False, fill_color=None, overlay_color=None, check_color=None, active_color=None, hover_color=None, focus_color=None, splash_radius=None, border_side=None, error=False, shape=None, visual_density=None, on_change=None, on_focus=None, on_blur=None, **base)
+saturn.Checkbox(label='', *, value=False, label_position=<LabelPosition.RIGHT: 'right'>, label_style=None, tristate=False, autofocus=False, fill_color=None, overlay_color=None, check_color=None, active_color=None, hover_color=None, focus_color=None, splash_radius=None, border_side=None, error=False, shape=None, visual_density=None, on_change=None, on_focus=None, on_blur=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -61,6 +61,6 @@ saturn.Checkbox(label='', *, value=False, label_position=<LabelPosition.RIGHT: '
 | `on_change` | `—` | `None` | Callback called when the value changes. |
 | `on_focus` | `—` | `None` | Callback called when the control gains focus. |
 | `on_blur` | `—` | `None` | Callback called when the control loses focus. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

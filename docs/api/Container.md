@@ -4,7 +4,7 @@ Adds spacing, background, borders, and other decoration to a child.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 326).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 351).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, border_radius=None, alignment=None, gradient=None, shadow=None, ink=False, animate=None, on_click=None, on_hover=None, on_long_press=None, on_tap_down=None, ink_color=None, clip_behavior=None, shape='rectangle', url=None, ignore_interactions=False, blend_mode=None, image=None, blur=None, theme=None, dark_theme=None, theme_mode=None, color_filter=None, foreground_decoration=None, **base)
+saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, border_radius=None, alignment=None, gradient=None, shadow=None, ink=False, animate=None, on_click=None, on_hover=None, on_long_press=None, on_tap_down=None, ink_color=None, clip_behavior=None, shape='rectangle', url=None, ignore_interactions=False, blend_mode=None, image=None, blur=None, theme=None, dark_theme=None, theme_mode=None, color_filter=None, foreground_decoration=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -68,6 +68,6 @@ saturn.Container(content=None, *, padding=None, bgcolor=None, border=None, borde
 | `theme_mode` | `—` | `None` | Unsupported for non-default requests. Light, dark, or detected system preference. |
 | `color_filter` | `—` | `None` | Unsupported for non-default requests. Requested color filter option; see the control comparison for supported values and restrictions. |
 | `foreground_decoration` | `—` | `None` | Unsupported for non-default requests. Requested foreground decoration option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -1,8 +1,6 @@
 """Owned native windows, comparable to tkinter.Toplevel."""
 from __future__ import annotations
 
-import ctypes
-import sys
 from .app import App
 from .page import Page
 from .types import Alignment, Offset
@@ -76,15 +74,10 @@ class Subpage(Page):
         return self._error
 
     def _set_owner(self):
-        if sys.platform == "win32":
-            user = ctypes.windll.user32
-            setter = user.SetWindowLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else user.SetWindowLongW
-            setter.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
-            setter.restype = ctypes.c_void_p
-            setter(self.window.hwnd, -8, self.parent_page.window.hwnd)
-            if self.modal:
-                user.EnableWindow(ctypes.c_void_p(self.parent_page.window.hwnd), False)
-        elif self.modal:
+        if not self._app.platform.set_window_owner(
+                self.window.hwnd, self.parent_page.window.hwnd, self.modal):
+            if not self.modal:
+                return
             self._app._window.set_modal_for(self.parent_page._app._window)
 
     def attach(self, anchor="center", *, offset=None, follow_parent=False):

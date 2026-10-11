@@ -4,7 +4,7 @@ Compact action button presented as an icon.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 395).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 399).
 
 ## Preview
 
@@ -42,7 +42,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.IconButton(icon=None, *, icon_size: 'float | None' = None, icon_color=None, selected_icon=None, selected=False, bgcolor=None, hover_color=None, tooltip=None, on_click=None, on_hover=None, selected_icon_color=None, highlight_color=None, style=None, autofocus=False, disabled_color=None, focus_color=None, splash_color=None, splash_radius=None, alignment=None, padding=None, enable_feedback=None, url=None, mouse_cursor=None, visual_density=None, size_constraints=None, on_long_press=None, on_focus=None, on_blur=None, expressive=False, size=None, shape='round', **base)
+saturn.IconButton(icon=None, *, icon_size: 'float | None' = None, icon_color=None, selected_icon=None, selected=False, bgcolor=None, hover_color=None, tooltip=None, on_click=None, on_hover=None, selected_icon_color=None, highlight_color=None, style=None, autofocus=False, disabled_color=None, focus_color=None, splash_color=None, splash_radius=None, alignment=None, padding=None, enable_feedback=None, url=None, mouse_cursor=None, visual_density=None, size_constraints=None, on_long_press=None, on_focus=None, on_blur=None, expressive=False, size=None, shape='round', **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -78,6 +78,6 @@ saturn.IconButton(icon=None, *, icon_size: 'float | None' = None, icon_color=Non
 | `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
 | `size` | `—` | `None` | Size of the text, icon, or control. |
 | `shape` | `—` | `'round'` | Base shape of the button. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

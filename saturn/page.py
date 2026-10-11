@@ -1,8 +1,6 @@
 """Root page and native window configuration."""
 from __future__ import annotations
 
-import ctypes
-import sys
 import time
 from types import SimpleNamespace
 
@@ -11,37 +9,6 @@ import pygame
 from . import colors
 from .control import Control
 from .types import CrossAxisAlignment, MainAxisAlignment, ThemeMode
-
-
-def _set_windows_dark_title_bar(hwnd: int, dark: bool) -> bool:
-    """Match an HWND's non-client frame to the active light/dark theme."""
-    if sys.platform != "win32" or not hwnd:
-        return False
-    try:
-        dwmapi = ctypes.windll.dwmapi
-        set_attribute = dwmapi.DwmSetWindowAttribute
-        set_attribute.argtypes = [
-            ctypes.c_void_p, ctypes.c_uint, ctypes.c_void_p, ctypes.c_uint,
-        ]
-        set_attribute.restype = ctypes.c_long
-        enabled = ctypes.c_int(1 if dark else 0)
-        # Windows 10 20H1+ uses 20. Earlier Windows 10 builds used 19.
-        applied = any(
-            set_attribute(
-                ctypes.c_void_p(hwnd), attribute,
-                ctypes.byref(enabled), ctypes.sizeof(enabled)) == 0
-            for attribute in (20, 19)
-        )
-        if applied:
-            # Recalculate the non-client frame immediately after a live theme
-            # change instead of waiting for the next resize/maximize action.
-            user32 = ctypes.windll.user32
-            user32.SetWindowPos(
-                ctypes.c_void_p(hwnd), None, 0, 0, 0, 0,
-                0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020)
-        return applied
-    except (AttributeError, OSError, TypeError, ValueError):
-        return False
 
 
 from .window import Window
@@ -119,6 +86,10 @@ class Page(Control):
     def __init__(self, app):
         super().__init__()
         self._app = app
+        # Automatic control and animation changes can be paused without
+        # disabling explicit ``page.update()`` calls.  Keep this state on the
+        # Page so desktop and web Page facades share the same behavior.
+        self._auto_update = True
         self._renderer_settings = _RendererSettings(app)
         self.window = Window(app) if getattr(self, '_native_window', True) else None
         self.controls: list[Control] = []
@@ -183,6 +154,45 @@ class Page(Control):
         return self._renderer_settings
 
     @property
+    def auto_update(self) -> bool:
+        """Whether implicit control changes request a new rendered frame.
+
+        The default is ``True``.  Setting it to ``False`` pauses automatic
+        redraws and animation frame scheduling; control state and layout changes
+        are still applied in memory.  Call :meth:`update` to force a frame
+        while automatic updates are paused.  Re-enabling the property also
+        requests one frame so the current state becomes visible.
+        """
+        return self._auto_update
+
+    @auto_update.setter
+    def auto_update(self, value: bool):
+        if not isinstance(value, bool):
+            raise TypeError("auto_update must be a bool")
+        if value == self._auto_update:
+            return
+        self._auto_update = value
+        # Changing the switch itself is an explicit state change.  Flush the
+        # current tree once so turning automatic updates off/on is visible.
+        self.update()
+
+    def _request_auto_update(self) -> bool:
+        """Request a frame from an implicit control/animation change."""
+        if not self._auto_update:
+            return False
+        self._app.mark_dirty()
+        return True
+
+    def _update_automatically(self):
+        """Reconcile state without forcing a frame when auto-update is off."""
+        self._update_page(force=False)
+
+    @property
+    def platform(self):
+        """The active platform adapter and its capability table."""
+        return self._app.platform
+
+    @property
     def route(self):
         return self._app._router.route
 
@@ -227,7 +237,7 @@ class Page(Control):
     @theme_mode.setter
     def theme_mode(self, mode):
         self._theme_mode = mode if isinstance(mode, ThemeMode) else ThemeMode(mode)
-        self.update()
+        self._update_automatically()
 
     @property
     def platform_brightness(self) -> str:
@@ -240,7 +250,7 @@ class Page(Control):
         if value == self._platform_brightness:
             return False
         self._platform_brightness = value
-        self.update()
+        self._update_automatically()
         from .event import PlatformBrightnessChangeEvent
         self._dispatch(self.on_platform_brightness_change,
                        PlatformBrightnessChangeEvent(
@@ -287,7 +297,7 @@ class Page(Control):
         brightness = getattr(self.window, "brightness", None)
         if brightness is not None:
             dark = getattr(brightness, "value", brightness) == "dark"
-        self._app.post(lambda: _set_windows_dark_title_bar(
+        self._app.post(lambda: self._app.platform.set_dark_title_bar(
             self._app._window.handle, dark))
 
     @property
@@ -297,7 +307,7 @@ class Page(Control):
     @theme.setter
     def theme(self, t):
         self._theme = t
-        self.update()
+        self._update_automatically()
 
     @property
     def dark_theme(self):
@@ -306,7 +316,7 @@ class Page(Control):
     @dark_theme.setter
     def dark_theme(self, theme):
         self._dark_theme = theme
-        self.update()
+        self._update_automatically()
 
     @property
     def fonts(self) -> dict[str, str]:
@@ -315,7 +325,7 @@ class Page(Control):
     @fonts.setter
     def fonts(self, fonts: dict[str, str]):
         self._fonts = dict(fonts or {})
-        self.update()
+        self._update_automatically()
 
     def _sync_fonts(self):
         if self._fonts != self._fonts_snapshot:
@@ -325,7 +335,7 @@ class Page(Control):
 
     def _font_ready(self):
         self._layout_dirty = True
-        self._app.mark_dirty()
+        self._request_auto_update()
 
     @property
     def title(self) -> str:
@@ -339,24 +349,24 @@ class Page(Control):
         for control in ctrls:
             _require_saturn_control(control)
         self.controls.extend(ctrls)
-        self.update()
+        self._update_automatically()
 
     def insert(self, index, ctrl):
         _require_saturn_control(ctrl)
         self.controls.insert(index, ctrl)
-        self.update()
+        self._update_automatically()
 
     def remove(self, ctrl):
         self.controls.remove(ctrl)
-        self.update()
+        self._update_automatically()
 
     def remove_at(self, index):
         self.controls.pop(index)
-        self.update()
+        self._update_automatically()
 
     def clean(self):
         self.controls.clear()
-        self.update()
+        self._update_automatically()
 
     # -- dialogs (overlay) ---------------------------------------------------
     def show_dialog(self, dialog):
@@ -372,7 +382,7 @@ class Page(Control):
             dialog._shown()
         if hasattr(dialog, "_start_timer"):
             dialog._start_timer(self)
-        self.update()
+        self._update_automatically()
 
     def pop_dialog(self, dialog=None):
         from .widgets.dialogs import DialogControl
@@ -389,7 +399,7 @@ class Page(Control):
         if dialog in self.overlay:
             self.overlay.remove(dialog)
             dialog._closed()
-            self.update()
+            self._update_automatically()
 
     def _reconcile_roots(self):
         """Attach direct list mutations without reattaching unchanged trees."""
@@ -460,6 +470,10 @@ class Page(Control):
                     service.page = self
 
     def update(self):
+        """Reconcile page state and force a frame, even with auto-update off."""
+        self._update_page(force=True)
+
+    def _update_page(self, *, force: bool):
         if not hasattr(self, "_attached_roots"):
             return
         self._apply_theme()
@@ -474,11 +488,16 @@ class Page(Control):
             control._prepare_animation_tree(now)
         self._layout_dirty = True
         self._animation_scan_needed = True
-        self._app.mark_dirty()
+        self._app.mark_dirty(force=force)
 
     def repaint(self):
-        """Redraw when geometry has not changed (scroll, hover, ripple)."""
-        self._app.mark_dirty()
+        """Force a redraw when geometry has not changed.
+
+        This is the explicit counterpart to the automatic redraw requests
+        issued by controls.  It remains available when ``auto_update`` is
+        disabled.
+        """
+        self._app.mark_dirty(force=True)
 
     def run_task(self, handler, *args, **kwargs):
         """Schedule a handler off the UI thread; coroutine handlers run on
@@ -549,7 +568,7 @@ class Page(Control):
                 else:
                     self._active_animations.discard(control)
         if animating:
-            self._app.mark_dirty()
+            self._request_auto_update()
         r = self._app.renderer
         r.clear(self.bgcolor or self.window.bgcolor or colors.Colors.SURFACE)
         from .widgets.containers import Column
@@ -722,7 +741,7 @@ class Page(Control):
             fire(control, "focus")
         else:
             pygame.key.stop_text_input()
-        self.update()
+        self._update_automatically()
 
     def _focus_next(self, reverse=False):
         controls = []
@@ -819,7 +838,7 @@ class Page(Control):
                 hit._pressed_hook(local_x, local_y)
             if hasattr(hit, "_drag_start"):
                 hit._drag_start(local_x, local_y)
-            self.update()
+            self._update_automatically()
 
     def pointer_up(self, x, y):
         if self.disabled or not self.visible:
@@ -839,7 +858,7 @@ class Page(Control):
                 from .event import fire
                 fire(hit, "click")
             self._pressed = None
-            self.update()
+            self._update_automatically()
 
     def pointer_move(self, x, y):
         if self.disabled or not self.visible:
@@ -870,7 +889,7 @@ class Page(Control):
                 fire(target, "hover", "true")
         self._hovered = target
         if prev is not None or target is not None:
-            self.repaint()
+            self._request_auto_update()
 
     def _clear_hover(self):
         """Drop the current hover state (mouse left the window)."""
@@ -884,7 +903,7 @@ class Page(Control):
             prev._hovered = False
             fire(prev, "hover", "false")
         self._hovered = None
-        self.repaint()
+        self._request_auto_update()
 
     def _sync_mouse_cursor(self, target):
         cursor = getattr(target, "mouse_cursor", None)

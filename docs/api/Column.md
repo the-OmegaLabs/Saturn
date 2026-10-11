@@ -4,7 +4,7 @@ Arranges child controls vertically.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 304).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 329).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Column(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, vertical_alignment=None, horizontal_alignment=None, spacing: 'float' = 10, tight: 'bool' = False, wrap=False, run_spacing=10, run_alignment=<MainAxisAlignment.START: 'start'>, intrinsic_height=False, intrinsic_width=False, scroll=None, auto_scroll=False, auto_scroll_animation=None, scroll_interval=10, on_scroll=None, **base)
+saturn.Column(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'>, vertical_alignment=None, horizontal_alignment=None, spacing: 'float' = 10, tight: 'bool' = False, wrap=False, run_spacing=10, run_alignment=<MainAxisAlignment.START: 'start'>, intrinsic_height=False, intrinsic_width=False, scroll=None, auto_scroll=False, auto_scroll_animation=None, scroll_interval=10, on_scroll=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -58,6 +58,6 @@ saturn.Column(*items, controls=None, alignment=<MainAxisAlignment.START: 'start'
 | `auto_scroll_animation` | `—` | `None` | Unsupported for non-default requests. Requested auto scroll animation option; see the control comparison for supported values and restrictions. |
 | `scroll_interval` | `—` | `10` | Minimum interval in milliseconds between scroll events. |
 | `on_scroll` | `—` | `None` | Callback called when the list scrolls. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

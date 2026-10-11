@@ -455,7 +455,7 @@ class ListView(Control):
             self._offset = new
             self._show_scrollbar()
             if self.page is not None:
-                self.page.repaint()
+                self.page._request_auto_update()
             self._emit_scroll()
 
     def _emit_scroll(self):
@@ -484,7 +484,7 @@ class ListView(Control):
                 time.perf_counter() + _SCROLLBAR_FADE_DELAY)
             if self.page is not None:
                 self.page._active_animations.add(self)
-                self.page._app.mark_dirty()
+                self.page._request_auto_update()
 
     def _scrollbar_geometry(self):
         """Return (track, thumb, travel) in page coordinates."""
@@ -536,7 +536,7 @@ class ListView(Control):
         if new != self._offset:
             self._offset = new
             if self.page is not None:
-                self.page.repaint()
+                self.page._request_auto_update()
             self._emit_scroll()
 
     def scroll_to(self, offset: float = 0, delta: float | None = None,
@@ -726,7 +726,7 @@ class ListView(Control):
                     motion.SHORT2, motion.STANDARD)
                 self._schedule_scrollbar_hide()
         if self.page is not None:
-            self.page.repaint()
+            self.page._request_auto_update()
 
     def _find_scrollable(self, x, y):
         x,y = self._hit_point(x,y)

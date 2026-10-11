@@ -4,7 +4,7 @@ Kinds of native window state events.
 
 [← API index](./README.md)
 
-Source: [`saturn/window.py`](../../saturn/window.py) (line 16).
+Source: [`saturn/window.py`](../../saturn/window.py) (line 14).
 
 **Base class:** `Enum`
 

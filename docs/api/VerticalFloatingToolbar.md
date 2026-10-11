@@ -4,7 +4,7 @@ Floating toolbar with vertically arranged actions.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 134).
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 139).
 
 ## Preview
 

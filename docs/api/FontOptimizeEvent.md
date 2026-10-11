@@ -4,7 +4,7 @@ Reports background font load/weight optimization start, completion or failure.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 78).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 85).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

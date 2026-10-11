@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 import enum
 import math
-import sys
 import time
 
 from .. import colors
@@ -849,13 +848,15 @@ class WindowDragArea(Control):
                 page._dispatch(self.on_double_tap)
             return
         native = getattr(window, "_native", None)
-        if sys.platform != "win32" or native is None or not window.movable:
+        if (native is None
+                or not window._app.platform.supports_window_feature("native_window_dragging")
+                or not window.movable):
             return
         if self.on_drag_start:
             page._dispatch(self.on_drag_start)
         # FIFO on the UI queue: the drag blocks inside the native move loop
         # and the completion hook queued behind it runs on release.
-        page._app.post(lambda: native.start_interaction(2))
+        page._app.post(native.start_dragging)
         if self.on_drag_end:
             page._app.post(lambda: page._dispatch(self.on_drag_end))
 

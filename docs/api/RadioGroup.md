@@ -4,7 +4,7 @@ Manages the selected value among Radio controls.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1615).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1625).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.RadioGroup(content=None, *, value=None, on_change=None, **base)
+saturn.RadioGroup(content=None, *, value=None, on_change=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -44,6 +44,6 @@ saturn.RadioGroup(content=None, *, value=None, on_change=None, **base)
 | `content` | `—` | `None` | Text or child control to display. |
 | `value` | `—` | `None` | Current value of the control or data object. |
 | `on_change` | `—` | `None` | Callback called when the value changes. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -4,7 +4,7 @@ Selects a value from a list of options.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 2117).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 2127).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Dropdown(value=None, *, options=None, text=None, hint_text=None, label=None, on_select=None, on_text_change=None, on_focus=None, on_blur=None, autofocus=False, text_size: 'float' = 16.0, text_style=None, text_align=<TextAlign.START: 'start'>, elevation=8, enable_filter=False, enable_search=True, editable=False, menu_height=None, menu_width=None, menu_style=None, expanded_insets=None, selected_suffix=None, input_filter=None, capitalization=None, trailing_icon=None, leading_icon=None, selected_trailing_icon=None, filled=False, fill_color=None, bgcolor=None, border=None, border_radius=None, border_width=None, border_color=None, focused_border_width=None, focused_border_color=None, color=None, content_padding=None, dense=False, hover_color=None, label_style=None, hint_style=None, helper_text=None, helper_style=None, error_text=None, error_style=None, **base)
+saturn.Dropdown(value=None, *, options=None, text=None, hint_text=None, label=None, on_select=None, on_text_change=None, on_focus=None, on_blur=None, autofocus=False, text_size: 'float' = 16.0, text_style=None, text_align=<TextAlign.START: 'start'>, elevation=8, enable_filter=False, enable_search=True, editable=False, menu_height=None, menu_width=None, menu_style=None, expanded_insets=None, selected_suffix=None, input_filter=None, capitalization=None, trailing_icon=None, leading_icon=None, selected_trailing_icon=None, filled=False, fill_color=None, bgcolor=None, border=None, border_radius=None, border_width=None, border_color=None, focused_border_width=None, focused_border_color=None, color=None, content_padding=None, dense=False, hover_color=None, label_style=None, hint_style=None, helper_text=None, helper_style=None, error_text=None, error_style=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -87,6 +87,6 @@ saturn.Dropdown(value=None, *, options=None, text=None, hint_text=None, label=No
 | `helper_style` | `—` | `None` | Style applied to helper. |
 | `error_text` | `—` | `None` | Text displayed as error. |
 | `error_style` | `—` | `None` | Style applied to error. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

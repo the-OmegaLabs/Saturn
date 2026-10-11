@@ -4,7 +4,7 @@ Application page that manages controls, themes, and dialogs.
 
 [← API index](./README.md)
 
-Source: [`saturn/page.py`](../../saturn/page.py) (line 103).
+Source: [`saturn/page.py`](../../saturn/page.py) (line 83).
 
 **Base class:** [Control](./Control.md)
 
@@ -18,6 +18,13 @@ Read-only `.gpu_name`, `.gpu_index` and `.gpus` expose the actual device and ava
 See [Renderer settings](../rendering.md) for backend behavior and threading rules.
 
 See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.
+
+## Automatic updates
+
+`page.auto_update` is a boolean property that defaults to `True`. Set it to
+`False` to pause implicit control redraws and animation frame scheduling. Call
+`page.update()` or `page.repaint()` for an explicit frame; setting it back to
+`True` requests one frame.
 
 > `saturn.run()` usually creates and passes these objects; application code does not need to construct them directly.
 
@@ -36,7 +43,8 @@ See [Page fonts and events](../page.md) for font registration, typed callbacks, 
 | `pop_dialog(self, dialog=None)` | Closes the current dialog or snackbar. |
 | `update(self)` | Requests a redraw of this control and its changes. |
 | `repaint(self)` | Redraw when geometry has not changed (scroll, hover, ripple). |
-| `run_task(self, handler, *args)` | Schedule a coroutine handler on the application event loop. |
+| `run_task(self, handler, *args, **kwargs)` | Schedule a handler off the UI thread; coroutine handlers run on |
+| `run_thread(self, handler, *args, **kwargs)` | Run `handler` off the UI thread and return a Future with its |
 | `take_screenshot(self, path: 'str | None' = None)` | Return the captured frame surface (and save |
 | `draw(self)` | Requests a draw of the current page. |
 | `handle_event(self, e)` | Handles an incoming control event. |

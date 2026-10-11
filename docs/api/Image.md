@@ -4,7 +4,7 @@ Displays a local image or SVG.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 108).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 118).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Image(src=None, *, fit=None, border_radius=None, color=None, error_content=None, repeat='noRepeat', color_blend_mode=None, gapless_playback=False, semantics_label=None, exclude_from_semantics=False, filter_quality='medium', placeholder_src=None, placeholder_fit=None, fade_in_animation=None, placeholder_fade_out_animation=None, cache_width=None, cache_height=None, anti_alias=False, **base)
+saturn.Image(src=None, *, fit=None, border_radius=None, color=None, error_content=None, repeat='noRepeat', color_blend_mode=None, gapless_playback=False, semantics_label=None, exclude_from_semantics=False, filter_quality='medium', placeholder_src=None, placeholder_fit=None, fade_in_animation=None, placeholder_fade_out_animation=None, cache_width=None, cache_height=None, anti_alias=False, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -59,6 +59,6 @@ saturn.Image(src=None, *, fit=None, border_radius=None, color=None, error_conten
 | `cache_width` | `—` | `None` | Requested image cache target width. |
 | `cache_height` | `—` | `None` | Requested image cache target height. |
 | `anti_alias` | `—` | `False` | Request smooth image edges on the active backend. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

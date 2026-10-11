@@ -7,7 +7,6 @@ Colors members, and named values ("red", "red500") or M3 role names
 """
 from __future__ import annotations
 
-import sys
 from contextvars import ContextVar
 
 _render_colors = ContextVar("saturn_render_colors", default=None)
@@ -126,20 +125,12 @@ _role_overrides_lock = threading.RLock()
 
 
 def system_prefers_dark() -> bool:
-    """Windows app-mode preference, cached between Page preference polls."""
+    """Host dark-mode preference, cached between Page preference polls."""
     global _system_dark_cache
     with _system_dark_lock:
         if _system_dark_cache is None:
-            v = False
-            if sys.platform == "win32":
-                try:
-                    import winreg
-                    with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
-                        v = winreg.QueryValueEx(k, "AppsUseLightTheme")[0] == 0
-                except OSError:
-                    pass
-            _system_dark_cache = v
+            from .platform import get_platform
+            _system_dark_cache = get_platform().system_prefers_dark()
         return _system_dark_cache
 
 

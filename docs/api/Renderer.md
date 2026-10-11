@@ -4,7 +4,7 @@ Selects the software, OpenGL, or Vulkan backend.
 
 [← API index](./README.md)
 
-Source: [`saturn/app.py`](../../saturn/app.py) (line 32).
+Source: [`saturn/app.py`](../../saturn/app.py) (line 31).
 
 **Base class:** `Enum`
 

@@ -4,7 +4,7 @@ Menu of actions expanded from a floating button.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 248).
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 253).
 
 ## Preview
 
@@ -43,15 +43,15 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.FloatingActionButtonMenu(items=None, *, icon=<Icons.ADD: 57669>, expanded=False, on_select=None, **base)
+saturn.FloatingActionButtonMenu(items=None, *, icon=Icons.ADD, expanded=False, on_select=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
 | --- | --- | --- | --- |
 | `items` | `—` | `None` | Items passed to a layout, group, or menu. |
-| `icon` | `—` | `<Icons.ADD: 57669>` | Icon to draw. |
+| `icon` | `—` | `Icons.ADD` | Icon to draw. |
 | `expanded` | `—` | `False` | Whether the floating component or menu is expanded. |
 | `on_select` | `—` | `None` | Callback called when a menu item or option is selected. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

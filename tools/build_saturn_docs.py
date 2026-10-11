@@ -24,16 +24,57 @@ OUT = ROOT / "docs"
 API = OUT / "api"
 
 CATEGORIES = {
-    "App and page": "App Renderer Render run ControlEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent RenderFailedEvent RenderReadyEvent FontOptimizeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
+    "App and page": "App Renderer Render run run_thread ControlEvent Event HoverEvent KeyboardEvent PageResizeEvent PlatformBrightnessChangeEvent TextSelectionChangeEvent LayoutSizeChangeEvent RouteChangeEvent RenderFailedEvent RenderReadyEvent FontOptimizeEvent WindowEvent WindowEventType WindowResizeEdge Control Page Window",
     "Navigation and effects": "Subpage Shader ShaderEffect ShaderBuffer",
     "Input border styles": "NoInputBorder UnderlineInputBorder",
     "Expressive namespace": "Compose",
     "Layout and content": "Text Row Column Container Stack Divider Icon Image Card ListView GestureDetector ListItem",
     "Buttons and actions": "Button ElevatedButton FilledButton FilledTonalButton OutlinedButton TextButton IconButton ExpressiveButton ExpressiveIconButton SplitButton ButtonGroup ToggleButton ElevatedToggleButton FilledTonalToggleButton OutlinedToggleButton FloatingActionButton SmallFloatingActionButton MediumFloatingActionButton LargeFloatingActionButton ExtendedFloatingActionButton FloatingToolbar HorizontalFloatingToolbar VerticalFloatingToolbar FloatingActionButtonMenu FloatingActionButtonMenuItem",
-    "Input and feedback": "TextField Checkbox Switch Radio RadioGroup Dropdown DropdownOption Option Slider AlertDialog SnackBar ProgressBar ProgressRing LoadingIndicator WavyProgressIndicator LinearWavyProgressIndicator CircularWavyProgressIndicator",
-    "File services": "FilePicker FilePickerFile FilePickerFileType FilePickerResultEvent FilePickerUploadEvent FilePickerUploadFile",
-    "Styles and types": "Colors Icons parse_color Alignment Animation AnimationCurve Border BorderRadius BorderSide BoxShadow BoxFit CrossAxisAlignment Duration FontWeight KeyboardType LabelPosition MainAxisAlignment MaterialExpressiveTheme Margin Offset OutlineInputBorder Padding Rotate Scale ScrollMode TextAlign Theme ThemeMode TextOverflow TextStyle Tooltip TooltipTriggerMode ButtonStyle ControlState BoxConstraints MouseCursor Ref RoundedRectangleBorder StadiumBorder CircleBorder ImageRepeat FilterQuality ClipBehavior BoxShape StrokeCap VisualDensity TextSelection TextAffinity InputFilter TextCapitalization SliderInteraction LinearGradient",
+    "Input and feedback": "TextField Checkbox Switch Radio RadioGroup Dropdown DropdownOption Option Slider AlertDialog DialogControl SnackBar ProgressBar ProgressRing LoadingIndicator WavyProgressIndicator LinearWavyProgressIndicator CircularWavyProgressIndicator",
+    "Navigation controls": "NavigationRail NavigationRailDestination NavigationRailLabelType PopupMenuButton PopupMenuItem",
+    "Additional widgets": "AnimatedSwitcher AnimatedSwitcherTransition VerticalDivider WindowDragArea",
+    "File services": "FilePicker FilePickerFile FilePickerFileType FilePickerResultEvent FilePickerUploadEvent FilePickerUploadFile Clipboard",
+    "Styles and types": "Colors Icons parse_color Alignment Animation AnimationCurve Border BorderRadius BorderSide BoxShadow Blur BlurTileMode BoxFit CrossAxisAlignment Duration FontWeight InputBorder NumbersOnlyInputFilter KeyboardType LabelPosition MainAxisAlignment MaterialExpressiveTheme Margin Offset OutlineInputBorder Padding Rotate Scale ScrollMode TextAlign Theme ThemeMode TextOverflow TextStyle Tooltip TooltipTriggerMode ButtonStyle ControlState BoxConstraints MouseCursor Ref RoundedRectangleBorder StadiumBorder CircleBorder ImageRepeat FilterQuality ClipBehavior BoxShape StrokeCap VisualDensity TextSelection TextAffinity InputFilter TextCapitalization SliderInteraction LinearGradient RadialGradient",
 }
+
+BOOK_CHAPTERS = [
+    ("Saturn 是什么", "book/00-introduction.md"),
+    ("安装与运行", "book/01-installation.md"),
+    ("项目脚手架：第一个窗口", "getting-started.md"),
+    ("Page、控件树与更新", "book/03-page-control-tree.md"),
+    ("布局", "book/04-layout.md"),
+    ("事件与状态", "book/05-events-state.md"),
+    ("输入、表单与反馈", "book/06-inputs.md"),
+    ("主题、颜色与字体", "book/07-theme.md"),
+    ("列表、滚动与性能", "book/08-lists.md"),
+    ("导航与原生子窗口", "book/09-navigation-windows.md"),
+    ("动画与渲染后端", "book/10-animation-rendering.md"),
+    ("Material 3 Expressive", "book/11-expressive.md"),
+    ("文件服务与资源", "book/12-services-assets.md"),
+    ("在浏览器中运行", "book/13-web.md"),
+    ("测试、诊断与发布", "book/14-testing-packaging.md"),
+    ("从 Flet 迁移", "book/15-flet-migration.md"),
+    ("阅读 API 参考", "book/16-api-reference.md"),
+    ("架构与扩展 Saturn", "book/17-architecture.md"),
+]
+
+REFERENCE_GUIDES = [
+    ("Page 属性、事件与字体", "page.md"),
+    ("原生桌面窗口", "window.md"),
+    ("子窗口与路由", "subpages.md"),
+    ("渲染器与 GPU 选择", "rendering.md"),
+    ("Web 会话", "web.md"),
+    ("GLSL 着色器", "shaders.md"),
+    ("Material 3 Expressive", "expressive.md"),
+    ("Compose 命名空间与验证", "compose.md"),
+    ("Orb GLSL 示例", "orb.md"),
+    ("窗口、Shader 与特效示例", "effects-demos.md"),
+    ("截图画廊", "gallery.md"),
+    ("Flet 功能映射", "flet-mapping.md"),
+    ("控件参数比较", "control-parameters-comparison.md"),
+    ("Page 属性与兼容性差异", "page-properties-comparison.md"),
+    ("saturn.run 与 Flet.run", "run-comparison.md"),
+]
 
 DESCRIPTIONS = {
     "Subpage": "Owned native child window with Page controls, independent rendering and shared application routing; see the Subpage guide.",
@@ -346,6 +387,11 @@ def page_for(name: str, category: str) -> str:
                           "`page.on_render_failed`, `.on_render_ready` and `.on_font_optimize` report startup recovery and background font work.",
                           "See [Renderer settings](../rendering.md) for backend behavior and threading rules.", ""]
                 lines += ["See [Page fonts and events](../page.md) for font registration, typed callbacks, themes, and ownership.", ""]
+                lines += ["## Automatic updates", "",
+                          "`page.auto_update` is a boolean property that defaults to `True`. Set it to",
+                          "`False` to pause implicit control redraws and animation frame scheduling. Call",
+                          "`page.update()` or `page.repaint()` for an explicit frame; setting it back to",
+                          "`True` requests one frame.", ""]
             if name == "Window":
                 lines += ["See [Native desktop windows](../window.md) for property behavior, platform limits, handles, and close interception.", ""]
             if name in ("App", "Page", "Window"):
@@ -371,6 +417,21 @@ def page_for(name: str, category: str) -> str:
     return "\n".join(lines)
 
 
+def summary_content() -> str:
+    """Build the mdBook table of contents from the public API catalog."""
+    lines = ["# Summary", "", "[Saturn 使用手册](README.md)", ""]
+    lines.extend(f"- [{title}]({path})" for title, path in BOOK_CHAPTERS)
+    lines += ["", "# API 参考", "", "- [API index](api/README.md)"]
+    for category, names in CATEGORIES.items():
+        lines.extend(
+            f"- [{category}: {name}](api/{name}.md)"
+            for name in names.split()
+        )
+    lines += ["", "# 专题指南", ""]
+    lines.extend(f"- [{title}]({path})" for title, path in REFERENCE_GUIDES)
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     API.mkdir(parents=True, exist_ok=True)
     listed = {name for names in CATEGORIES.values() for name in names.split()}
@@ -379,6 +440,7 @@ def main() -> None:
         raise SystemExit(f"Catalog mismatch: missing={sorted(public - listed)}, extra={sorted(listed - public)}")
     visual = set().union(*(set(CATEGORIES[key].split()) for key in
                            ("Layout and content", "Buttons and actions", "Input and feedback"))) - {"DropdownOption", "Option"}
+    visual.discard("DialogControl")
     if set(EXAMPLES) != visual:
         raise SystemExit(f"Control examples mismatch: missing={sorted(visual - set(EXAMPLES))}, extra={sorted(set(EXAMPLES) - visual)}")
     missing_images = [name for name in EXAMPLES if not (ROOT / ".static" / "controls" / f"{name}.png").exists()]
@@ -387,11 +449,12 @@ def main() -> None:
     for category, names in CATEGORIES.items():
         for name in names.split():
             (API / f"{name}.md").write_text(page_for(name, category), encoding="utf-8")
-    lines = ["# Saturn API index", "", "[← Documentation home](../README.md) · [Screenshot gallery](../gallery.md)", "", f"This index covers the {len(public)} public symbols currently in `saturn.__all__`, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.", ""]
+    lines = ["# Saturn API reference", "", "[← Saturn 使用手册](../README.md) · [Screenshot gallery](../gallery.md)", "", f"This reference covers the {len(public)} public symbols currently exported by saturn.__all__, with one Markdown page per symbol. Visual control pages include a summary, dark theme screenshot, runnable example, and constructor parameter descriptions. Other type and service pages document their actual interfaces.", ""]
     for category, names in CATEGORIES.items():
         lines += [f"## {category}", "", " · ".join(f"[{name}](./{name}.md)" for name in names.split()), ""]
     lines += ["## Relationship to the Flet knowledge base", "", "The categories follow the local `flet-skill/` reference, but this index lists only symbols actually exported by Saturn. Other controls, services, or properties in the Flet reference may not be implemented in Saturn.", ""]
     (API / "README.md").write_text("\n".join(lines), encoding="utf-8")
+    (OUT / "SUMMARY.md").write_text(summary_content(), encoding="utf-8")
     broken = []
     for page in OUT.rglob("*.md"):
         body = page.read_text(encoding="utf-8")
@@ -405,7 +468,7 @@ def main() -> None:
                 broken.append(f"{page.relative_to(ROOT)} -> {target}")
     if broken:
         raise SystemExit("Broken documentation links:\n" + "\n".join(broken))
-    print(f"Wrote {len(public)} API pages and index to {API}")
+    print(f"Wrote {len(public)} API pages, index, and book summary to {API}")
 
 
 if __name__ == "__main__":

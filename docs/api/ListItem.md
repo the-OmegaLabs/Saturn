@@ -4,7 +4,7 @@ Displays a row with a title, supporting text, and optional slots.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/list_item.py`](../../saturn/widgets/list_item.py) (line 30).
+Source: [`saturn/widgets/list_item.py`](../../saturn/widgets/list_item.py) (line 34).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.ListItem(content=None, *, headline=None, leading=None, trailing=None, overline=None, supporting=None, selected=False, container_color=None, selected_container_color=None, content_color=None, selected_content_color=None, border_radius=None, on_click=None, on_hover=None, on_long_press=None, **base)
+saturn.ListItem(content=None, *, headline=None, leading=None, trailing=None, overline=None, supporting=None, selected=False, container_color=None, selected_container_color=None, content_color=None, selected_content_color=None, border_radius=None, on_click=None, on_hover=None, on_long_press=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -56,6 +56,6 @@ saturn.ListItem(content=None, *, headline=None, leading=None, trailing=None, ove
 | `on_click` | `—` | `None` | Callback called when the control is clicked. |
 | `on_hover` | `—` | `None` | Callback called when the pointer's hover state changes. |
 | `on_long_press` | `—` | `None` | Callback called when the control is long pressed. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

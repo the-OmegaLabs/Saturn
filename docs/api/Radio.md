@@ -4,7 +4,7 @@ Single choice in a mutually exclusive group.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1669).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1679).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Radio(value=None, *, label: 'str' = '', label_position=<LabelPosition.RIGHT: 'right'>, label_style=None, autofocus=False, active_color=None, fill_color=None, overlay_color=None, hover_color=None, focus_color=None, splash_radius=None, toggleable=False, visual_density=None, on_focus=None, on_blur=None, **base)
+saturn.Radio(value=None, *, label: 'str' = '', label_position=<LabelPosition.RIGHT: 'right'>, label_style=None, autofocus=False, active_color=None, fill_color=None, overlay_color=None, hover_color=None, focus_color=None, splash_radius=None, toggleable=False, visual_density=None, on_focus=None, on_blur=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -56,6 +56,6 @@ saturn.Radio(value=None, *, label: 'str' = '', label_position=<LabelPosition.RIG
 | `visual_density` | `—` | `None` | Unsupported for non-default requests. Compact, comfortable, or standard control sizing where supported. |
 | `on_focus` | `—` | `None` | Callback called when the control gains focus. |
 | `on_blur` | `—` | `None` | Callback called when the control loses focus. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

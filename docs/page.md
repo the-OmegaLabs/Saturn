@@ -23,6 +23,33 @@ saturn.run(main)
 
 `page.width` and `page.height` report logical client dimensions and are read-only. `page.window.width` and `.height` configure outer window dimensions. `page.media.device_pixel_ratio` reports the measured device density; the other Flet media fields are not implemented.
 
+## Automatic updates
+
+`page.auto_update` defaults to `True`. Set it to `False` to pause redraws
+requested implicitly by controls, input state changes, and animation frames. State
+and layout mutations are kept in memory; call `page.update()` to reconcile and
+force a frame while automatic updates are paused. `page.repaint()` is also an
+explicit redraw request. Turning `auto_update` back on requests one frame.
+
+```python
+page.auto_update = False
+label.value = "Queued until the next explicit update"
+page.update()
+page.auto_update = True
+```
+
+For a user-facing switch, bind the property in the change handler:
+
+```python
+def toggle_updates(event):
+    page.auto_update = event.control.value
+
+page.add(saturn.Switch("Auto update", value=page.auto_update,
+                       on_change=toggle_updates))
+```
+
+Only boolean values are accepted.
+
 ## Fonts
 
 Register aliases and use them on individual controls or in a theme:

@@ -4,7 +4,7 @@ Base class for visual controls, with size, state, and update methods.
 
 [← API index](./README.md)
 
-Source: [`saturn/control.py`](../../saturn/control.py) (line 26).
+Source: [`saturn/control.py`](../../saturn/control.py) (line 76).
 
 ## Public methods
 

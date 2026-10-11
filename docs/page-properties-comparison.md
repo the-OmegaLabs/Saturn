@@ -14,6 +14,7 @@ Reviewed on **2026-09-27** against installed **Flet 1.0.1**. The ordinary deskto
 | `title` and `window.title` | Both access the same startup/window title | Startup title and updates through both access paths |
 | Window state | Native state readback and events synchronize minimized, maximized, fullscreen, focus, and visibility behavior | See [Native windows](./window.md) and native window checks |
 | `disabled` | Blocks control and overlay pointer, keyboard, IME, and wheel input; clears existing focus/press/hover | Focused input and overlay hit testing while disabled; input resumes after enabling |
+| `auto_update` | Boolean switch for implicit redraws and animation frame scheduling; `update()` and `repaint()` remain explicit frame requests | Page auto-update unit checks on desktop and Web schedulers |
 | `services` | Registering through the list and calling `update()` assigns the owning Page; removal clears ownership | FilePicker ownership and removal |
 | Platform brightness and density | `platform_brightness`, change events, and measured `media.device_pixel_ratio` | System preference change and logical/device pointer conversion |
 | Native child windows and shared routes | `open_subpage()`, `subpages`, `Subpage(Page)` with independent `.window`, HWND, controls, focus and renderer. `route`, `go()` and `on_route_change` share application state across windows | All three backends: native ownership, independent pixels/resources, nested close, modal input, attachment/following and typed route events |

@@ -4,7 +4,7 @@ Built-in procedural effects supported by OpenGL and Vulkan.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 14).
+Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 18).
 
 **Base class:** `str`, `Enum`
 

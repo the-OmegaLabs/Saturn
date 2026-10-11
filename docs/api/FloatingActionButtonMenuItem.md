@@ -4,7 +4,7 @@ Clickable item in a floating action menu.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 139).
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 144).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base)
+saturn.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -44,6 +44,6 @@ saturn.FloatingActionButtonMenuItem(content, *, icon=None, on_click=None, **base
 | `content` | `—` | `required` | Text or child control to display. |
 | `icon` | `—` | `None` | Icon to draw. |
 | `on_click` | `—` | `None` | Callback called when the control is clicked. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

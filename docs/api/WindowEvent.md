@@ -4,7 +4,7 @@ Native desktop window state event with its owning Page.
 
 [← API index](./README.md)
 
-Source: [`saturn/window.py`](../../saturn/window.py) (line 45).
+Source: [`saturn/window.py`](../../saturn/window.py) (line 43).
 
 ## Constructor parameters
 

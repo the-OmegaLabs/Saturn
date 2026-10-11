@@ -4,7 +4,7 @@ Displays brief feedback about an action.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 294).
+Source: [`saturn/widgets/dialogs.py`](../../saturn/widgets/dialogs.py) (line 298).
 
 ## Preview
 
@@ -31,12 +31,12 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ```
 
-**Base class:** `DialogControl`
+**Base class:** [DialogControl](./DialogControl.md)
 
 ## Constructor parameters
 
 ```python
-saturn.SnackBar(content, *, action=None, bgcolor=None, duration: 'int' = 4000, on_action=None, open=False, on_dismiss=None, behavior=None, dismiss_direction=None, show_close_icon=False, close_icon_color=None, margin=None, padding=None, width=None, elevation=None, shape=None, clip_behavior='hardEdge', action_overflow_threshold=0.25, persist=None, on_visible=None, **base)
+saturn.SnackBar(content, *, action=None, bgcolor=None, duration: 'int' = 4000, on_action=None, open=False, on_dismiss=None, behavior=None, dismiss_direction=None, show_close_icon=False, close_icon_color=None, margin=None, padding=None, width=None, elevation=None, shape=None, clip_behavior='hardEdge', action_overflow_threshold=0.25, persist=None, on_visible=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -61,6 +61,6 @@ saturn.SnackBar(content, *, action=None, bgcolor=None, duration: 'int' = 4000, o
 | `action_overflow_threshold` | `—` | `0.25` | Width fraction at which the SnackBar action wraps. |
 | `persist` | `—` | `None` | Keep the SnackBar open until explicitly dismissed. |
 | `on_visible` | `—` | `None` | Callback for visible; accepts zero arguments or an event. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

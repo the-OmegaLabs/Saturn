@@ -4,7 +4,7 @@ LayoutSizeChangeEvent(name: 'str', control: "'Control'", data: 'Any' = None, wid
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 50).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 57).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

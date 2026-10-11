@@ -4,7 +4,7 @@ Floating toolbar that holds actions in a capsule surface.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 18).
+Source: [`saturn/widgets/floating.py`](../../saturn/widgets/floating.py) (line 23).
 
 ## Preview
 
@@ -42,7 +42,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.FloatingToolbar(*items, controls=None, leading=None, trailing=None, expanded=True, vertical=False, vibrant=False, bgcolor=None, elevation=6, **base)
+saturn.FloatingToolbar(*items, controls=None, leading=None, trailing=None, expanded=True, vertical=False, vibrant=False, bgcolor=None, elevation=6, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -56,6 +56,6 @@ saturn.FloatingToolbar(*items, controls=None, leading=None, trailing=None, expan
 | `vibrant` | `—` | `False` | Use a more vivid surface color for the toolbar. |
 | `bgcolor` | `—` | `None` | Background color of the control or container. |
 | `elevation` | `—` | `6` | Surface elevation, which determines shadow strength. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

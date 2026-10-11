@@ -4,7 +4,7 @@ System light/dark preference supplied to a Page brightness handler.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 39).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 46).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

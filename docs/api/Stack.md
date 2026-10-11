@@ -4,7 +4,7 @@ Places child controls in overlapping layers.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 563).
+Source: [`saturn/widgets/containers.py`](../../saturn/widgets/containers.py) (line 620).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Stack(*items, controls=None, clip_behavior='hardEdge', alignment=None, fit='loose', **base)
+saturn.Stack(*items, controls=None, clip_behavior='hardEdge', alignment=None, fit='loose', **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -46,6 +46,6 @@ saturn.Stack(*items, controls=None, clip_behavior='hardEdge', alignment=None, fi
 | `clip_behavior` | `—` | `'hardEdge'` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
 | `alignment` | `—` | `None` | Alignment of child content within a container or layout. |
 | `fit` | `—` | `'loose'` | How an image scales and crops within its bounds. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

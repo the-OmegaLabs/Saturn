@@ -4,7 +4,7 @@ Reports a failed GPU startup request and recovery to software rendering.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 61).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 68).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

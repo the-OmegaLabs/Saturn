@@ -4,7 +4,7 @@ Receives pointer and gesture events.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 797).
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 801).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.GestureDetector(content=None, *, on_tap=None, on_tap_down=None, on_long_press=None, on_hover=None, on_enter=None, on_exit=None, mouse_cursor=None, drag_interval=0, hover_interval=0, on_tap_up=None, on_tap_move=None, on_tap_cancel=None, on_double_tap=None, on_double_tap_down=None, on_double_tap_cancel=None, on_horizontal_drag_down=None, on_horizontal_drag_start=None, on_horizontal_drag_update=None, on_horizontal_drag_end=None, on_horizontal_drag_cancel=None, on_vertical_drag_down=None, on_vertical_drag_start=None, on_vertical_drag_update=None, on_vertical_drag_end=None, on_vertical_drag_cancel=None, on_pan_down=None, on_pan_start=None, on_pan_update=None, on_pan_end=None, on_pan_cancel=None, on_scroll=None, allowed_devices=None, exclude_from_semantics=False, multi_tap_touches=0, trackpad_scroll_causes_scale=False, **base)
+saturn.GestureDetector(content=None, *, on_tap=None, on_tap_down=None, on_long_press=None, on_hover=None, on_enter=None, on_exit=None, mouse_cursor=None, drag_interval=0, hover_interval=0, on_tap_up=None, on_tap_move=None, on_tap_cancel=None, on_double_tap=None, on_double_tap_down=None, on_double_tap_cancel=None, on_horizontal_drag_down=None, on_horizontal_drag_start=None, on_horizontal_drag_update=None, on_horizontal_drag_end=None, on_horizontal_drag_cancel=None, on_vertical_drag_down=None, on_vertical_drag_start=None, on_vertical_drag_update=None, on_vertical_drag_end=None, on_vertical_drag_cancel=None, on_pan_down=None, on_pan_start=None, on_pan_update=None, on_pan_end=None, on_pan_cancel=None, on_scroll=None, allowed_devices=None, exclude_from_semantics=False, multi_tap_touches=0, trackpad_scroll_causes_scale=False, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -77,6 +77,6 @@ saturn.GestureDetector(content=None, *, on_tap=None, on_tap_down=None, on_long_p
 | `exclude_from_semantics` | `—` | `False` | Exclude this control from accessibility semantics. |
 | `multi_tap_touches` | `—` | `0` | Unsupported for non-default requests. Requested multi tap touches option; see the control comparison for supported values and restrictions. |
 | `trackpad_scroll_causes_scale` | `—` | `False` | Unsupported for non-default requests. Requested trackpad scroll causes scale option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

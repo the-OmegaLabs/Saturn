@@ -11,7 +11,6 @@ import ctypes
 import math
 import os
 import struct
-import sys
 from array import array
 from collections import OrderedDict
 from pathlib import Path
@@ -20,6 +19,7 @@ import pygame
 import moderngl
 
 from ..colors import parse_color
+from ..platform import get_platform
 from .base import Renderer
 from .geometry import arc_triangles, polygon_triangles, stroke_triangles
 
@@ -300,13 +300,12 @@ class GLRenderer(Renderer):
         self._ssaa = 1 if not anti_aliasing or self.pixel_ratio >= 1.5 else 2
         self.scale = self._ssaa * self.pixel_ratio
         from _moderngl import DefaultLoader
-        from .gl_gpu import GLGPUBinding
         # Load each window's actual context rather than reusing ModernGL's
         # process-global wrapper and its cached renderer/GPU information.
         self.ctx = moderngl.create_context(context=DefaultLoader())
         self._gpu_binding = None
         try:
-            self._gpu_binding = GLGPUBinding(self.ctx,gpu)
+            self._gpu_binding = get_platform().create_gl_gpu_binding(self.ctx, gpu)
             if self._gpu_binding.render_rc:
                 self.ctx = moderngl.create_context(standalone=True,context=self._gpu_binding)
             self.gpu_name = self.ctx.info['GL_RENDERER']
@@ -388,13 +387,13 @@ class GLRenderer(Renderer):
 
     def activate(self):
         # SDL validates the current window before swapping its buffers.
-        # Switching only WGL leaves SDL pointing at the last-created child,
+        # Switching only the native GL context leaves SDL pointing at the
+        # last-created child,
         # so the parent's draws succeed but its window.flip() is rejected.
         if self._context_sdl.SDL_GL_GetCurrentContext() != self._native_gl_context:
             if self._context_sdl.SDL_GL_MakeCurrent(self._native_sdl_window, self._native_gl_context) != 0:
                 raise RuntimeError("Cannot activate the window's OpenGL context")
-        if sys.platform=='win32':
-            self._gpu_binding.activate()
+        self._gpu_binding.activate()
 
     def _configure_vsync(self, enabled):
         if self._gpu_binding.render_rc:

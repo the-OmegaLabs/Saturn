@@ -4,7 +4,7 @@ Floating button that highlights a page's primary action.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 26).
+Source: [`saturn/widgets/fab.py`](../../saturn/widgets/fab.py) (line 30).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.FloatingActionButton(icon=None, *, content: 'str | None' = None, text: 'str | None' = None, mini: 'bool' = False, size: 'str' = 'standard', expanded: 'bool' = True, bgcolor=None, color=None, foreground_color=None, elevation: 'float' = 6.0, on_click=None, on_hover=None, shape=None, autofocus=False, focus_color=None, disabled_elevation=None, focus_elevation=None, highlight_elevation=None, hover_elevation=None, hover_color=None, splash_color=None, enable_feedback=None, url=None, mouse_cursor=None, clip_behavior='none', **base)
+saturn.FloatingActionButton(icon=None, *, content: 'str | None' = None, text: 'str | None' = None, mini: 'bool' = False, size: 'str' = 'standard', expanded: 'bool' = True, bgcolor=None, color=None, foreground_color=None, elevation: 'float' = 6.0, on_click=None, on_hover=None, shape=None, autofocus=False, focus_color=None, disabled_elevation=None, focus_elevation=None, highlight_elevation=None, hover_elevation=None, hover_color=None, splash_color=None, enable_feedback=None, url=None, mouse_cursor=None, clip_behavior='none', **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -66,6 +66,6 @@ saturn.FloatingActionButton(icon=None, *, content: 'str | None' = None, text: 's
 | `url` | `—` | `None` | Destination opened when the button is clicked. |
 | `mouse_cursor` | `—` | `None` | Cursor displayed while hovering over the control. |
 | `clip_behavior` | `—` | `'none'` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

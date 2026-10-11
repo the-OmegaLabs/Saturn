@@ -317,7 +317,7 @@ class WebRuntime:
                 event.data=value
                 if name=='change':
                     control.value=value
-                    session.page.update()
+                    session.page._update_automatically()
             elif name == 'select':
                 option=next((o for o in control.options if o.key==message.get('value') and o.visible and not o.disabled),None)
                 if option is None:
@@ -325,7 +325,7 @@ class WebRuntime:
                 control.value=option.key
                 control.text=option.text or str(option.key)
                 event.data=option.key
-                session.page.update()
+                session.page._update_automatically()
             elif name == 'change':
                 if isinstance(control, TextField):
                     if control.read_only:
@@ -353,7 +353,7 @@ class WebRuntime:
                         raise ValueError("Toggle value must be boolean")
                     control.value = message['value']
                 event.data = control.value
-                session.page.update()
+                session.page._update_automatically()
             for callback in normalize_handlers(getattr(control, f'on_{name}', None)):
                 from ..event import _invoke
                 try:

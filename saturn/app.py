@@ -11,7 +11,6 @@ Thread rules:
 from __future__ import annotations
 
 import asyncio
-import ctypes
 import enum
 import inspect
 import os
@@ -20,10 +19,10 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import pygame
 
+from .platform import get_platform
 from .renderer import create_renderer
 from .renderer.base import Renderer as _RendererBase
 from .window import WindowEventType
@@ -58,49 +57,18 @@ def _system_refresh_rate() -> int:
 
 
 def _system_pixel_ratio() -> float:
-    """Return the primary Windows display density in logical-pixel units."""
-    if sys.platform != "win32":
-        return 1.0
-    try:
-        dpi = int(ctypes.windll.user32.GetDpiForSystem())
-        return max(1.0, dpi / 96.0) if dpi > 0 else 1.0
-    except (AttributeError, OSError, TypeError, ValueError):
-        return 1.0
+    """Compatibility wrapper for the active platform adapter."""
+    return get_platform().system_pixel_ratio()
 
 
 def _window_pixel_ratio(hwnd: int) -> float:
-    """Return the live per-monitor density for a native window."""
-    if sys.platform != "win32" or not hwnd:
-        return 1.0
-    try:
-        dpi = int(ctypes.windll.user32.GetDpiForWindow(hwnd))
-        return max(1.0, dpi / 96.0) if dpi > 0 else 1.0
-    except (AttributeError, OSError, TypeError, ValueError):
-        return _system_pixel_ratio()
+    """Compatibility wrapper for the active platform adapter."""
+    return get_platform().window_pixel_ratio(hwnd)
 
 
 def _set_windows_default_icon(hwnd: int) -> bool:
-    """Apply Windows' shared generic application icon to an HWND."""
-    if sys.platform != "win32" or not hwnd:
-        return False
-    try:
-        user32 = ctypes.windll.user32
-        user32.LoadIconW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-        user32.LoadIconW.restype = ctypes.c_void_p
-        user32.SendMessageW.argtypes = [
-            ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t,
-        ]
-        user32.SendMessageW.restype = ctypes.c_ssize_t
-        # IDI_APPLICATION is a shared system resource and must not be freed.
-        icon = user32.LoadIconW(None, ctypes.c_void_p(32512))
-        if not icon:
-            return False
-        wm_seticon = 0x0080
-        user32.SendMessageW(hwnd, wm_seticon, 0, icon)  # ICON_SMALL
-        user32.SendMessageW(hwnd, wm_seticon, 1, icon)  # ICON_BIG
-        return True
-    except (AttributeError, OSError, TypeError, ValueError):
-        return False
+    """Compatibility wrapper for the active platform adapter."""
+    return get_platform().set_default_window_icon(hwnd)
 
 
 class App:
@@ -111,6 +79,7 @@ class App:
             raise ValueError('The software renderer does not support GPU selection')
         self._parent_app = _parent_app
         self._root = _parent_app._root if _parent_app else self
+        self.platform = _parent_app.platform if _parent_app else get_platform()
         self._children = []
         self._window = None
         self._disposed = False
@@ -151,9 +120,6 @@ class App:
         self._renderer_options_lock = threading.Lock()
         self._font_event_lock = asyncio.Lock()
         self.page = None  # set in start()
-        self._live_resize_dll = None
-        self._live_resize_callback = None
-        self._last_live_resize_frame = 0.0
         self._last_resize_dispatched_size = None
         self._refresh_rate = 60
         self._window_icon = None
@@ -164,13 +130,9 @@ class App:
     # -- lifecycle ------------------------------------------------------
     def start(self):
         self._ui_thread = threading.get_ident()
-        # SDL2 suppresses native IME UI by default. Enable the operating
-        # system candidate list before initializing the video subsystem.
-        os.environ.setdefault("SDL_IME_SHOW_UI", "1")
-        # SDL must opt into Per-Monitor V2 before video initialization. This
-        # disables Windows' blurry bitmap scaling when a window moves between
-        # displays with different densities.
-        os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
+        # Give the active platform a chance to configure SDL before video
+        # initialization. The Windows DPI setting lives in its adapter.
+        self.platform.prepare_environment()
         if self._parent_app is None:
             pygame.init()
         # pygame disables key repeat by default. SDL owns the held-key timer
@@ -222,13 +184,13 @@ class App:
     def _create_window_renderer(self):
         if self._backend is Renderer.OPENGL:
             pygame.display.gl_set_attribute(pygame.GL_ALPHA_SIZE, 8)
-        self._pixel_ratio = _system_pixel_ratio()
+        self._pixel_ratio = self.platform.system_pixel_ratio()
         self._window = pygame.Window(
             title=self._title, size=self.physical_size_for_logical(*self._outer_size),
             resizable=True, opengl=self._backend is Renderer.OPENGL,
             vulkan=self._backend is Renderer.VULKAN, allow_high_dpi=True,
             hidden=False)
-        self._pixel_ratio = _window_pixel_ratio(self._window.handle)
+        self._pixel_ratio = self.platform.window_pixel_ratio(self._window.handle)
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
@@ -448,11 +410,10 @@ class App:
         if parent is not None:
             if self in parent._children:
                 parent._children.remove(self)
-            if (sys.platform == "win32" and parent._window is not None
-                    and getattr(self.page, "modal", False)
+            if (parent._window is not None and getattr(self.page, "modal", False)
                     and not any(getattr(c.page, "modal", False) and not c._closed.is_set()
                                 for c in parent._children)):
-                ctypes.windll.user32.EnableWindow(ctypes.c_void_p(parent._window.handle), True)
+                self.platform.enable_window(parent._window.handle, True)
             if not parent._closed.is_set():
                 parent._activate()
 
@@ -525,7 +486,17 @@ class App:
                 return result
             return self._executor.submit(_swallow, invoke)
 
-    def mark_dirty(self):
+    def mark_dirty(self, *, force: bool = False):
+        """Request a frame, respecting the owning Page's auto-update switch.
+
+        ``force=True`` is reserved for explicit Page/API requests.  Internal
+        control, animation and input paths use the default so
+        ``page.auto_update = False`` can pause them without blocking a manual
+        ``page.update()``.
+        """
+        page = self.page
+        if not force and page is not None and not getattr(page, "_auto_update", True):
+            return
         self._dirty.set()
 
     def post(self, fn):
@@ -542,14 +513,14 @@ class App:
         ))
 
     def _apply_default_window_icon(self):
-        return _set_windows_default_icon(self._window.handle)
+        return self.platform.set_default_window_icon(self._window)
 
     def _resize_frame(self, width: int, height: int, *, present: bool,
                       dispatch: bool = False):
         """Apply a client-area resize, optionally drawing immediately.
 
-        ``present=True`` is used by the SDL event watch while Win32 owns the
-        modal move/size loop and Saturn's normal event loop cannot advance.
+        ``present=True`` is used by a platform event watch while the native
+        window system owns a modal move/size loop.
         """
         self._activate()
         pixel_width = max(1, int(width))
@@ -594,77 +565,11 @@ class App:
             self._dirty.set()
 
     def _install_live_resize_watch(self):
-        """Redraw inside SDL's Win32 modal resize loop.
-
-        pygame does not expose SDL_AddEventWatch, so bind the SDL2 bundled
-        beside pygame. SDL invokes this callback on the window/UI thread;
-        that preserves the renderer's strict thread-affinity requirement.
-        """
-        if sys.platform != "win32":
-            return
-        try:
-            dll = ctypes.CDLL(str(Path(pygame.__file__).with_name("SDL2.dll")))
-
-            class SDLWindowEvent(ctypes.Structure):
-                _fields_ = [
-                    ("type", ctypes.c_uint32), ("timestamp", ctypes.c_uint32),
-                    ("window_id", ctypes.c_uint32), ("event", ctypes.c_uint8),
-                    ("padding1", ctypes.c_uint8), ("padding2", ctypes.c_uint8),
-                    ("padding3", ctypes.c_uint8), ("data1", ctypes.c_int32),
-                    ("data2", ctypes.c_int32),
-                ]
-
-            class SDLEvent(ctypes.Union):
-                _fields_ = [("type", ctypes.c_uint32),
-                            ("window", SDLWindowEvent),
-                            ("padding", ctypes.c_uint8 * 56)]
-
-            callback_type = ctypes.CFUNCTYPE(
-                ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(SDLEvent))
-            window_id = self._window.id
-
-            @callback_type
-            def watch(_userdata, event_ptr):
-                if threading.get_ident() != self._ui_thread or self._closed.is_set():
-                    return 1
-                event = event_ptr.contents
-                # SDL2: WINDOWEVENT=0x200; RESIZED=5; SIZE_CHANGED=6.
-                if (event.type == 0x200 and event.window.window_id == window_id
-                        and event.window.event in (5, 6)):
-                    # RESIZED and SIZE_CHANGED can arrive back-to-back for the
-                    # same dimensions. Avoid presenting an identical frame.
-                    size = (event.window.data1, event.window.data2)
-                    now = time.perf_counter()
-                    if size != tuple(self._size) or now - self._last_live_resize_frame > 0.1:
-                        self._last_live_resize_frame = now
-                        try:
-                            self._resize_frame(*size, present=True, dispatch=True)
-                        except (RuntimeError, ValueError, AttributeError) as e:
-                            # ctypes callbacks must never leak exceptions into SDL.
-                            # RuntimeError: renderer/window destroyed
-                            # ValueError: invalid size
-                            # AttributeError: component not initialized
-                            import traceback
-                            print(f"Resize frame error: {e}", file=sys.stderr)
-                            traceback.print_exc()
-                return 1
-
-            dll.SDL_AddEventWatch.argtypes = [callback_type, ctypes.c_void_p]
-            dll.SDL_AddEventWatch.restype = None
-            dll.SDL_DelEventWatch.argtypes = [callback_type, ctypes.c_void_p]
-            dll.SDL_DelEventWatch.restype = None
-            dll.SDL_AddEventWatch(watch, None)
-            self._live_resize_dll = dll
-            self._live_resize_callback = watch
-        except (AttributeError, OSError):
-            self._live_resize_dll = None
-            self._live_resize_callback = None
+        """Install the active platform's live resize hook, if it has one."""
+        self.platform.install_live_resize_watch(self)
 
     def _remove_live_resize_watch(self):
-        if self._live_resize_dll is not None and self._live_resize_callback is not None:
-            self._live_resize_dll.SDL_DelEventWatch(self._live_resize_callback, None)
-        self._live_resize_callback = None
-        self._live_resize_dll = None
+        self.platform.remove_live_resize_watch(self)
 
     def screenshot(self, path: str | None = None):
         """Grab the current frame from any thread; returns a pygame Surface
@@ -722,7 +627,7 @@ class App:
     def _refresh_pixel_ratio(self):
         if self._window is None:
             return False
-        ratio = _window_pixel_ratio(self._window.handle)
+        ratio = self.platform.window_pixel_ratio(self._window.handle)
         if abs(ratio - self._pixel_ratio) < 0.001:
             return False
         self._pixel_ratio = ratio
@@ -736,11 +641,7 @@ class App:
                 max(1, int(height) - self._frame_size[1]))
 
     def _measure_frame_size(self):
-        """Return native non-client (border + title bar) width/height.
-
-        Win32 reports the real metrics for the current DPI/theme, avoiding
-        hard-coded 16x39 assumptions. Other platforms retain SDL semantics.
-        """
+        """Return native non-client frame width/height when available."""
         rects = self._window_rects()
         if rects is None:
             return (0, 0)
@@ -767,28 +668,8 @@ class App:
                 max(1, round((outer.bottom - outer.top) / ratio)))
 
     def _window_rects(self):
-        """Outer and client rects in physical pixels, or None off-Windows."""
-        if sys.platform != "win32" or self._window is None:
-            return None
-        try:
-            import ctypes
-            from ctypes import wintypes
-
-            hwnd = self._window.handle
-            outer = wintypes.RECT()
-            client = wintypes.RECT()
-            user32 = ctypes.windll.user32
-            user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
-            user32.GetWindowRect.restype = wintypes.BOOL
-            user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
-            user32.GetClientRect.restype = wintypes.BOOL
-            if not user32.GetWindowRect(hwnd, ctypes.byref(outer)):
-                return None
-            if not user32.GetClientRect(hwnd, ctypes.byref(client)):
-                return None
-            return outer, client
-        except (KeyError, OSError):
-            return None
+        """Outer and client rects in physical pixels, when the platform has them."""
+        return self.platform.window_rects(self._window)
 
 
 def _swallow(fn, *args):

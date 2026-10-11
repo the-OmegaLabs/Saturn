@@ -4,7 +4,7 @@ Built-in effects or custom GLSL fragment backgrounds on OpenGL and Vulkan; see t
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 54).
+Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 58).
 
 **Base class:** [Control](./Control.md)
 
@@ -17,7 +17,7 @@ Source: [`saturn/widgets/shader.py`](../../saturn/widgets/shader.py) (line 54).
 ## Constructor parameters
 
 ```python
-saturn.Shader(effect: 'ShaderEffect | str | None' = None, *, shader=None, color='#6750A4', secondary_color='#EADDFF', uniforms=None, animate: 'bool' = True, speed: 'float' = 1.0, time: 'float' = 0.0, border_radius: 'float' = 0.0, fallback_color=None, includes=None, include_dirs=(), on_error=None, buffer=None, **base)
+saturn.Shader(effect: 'ShaderEffect | str | None' = None, *, shader=None, color='#6750A4', secondary_color='#EADDFF', uniforms=None, animate: 'bool' = True, speed: 'float' = 1.0, time: 'float' = 0.0, border_radius: 'float' = 0.0, fallback_color=None, includes=None, include_dirs=(), on_error=None, buffer=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -36,6 +36,6 @@ saturn.Shader(effect: 'ShaderEffect | str | None' = None, *, shader=None, color=
 | `include_dirs` | `—` | `()` | Explicit folders searched for GLSL include files. |
 | `on_error` | `—` | `None` | Callback for error; accepts zero arguments or an event. |
 | `buffer` | `—` | `None` | Optional ShaderBuffer rendered on the GPU before the final fragment; sample with saturnSampleBuffer(uv). |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

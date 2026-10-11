@@ -4,7 +4,7 @@ Pressed key and modifier flags supplied to a Page keyboard handler.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 30).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 37).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

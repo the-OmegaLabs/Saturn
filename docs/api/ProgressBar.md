@@ -4,7 +4,7 @@ Shows determinate or indeterminate progress as a horizontal bar.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 366).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 376).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.ProgressBar(value: 'float | None' = None, *, bar_height: 'float' = 4, color=None, bgcolor=None, border_radius=None, semantics_label=None, semantics_value=None, stop_indicator_color=None, stop_indicator_radius=None, track_gap=None, year_2023=None, **base)
+saturn.ProgressBar(value: 'float | None' = None, *, bar_height: 'float' = 4, color=None, bgcolor=None, border_radius=None, semantics_label=None, semantics_value=None, stop_indicator_color=None, stop_indicator_radius=None, track_gap=None, year_2023=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -52,6 +52,6 @@ saturn.ProgressBar(value: 'float | None' = None, *, bar_height: 'float' = 4, col
 | `stop_indicator_radius` | `—` | `None` | Radius of the progress end marker. |
 | `track_gap` | `—` | `None` | Gap between a progress stroke and its track. |
 | `year_2023` | `—` | `None` | Requested year 2023 option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

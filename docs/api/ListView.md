@@ -4,7 +4,7 @@ Scrollable list of controls.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 124).
+Source: [`saturn/widgets/scrolling.py`](../../saturn/widgets/scrolling.py) (line 128).
 
 ## Preview
 
@@ -42,7 +42,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'float' = 0, item_extent: 'float | None' = None, padding=None, auto_scroll: 'bool' = False, on_scroll=None, reverse=False, first_item_prototype=False, prototype_item=None, divider_thickness=0, clip_behavior='hardEdge', semantic_child_count=None, cache_extent=None, build_controls_on_demand=True, scroll=None, auto_scroll_animation=None, scroll_interval=10, **base)
+saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'float' = 0, item_extent: 'float | None' = None, padding=None, auto_scroll: 'bool' = False, on_scroll=None, reverse=False, first_item_prototype=False, prototype_item=None, divider_thickness=0, clip_behavior='hardEdge', semantic_child_count=None, cache_extent=None, build_controls_on_demand=True, scroll=None, auto_scroll_animation=None, scroll_interval=10, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -66,6 +66,6 @@ saturn.ListView(*items, controls=None, horizontal: 'bool' = False, spacing: 'flo
 | `scroll` | `—` | `None` | Scroll mode: auto, always, hidden, or none. |
 | `auto_scroll_animation` | `—` | `None` | Unsupported for non-default requests. Requested auto scroll animation option; see the control comparison for supported values and restrictions. |
 | `scroll_interval` | `—` | `10` | Minimum interval in milliseconds between scroll events. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

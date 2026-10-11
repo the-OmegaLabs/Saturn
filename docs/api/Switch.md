@@ -4,7 +4,7 @@ Sliding on/off toggle.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1476).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 1486).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Switch(label='', *, value=False, label_position=<LabelPosition.RIGHT: 'right'>, label_text_style=None, autofocus=False, active_color=None, active_track_color=None, inactive_thumb_color=None, inactive_track_color=None, thumb_color=None, thumb_icon=None, track_color=None, track_outline_color=None, track_outline_width=None, overlay_color=None, focus_color=None, hover_color=None, splash_radius=None, padding=None, on_change=None, on_focus=None, on_blur=None, **base)
+saturn.Switch(label='', *, value=False, label_position=<LabelPosition.RIGHT: 'right'>, label_text_style=None, autofocus=False, active_color=None, active_track_color=None, inactive_thumb_color=None, inactive_track_color=None, thumb_color=None, thumb_icon=None, track_color=None, track_outline_color=None, track_outline_width=None, overlay_color=None, focus_color=None, hover_color=None, splash_radius=None, padding=None, on_change=None, on_focus=None, on_blur=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -63,6 +63,6 @@ saturn.Switch(label='', *, value=False, label_position=<LabelPosition.RIGHT: 'ri
 | `on_change` | `—` | `None` | Callback called when the value changes. |
 | `on_focus` | `—` | `None` | Callback called when the control gains focus. |
 | `on_blur` | `—` | `None` | Callback called when the control loses focus. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

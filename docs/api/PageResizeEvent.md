@@ -4,7 +4,7 @@ Logical client dimensions supplied to a Page resize handler.
 
 [← API index](./README.md)
 
-Source: [`saturn/event.py`](../../saturn/event.py) (line 24).
+Source: [`saturn/event.py`](../../saturn/event.py) (line 31).
 
 **Base class:** [ControlEvent](./ControlEvent.md)
 

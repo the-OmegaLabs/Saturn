@@ -4,7 +4,7 @@ Remove the input outline and underline.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 392).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 393).
 
 ## Constructor parameters
 

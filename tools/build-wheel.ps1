@@ -116,7 +116,13 @@ if (-not $SkipSmoke) {
                 $check = @"
 import importlib.metadata
 assert importlib.metadata.version('saturn') == '0.1.0'
+import importlib.util
+assert importlib.util.find_spec('saturn_fonts_cjk') is None
+assert importlib.util.find_spec('saturn_icons_material') is None
 import saturn.renderer.gl   # installed wheel has no .glsl: exercises the embedded copy
+from saturn import text, Icons
+assert text.line_width('Saturn 中文', 20) > 0
+assert text.render_icon_cached(Icons.ADD, 24, (255, 255, 255, 255)).get_width() > 0
 try:
     import saturn.renderer.vulkan
 except ImportError as error:

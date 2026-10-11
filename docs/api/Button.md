@@ -4,7 +4,7 @@ Basic clickable button.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 386).
+Source: [`saturn/widgets/buttons.py`](../../saturn/widgets/buttons.py) (line 390).
 
 ## Preview
 
@@ -36,7 +36,7 @@ The public name `saturn.Button` refers to the implementation class `_ConcreteBut
 ## Constructor parameters
 
 ```python
-saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, clip_behavior=None, expressive=False, size=None, shape='round', **base)
+saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=None, elevation: 'float' = 1, style=None, on_click=None, on_hover=None, on_long_press=None, on_focus=None, on_blur=None, autofocus=False, url=None, clip_behavior=None, expressive=False, size=None, shape='round', **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -59,6 +59,6 @@ saturn.Button(content=None, *, icon=None, icon_color=None, color=None, bgcolor=N
 | `expressive` | `—` | `False` | Enable Expressive sizing and shape behavior. |
 | `size` | `—` | `None` | Size of the text, icon, or control. |
 | `shape` | `—` | `'round'` | Base shape of the button. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

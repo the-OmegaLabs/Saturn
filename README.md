@@ -5,263 +5,95 @@
 <h1 align="center">Saturn</h1>
 
 <p align="center">
-  A modern, lightweight, GPU-accelerated desktop UI framework for Python.
+  Python 桌面 UI 框架：用一棵控件树构建本地应用界面。
 </p>
 
 <p align="center">
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-000000?style=flat-square&logo=python&logoColor=white">
   <img alt="Status: Alpha" src="https://img.shields.io/badge/status-alpha-000000?style=flat-square">
-  <img alt="Software, OpenGL, and Vulkan renderers" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan%20(Experimental)-000000?style=flat-square">
+  <img alt="Renderers: Software, OpenGL, Vulkan experimental" src="https://img.shields.io/badge/renderers-Software%20%7C%20OpenGL%20%7C%20Vulkan%20(experimental)-000000?style=flat-square">
 </p>
 
-> **Saturn** is currently in **alpha** stages. Everything may change, some controls are still being completed, and production use should be evaluated carefully.
+Saturn 借鉴 Flet 等声明式 UI 框架的开发体验，但运行时、渲染器和功能覆盖
+由 Saturn 自己实现。它主要面向 Python 桌面应用，也提供可选的浏览器会话
+运行时。
 
-Saturn provides a familiar, declarative API for building native desktop interfaces while keeping rendering and the event loop local to the application.
+> Saturn 目前处于 alpha 阶段。API 和功能覆盖可能变化；在生产应用中使用前，
+> 请先阅读对应章节，并验证应用实际依赖的行为。
 
-Browse the [Saturn documentation](./docs/README.md) for API pages and a screenshot gallery.
+## 开始使用
 
-Material 3 Expressive controls are grouped under `saturn.Compose`; see the [Compose API and Flet verification](./docs/compose.md).
+先读 [Saturn 使用手册](./docs/README.md)。章节从项目脚手架开始，逐步介绍
+页面、控件、布局、事件、输入、主题、窗口、渲染器和 Web。完整参数列表见
+[API 参考](./docs/api/README.md)。
 
-Inspired by the simplicity of [Flet](https://flet.dev/), Saturn takes a **lighter and more local approach** to desktop UI development. It uses almost the same concepts and API patterns, while remaining an independent, minimal, and lightweight native UI framework with its own architecture and direction.
+在 Windows 开发环境中克隆仓库并运行示例：
 
-Saturn implements a subset of Flet-style desktop APIs. When migrating a Flet application, check constructor parameters and behavior against the [Flet mapping](./docs/flet-mapping.md) and [verified API gaps](./docs/compose.md).
-
-Browser apps can use the optional `saturn.web` runtime with shared sessions,
-scoped events and Canvas rendering. See [Web sessions](./docs/web.md) for the
-runnable demo and current coverage.
-
-## Third-party expressive geometry
-
-The generated loading shapes in `saturn/_gen/loading_shapes.json` derive from AndroidX Compose Material 3 and Graphics Shapes. Their source files carry Android Open Source Project copyright notices; Saturn transformed the geometry into matching Bézier curves using JetBrains Compose Material 3 desktop and AndroidX Graphics Shapes. The derived geometry is distributed under Apache License 2.0. See the [source attribution and exact versions](./saturn/_gen/NOTICE.md) and the [full license text](./saturn/_gen/LICENSE-APACHE-2.0.txt).
-
-### Orb GLSL demos
-
-The [Orb GLSL editor](./examples/orb_glsl.py) and [13-effect gallery](./examples/orb_gallery.py) adapt every curated preset from [LerSent001/orb](https://github.com/LerSent001/orb), including instanced Particle Ribbons with glass refraction on OpenGL and Vulkan. Copyright (c) 2026 LerSent001. Orb is distributed under the [MIT license](https://github.com/LerSent001/orb/blob/main/LICENSE); the complete [license and copyright notice](./.static/shaders/ORB-LICENSE.txt) are retained beside the adapted GLSL sources. See the [preset catalog and usage](./docs/orb.md).
-
-## Preview
-
-<table>
-  <tr>
-    <td align="center">
-      <strong>Demo</strong><br>
-      <img src="./.static/shots/demo.png" width="440" alt="Saturn controls demo">
-    </td>
-    <td align="center">
-      <strong>Layout</strong><br>
-      <img src="./.static/shots/layout-demo.png" width="440" alt="Saturn layout demo">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Text</strong><br>
-      <img src="./.static/shots/text-demo.png" width="440" alt="Saturn text demo">
-    </td>
-    <td align="center">
-      <strong>Widgets</strong><br>
-      <img src="./.static/shots/widgets-demo.png" width="440" alt="Saturn widgets demo">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Buttons</strong><br>
-      <img src="./.static/shots/buttons-demo.png" width="440" alt="Saturn button variants">
-    </td>
-    <td align="center">
-      <strong>Inputs</strong><br>
-      <img src="./.static/shots/inputs-demo.png" width="440" alt="Saturn input controls">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Expressive</strong><br>
-      <img src="./.static/shots/expressive-dark.png" width="440" alt="Expressive controls with dark theme">
-    </td>
-    <td align="center">
-      <strong>Demo</strong><br>
-      <img src="./.static/shots/demo.png" width="440" alt="Saturn controls with dark theme">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Motion</strong><br>
-      <img src="./.static/shots/expressive-motion.png" width="440" alt="Expressive loading and motion controls">
-    </td>
-    <td align="center">
-      <strong>FAB Menu</strong><br>
-      <img src="./.static/shots/expressive-menu.png" width="440" alt="Expanded floating action button menu">
-    </td>
-  </tr>
-</table>
-
-<p align="center">
-  <i>Preview: not final.</i>
-</p>
-
-## Why
-
-Saturn is built around a simple idea: **desktop UI development should be lightweight, easy to understand, and easy to extend.**
-
-The API and architecture are intentionally kept **extremely simple, lightweight, and extensible**, with a focus on local rendering and a clear separation between the framework and the language it is implemented in.
-
-Saturn takes inspiration from familiar declarative UI frameworks such as [Flet](https://flet.dev/), while developing its own approach to native desktop UI. By keeping the design language simple and implementation-independent, the same concepts can be brought to other programming languages in the future.
-
-Unlike frameworks built around **Skia or WebView**, Saturn renders directly through the platform's **native graphics APIs**, avoiding unnecessary rendering layers and keeping the rendering pipeline lightweight and efficient.
-
-That's our goal: **a small foundation that is easy to understand, extend, and port.**
-
-## Requirements
-
-- Python 3.10 or newer
-- A desktop environment supported by SDL
-- An OpenGL-capable driver when using the OpenGL backend
-
-Saturn is still in its early stages and is currently developed and tested exclusively on Windows. Cross-platform support is planned for future releases as the project matures.
-
-## Installation
-
-Clone the repository and install its dependencies with [uv](https://docs.astral.sh/uv/):
-
-```bash
+~~~powershell
 git clone https://github.com/the-OmegaLabs/Saturn.git
 cd Saturn
 uv sync
-```
+uv run python examples/hello.py
+~~~
 
-Alternatively, install the project into an existing virtual environment:
+一个最小窗口：
 
-```bash
-python -m pip install -e .
-```
-
-## Quick start
-
-```python
+~~~python
 import saturn
 
 
-def main(page: saturn.Page):
-    page.title = "Hello Saturn"
-    page.theme_mode = saturn.ThemeMode.DARK
-    page.bgcolor = saturn.Colors.SURFACE
-    page.padding = 24
+class Application:
+    def __init__(self):
+        self.page = None
 
-    message = saturn.Text(
-        "Hello from Saturn!",
-        size=28,
-        weight=saturn.FontWeight.BOLD,
-        color=saturn.Colors.ON_SURFACE,
-    )
-
-    def handle_click(e):
-        message.value = "It works!"
-        message.update()
-
-    page.add(
-        message,
-        saturn.FilledButton(
-            "Click me",
-            icon=saturn.Icons.AUTO_AWESOME,
-            on_click=handle_click,
-        ),
-    )
-    page.update()
+    def create_window(self, page: saturn.Page):
+        self.page = page
+        page.title = "Hello Saturn"
+        page.add(saturn.Text(value="Hello, World!"))
 
 
-saturn.run(main)
-```
-Controls are mutable. After changing a control's state, call `control.update()` or `page.update()` to schedule a redraw.
+if __name__ == "__main__":
+    application = Application()
+    saturn.run(main=application.create_window)
+~~~
 
-Or run the bundled hello example:
+将入口方法传给 saturn.run，不要提前调用它；框架启动窗口后会把 Page 传入。
+完整项目结构和状态更新示例见[项目脚手架](./docs/getting-started.md)。
 
-```bash
-uv run python examples/hello.py
-```
+## 框架能力
 
-The API is intentionally simple and familiar, so writing Saturn applications feels almost the same as writing Flet applications.
+Saturn 提供常用布局、文字和媒体、按钮与输入、对话框、主题、动画、原生子
+窗口和 GPU 着色器。桌面默认使用 OpenGL，也可以选择软件后端；Vulkan 仍是
+实验性后端。可选的 saturn.web 运行时支持浏览器中的共享页面与会话。
 
-## Rendering backends
+浏览[截图画廊](./docs/gallery.md)，或直接运行示例：
 
-OpenGL is the default renderer for `saturn.run(main)`. Select another renderer explicitly when needed:
-
-```python
-# CPU renderer
-saturn.run(main, backend=saturn.Renderer.SOFTWARE)
-
-# Explicit GPU renderer
-saturn.run(main, backend=saturn.Renderer.OPENGL)
-
-# Vulkan GPU renderer (experimental)
-saturn.run(main, backend=saturn.Renderer.VULKAN)
-```
-
-The experimental Vulkan backend draws geometry and composites textures on the GPU with batched draw calls and scissor clipping. OpenGL is the supported GPU backend; Vulkan may change or fall behind it while it matures. Text and some effects are prepared as surfaces before texture upload; the full frame is not rasterized on the CPU. A Vulkan-capable driver is required, along with the optional `vulkan` package: `pip install saturn[vulkan]`. Without the package, apps requesting Vulkan fall back to software rendering and print the reason. The backend can also be selected with the `SATURN_BACKEND` environment variable when `backend` is omitted:
-
-```powershell
-$env:SATURN_BACKEND = "opengl"
-uv run python examples/hello.py
-```
-
-## Implemented or partially implemented
-
-| Category | Available controls |
-|---|---|
-| Layout | `Row`, `Column`, `Stack`, `Container`, `Card`, `Divider`, `ListView` |
-| Content | `Text`, `Icon`, `Image` |
-| Buttons | `Button`, `ElevatedButton`, `FilledButton`, `FilledTonalButton`, `OutlinedButton`, `TextButton`, `IconButton` |
-| Inputs | `TextField`, `Checkbox`, `Switch`, `Radio`, `RadioGroup`, `Slider`, `Dropdown` |
-| Feedback | `ProgressBar`, `ProgressRing`, `AlertDialog`, `SnackBar` |
-| Interaction | `GestureDetector`, tooltips, pointer and keyboard events |
-| Services | `FilePicker` |
-
-The public API also includes theme, alignment, padding, border, shadow, animation, transform, text-style, and scrolling types.
-
-## Custom fonts
-
-Register local `.ttf`, `.otf`, or `.woff2` files with `page.fonts`, then use the alias in a theme or individual control:
-
-```python
-from pathlib import Path
-import saturn as ft
-
-font = Path(__file__).parent / "assets" / "Brand.woff2"
-
-def main(page: ft.Page):
-    page.fonts = {"brand": str(font)}
-    page.theme = ft.Theme(font_family="brand")
-    page.add(ft.Text("Hello Saturn", font_family="brand", size=24))
-
-ft.run(main)
-```
-
-WOFF2 is decoded on first use and cached as a native font. Variable WOFF2 fonts use the existing weight selection and glyph fallback paths. A local font file path can also be passed directly as `font_family`.
-
-The bundled Inter and Noto Sans SC families ship as WOFF2. The Chinese fallback is decoded only when a character needs it; common regular and bold weights retain their prebuilt instances.
-
-## Examples
-
-| Example | Description |
-|---|---|
-| [`examples/hello.py`](./examples/hello.py) | Minimal application and window lifecycle |
-| [`examples/demo.py`](./examples/demo.py) | Combined control showcase |
-| [`examples/layout_demo.py`](./examples/layout_demo.py) | Layout, alignment, expansion, and stacking |
-| [`examples/inputs_demo.py`](./examples/inputs_demo.py) | Text fields, toggles, radios, sliders, and dropdowns |
-| [`examples/buttons_demo.py`](./examples/buttons_demo.py) | Button variants and events |
-| [`examples/text_demo.py`](./examples/text_demo.py) | Typography and text behavior |
-| [`examples/widgets_demo.py`](./examples/widgets_demo.py) | Icons, images, cards, and progress indicators |
-| [`examples/expressive_demo.py`](./examples/expressive_demo.py) | Expressive controls in light and dark themes |
-| [`examples/expressive_motion_demo.py`](./examples/expressive_motion_demo.py) | Loading shapes, waves, toolbar, and FAB menu |
-
-Run the full showcase with either renderer:
-
-```bash
-uv run python examples/demo.py
+~~~powershell
 uv run python examples/demo.py --backend opengl
-```
+uv run python examples/expressive_demo.py
+~~~
 
-## Contributing
+## 文档入口
 
-**Saturn** is an open-source project led by **Omega Labs**. Contributions, issues, and feature requests are welcome.
+- [安装、脚手架与入门章节](./docs/README.md)
+- [全部公开 API 符号](./docs/api/README.md)
+- [与 Flet 的映射和限制](./docs/flet-mapping.md)
+- [Compose 与 Expressive 控件](./docs/compose.md)
+- [Web 会话](./docs/web.md)
+- [子窗口](./docs/subpages.md)
+- [渲染器和 GPU 选择](./docs/rendering.md)
+- [GLSL 着色器](./docs/shaders.md)
+- [平台适配层与 Win32 拆分](./docs/platform-adapters.md)
+- [Linux 桌面路线图](./docs/linux-desktop-roadmap.md)
 
-## License
+## 第三方资源
 
-License information will be announced later.
+saturn/_gen/loading_shapes.json 中的图形由 AndroidX Compose Material 3 和
+Graphics Shapes 派生，按 Apache License 2.0 分发。来源和许可文本见
+[NOTICE](./saturn/_gen/NOTICE.md) 与[许可证](./saturn/_gen/LICENSE-APACHE-2.0.txt)。
+
+Orb GLSL 示例改编自 [LerSent001/orb](https://github.com/LerSent001/orb)；
+上游 MIT 许可证与版权声明保留在
+[ORB-LICENSE.txt](./.static/shaders/ORB-LICENSE.txt)。
+
+Saturn 由 Omega Labs 维护，欢迎提交问题和贡献。项目许可证信息将在之后公布。

@@ -4,7 +4,7 @@ Content container with a surface and shadow.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 301).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 311).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Card(content=None, *, elevation: 'float' = 1, variant: 'str' = 'elevated', bgcolor=None, shadow_color=None, shape=None, clip_behavior=None, semantic_container=True, show_border_on_foreground=True, **base)
+saturn.Card(content=None, *, elevation: 'float' = 1, variant: 'str' = 'elevated', bgcolor=None, shadow_color=None, shape=None, clip_behavior=None, semantic_container=True, show_border_on_foreground=True, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -50,6 +50,6 @@ saturn.Card(content=None, *, elevation: 'float' = 1, variant: 'str' = 'elevated'
 | `clip_behavior` | `—` | `None` | Clip mode; GPU rotated clips use conservative axis-aligned bounds. |
 | `semantic_container` | `—` | `True` | Accessibility container metadata. |
 | `show_border_on_foreground` | `—` | `True` | Requested show border on foreground option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

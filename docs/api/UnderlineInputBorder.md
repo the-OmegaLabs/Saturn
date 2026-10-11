@@ -4,7 +4,7 @@ Input underline configuration.
 
 [← API index](./README.md)
 
-Source: [`saturn/types.py`](../../saturn/types.py) (line 397).
+Source: [`saturn/types.py`](../../saturn/types.py) (line 398).
 
 ## Constructor parameters
 

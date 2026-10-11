@@ -4,7 +4,7 @@ Linear wavy progress indicator.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 254).
+Source: [`saturn/widgets/expressive_progress.py`](../../saturn/widgets/expressive_progress.py) (line 259).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.LinearWavyProgressIndicator(value=None, *, color=None, bgcolor=None, stroke_width=4, amplitude=None, wavelength=None, wave_speed=1.0, **base)
+saturn.LinearWavyProgressIndicator(value=None, *, color=None, bgcolor=None, stroke_width=4, amplitude=None, wavelength=None, wave_speed=1.0, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -48,6 +48,6 @@ saturn.LinearWavyProgressIndicator(value=None, *, color=None, bgcolor=None, stro
 | `amplitude` | `—` | `None` | Height of the wave relative to its baseline. |
 | `wavelength` | `—` | `None` | Distance between adjacent wave peaks. |
 | `wave_speed` | `—` | `1.0` | Movement speed of the wave animation. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

@@ -4,7 +4,7 @@ Displays a Material icon.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 53).
+Source: [`saturn/widgets/basic.py`](../../saturn/widgets/basic.py) (line 57).
 
 ## Preview
 
@@ -36,7 +36,7 @@ saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ## Constructor parameters
 
 ```python
-saturn.Icon(icon, *, color=None, size: 'float' = 24, semantics_label=None, shadows=None, fill=None, apply_text_scaling=None, grade=None, weight=None, optical_size=None, blend_mode=None, **base)
+saturn.Icon(icon, *, color=None, size: 'float' = 24, semantics_label=None, shadows=None, fill=None, apply_text_scaling=None, grade=None, weight=None, optical_size=None, blend_mode=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -52,6 +52,6 @@ saturn.Icon(icon, *, color=None, size: 'float' = 24, semantics_label=None, shado
 | `weight` | `—` | `None` | Unsupported for non-default requests. Text font weight. |
 | `optical_size` | `—` | `None` | Unsupported for non-default requests. Requested optical size option; see the control comparison for supported values and restrictions. |
 | `blend_mode` | `—` | `None` | Unsupported for non-default requests. Requested blend mode option; see the control comparison for supported values and restrictions. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

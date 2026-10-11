@@ -4,7 +4,7 @@ Short alias for DropdownOption.
 
 [← API index](./README.md)
 
-Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 2014).
+Source: [`saturn/widgets/inputs.py`](../../saturn/widgets/inputs.py) (line 2024).
 
 **Base class:** [Control](./Control.md)
 
@@ -13,7 +13,7 @@ The public name `saturn.Option` refers to the implementation class `DropdownOpti
 ## Constructor parameters
 
 ```python
-saturn.Option(key=None, *, text=None, content=None, leading_icon=None, trailing_icon=None, style=None, **base)
+saturn.Option(key=None, text=None, *, content=None, leading_icon=None, trailing_icon=None, style=None, **base: 'Unpack[ControlOptions]')
 ```
 
 | Parameter | Type annotation | Default | Description |
@@ -24,6 +24,6 @@ saturn.Option(key=None, *, text=None, content=None, leading_icon=None, trailing_
 | `leading_icon` | `—` | `None` | Icon used for leading. |
 | `trailing_icon` | `—` | `None` | Icon in the secondary action area of a split button. |
 | `style` | `—` | `None` | Additional button style settings. |
-| `**base` | `—` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
+| `**base` | `Unpack[ControlOptions]` | `additional keyword arguments` | Keyword arguments passed to Control, such as width and height. |
 
 `**base` accepts [common Control constructor parameters](./Control.md#constructor-parameters), such as `width`, `height`, and `visible`.

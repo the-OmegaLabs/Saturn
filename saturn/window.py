@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import asyncio
-import ctypes
 import enum
 import math
-import sys
 from dataclasses import dataclass
 
 import pygame
@@ -61,8 +59,8 @@ def _setting(name, default, apply=None, validate=None, windows_only=False):
         return window._values.get(name, default)
 
     def set(window, value):
-        if windows_only and sys.platform != "win32":
-            raise NotImplementedError(f"window.{name} currently requires Windows")
+        if windows_only and not window._app.platform.supports_window_feature(name):
+            raise NotImplementedError(f"window.{name} currently requires a native platform adapter")
         if validate:
             value = validate(value)
         elif isinstance(default, bool):
@@ -145,10 +143,10 @@ class Window:
 
     @property
     def hwnd(self) -> int:
-        """The real HWND on Windows; zero on platforms without HWNDs."""
+        """The platform-native HWND, or zero when the platform has no HWND."""
         window = getattr(self._app, "_window", None)
         try:
-            return int(window.handle) if sys.platform == "win32" and window is not None else 0
+            return self._app.platform.hwnd(window) if window is not None else 0
         except pygame.error:
             return 0
 
@@ -156,7 +154,7 @@ class Window:
     def native_handle(self) -> int:
         window = getattr(self._app, "_window", None)
         try:
-            return int(window.handle) if window is not None else 0
+            return self._app.platform.native_handle(window) if window is not None else 0
         except pygame.error:
             return 0
 
@@ -244,7 +242,7 @@ class Window:
 
     @property
     def maximized(self):
-        return (bool(self._native.user32.IsZoomed(self.hwnd)) if self._native
+        return (bool(self._native.is_maximized()) if self._native
                 else self._values.get("maximized", False))
 
     @maximized.setter
@@ -255,7 +253,7 @@ class Window:
 
     @property
     def minimized(self):
-        return (bool(self._native.user32.IsIconic(self.hwnd)) if self._native
+        return (bool(self._native.is_minimized()) if self._native
                 else self._values.get("minimized", False))
 
     @minimized.setter
@@ -278,7 +276,7 @@ class Window:
 
     @property
     def visible(self):
-        return (bool(self._native.user32.IsWindowVisible(self.hwnd)) if self._native
+        return (bool(self._native.is_visible()) if self._native
                 else self._values.get("visible", True))
 
     @visible.setter
@@ -361,9 +359,7 @@ class Window:
                 raise ValueError("always_on_top and always_on_bottom are mutually exclusive")
 
     def _install_native(self):
-        if sys.platform == "win32" and self.hwnd:
-            from ._native_window import NativeWindow
-            self._native = NativeWindow(self)
+        self._native = self._app.platform.create_native_window(self)
 
     def _apply_styles(self):
         if self._native:
@@ -407,7 +403,7 @@ class Window:
             parse_color(self.bgcolor)
         self._apply_transparency()
         if self.page:
-            self.page.update()
+            self.page._update_automatically()
 
     def _apply_brightness(self):
         if self.page:
@@ -465,7 +461,7 @@ class Window:
     def _apply_pending_size(self):
         if not self._size_pending:
             return
-        if self._native is not None and self._native.user32.IsZoomed(self.hwnd):
+        if self._native is not None and self._native.is_maximized():
             # Resizing a maximized window rewrites its saved restore bounds
             # instead of the visible size; keep the target queued until the
             # window is restored.
@@ -480,24 +476,8 @@ class Window:
         self._emit(WindowEventType.RESIZED)
 
     def _set_native_client(self, pixels):
-        """Size the window so its client area lands exactly on `pixels`.
-
-        SDL's SetWindowSize adds the frame AdjustWindowRectEx reports, which
-        overshoots once WM_NCCALCSIZE hands that frame to the client area.
-        Setting the Win32 outer rect from the frame measured at this instant
-        stays exact across style changes.
-        """
-        rects = self._app._window_rects()
-        if rects is None:
-            return False
-        outer, client = rects
-        frame_w = (outer.right - outer.left) - (client.right - client.left)
-        frame_h = (outer.bottom - outer.top) - (client.bottom - client.top)
-        self._native.user32.SetWindowPos(
-            self.hwnd, None, 0, 0,
-            max(1, pixels[0] + frame_w), max(1, pixels[1] + frame_h),
-            0x2 | 0x4 | 0x10)  # SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE
-        return True
+        """Ask the native adapter to size the client area exactly."""
+        return bool(self._native is not None and self._native.set_client_size(pixels))
 
     def _apply_limits(self):
         frame = self._app._frame_size
@@ -541,24 +521,7 @@ class Window:
             rect.bottom = rect.top + height
 
     def _work_area(self):
-        if self._native:
-            import ctypes
-            from ctypes import wintypes
-            user = self._native.user32
-            user.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
-            user.MonitorFromWindow.restype = wintypes.HMONITOR
-            class MonitorInfo(ctypes.Structure):
-                _fields_ = [("size", wintypes.DWORD), ("monitor", wintypes.RECT),
-                            ("work", wintypes.RECT), ("flags", wintypes.DWORD)]
-            user.GetMonitorInfoW.argtypes = [wintypes.HMONITOR, ctypes.c_void_p]
-            info = MonitorInfo()
-            info.size = ctypes.sizeof(info)
-            monitor = user.MonitorFromWindow(self.hwnd, 2)
-            if user.GetMonitorInfoW(monitor, ctypes.byref(info)):
-                return (info.work.left, info.work.top,
-                        info.work.right - info.work.left, info.work.bottom - info.work.top)
-        width, height = pygame.display.get_desktop_sizes()[0]
-        return (0, 0, width, height)
+        return self._app.platform.work_area(self)
 
     def _apply_alignment(self):
         if self.alignment is None:
@@ -643,21 +606,26 @@ class Window:
         self._post(lambda: self._app._window.focus())
 
     async def start_dragging(self):
-        if sys.platform != "win32":
-            raise NotImplementedError("native dragging currently requires Windows")
-        if self.movable:
-            self._post(lambda: self._native.start_interaction(2))
+        if not self._app.platform.supports_window_feature("native_window_dragging"):
+            raise NotImplementedError("native dragging requires a platform adapter")
+        if self.movable and self._native is not None:
+            self._post(self._native.start_dragging)
 
     async def start_resizing(self, edge):
-        if sys.platform != "win32":
-            raise NotImplementedError("native resizing currently requires Windows")
+        if not self._app.platform.supports_window_feature("native_window_resizing"):
+            raise NotImplementedError("native resizing requires a platform adapter")
         edge = edge if isinstance(edge, WindowResizeEdge) else WindowResizeEdge(edge)
         hits = {WindowResizeEdge.LEFT: 10, WindowResizeEdge.RIGHT: 11,
                 WindowResizeEdge.TOP: 12, WindowResizeEdge.TOP_LEFT: 13,
                 WindowResizeEdge.TOP_RIGHT: 14, WindowResizeEdge.BOTTOM: 15,
                 WindowResizeEdge.BOTTOM_LEFT: 16, WindowResizeEdge.BOTTOM_RIGHT: 17}
-        if self.resizable:
-            self._post(lambda: self._native.start_interaction(hits[edge]))
+        if self.resizable and self._native is not None:
+            self._post(lambda: self._native.start_resizing(hits[edge]))
+
+    def _begin_native_drag(self):
+        """Internal title-bar hook used by ``WindowDragArea``."""
+        if self._native is not None and self.movable:
+            self._native.start_dragging()
 
     def _dispose(self):
         if self._native is not None:
