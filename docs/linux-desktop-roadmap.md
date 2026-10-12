@@ -1,119 +1,119 @@
-# Saturn Linux 改造与桌面环境路线图
+# Saturn Linux Adaptation and Desktop Environment Roadmap
 
-> 评估日期：2026-10-11\
-> 当前基线：Saturn 0.1.0，Alpha 级别\
-> 目标：把 Saturn 从 Windows 优先的 GPU 桌面 UI 框架，逐步发展为 Linux 桌面应用框架、桌面 Shell 工具包，并评估完整桌面环境的可行性。
+> Assessment date: 2026-10-11\
+> Current baseline: Saturn 0.1.0, Alpha level\
+> Goal: gradually evolve Saturn from a Windows-first GPU desktop UI framework into a Linux desktop application framework and desktop shell toolkit, and assess the feasibility of a full desktop environment.
 
-## 1. 结论
+## 1. Conclusion
 
-Saturn 有做 Linux 桌面软件的潜力，但现阶段的定位是 **桌面 UI 框架**，不是桌面环境本身。
+Saturn has the potential to make Linux desktop software, but at this stage its positioning is a **desktop UI framework**, not a desktop environment itself.
 
-建议把目标拆成三层：
+It is recommended to split the goal into three layers:
 
-| 目标 | 可行性 | 当前成熟度 | 说明 |
+| Goal | Feasibility | Current maturity | Notes |
 | --- | --- | --- | --- |
-| Linux 桌面应用框架 | 高 | 中低 | SDL 已提供窗口、输入和基础图形通道，适合先完成这一步 |
-| 启动器、面板、设置中心、通知中心等桌面 Shell | 中高 | 低 | 需要 Wayland/X11 原生协议、D-Bus、桌面门户和系统服务 |
-| GNOME/KDE 级完整桌面环境 | 长期可行 | 很低 | 需要 compositor、会话、锁屏、无障碍、系统服务和发行版集成，不能只做 Linux 后端 |
+| Linux desktop application framework | High | Medium-low | SDL already provides windows, input, and a basic graphics channel; this step is the right one to complete first |
+| Desktop shell: launcher, panel, settings center, notification center, etc. | Medium-high | Low | Requires Wayland/X11 native protocols, D-Bus, desktop portals, and system services |
+| A full GNOME/KDE-grade desktop environment | Feasible long-term | Very low | Requires a compositor, session, lock screen, accessibility, system services, and distribution integration; a Linux backend alone is not enough |
 
-最合理的路线是：
+The most reasonable path is:
 
 ```text
-Saturn UI 核心
+Saturn UI core
       ↓
-Linux 应用框架
+Linux application framework
       ↓
-Shell 组件（面板、启动器、设置、通知）
+Shell components (panel, launcher, settings, notifications)
       ↓
-独立 compositor 与系统服务
+Independent compositor and system services
       ↓
-完整桌面环境
+Full desktop environment
 ```
 
-## 2. 当前项目能力盘点
+## 2. Inventory of current project capabilities
 
-### 2.1 已有基础
+### 2.1 Existing foundations
 
-- Python 控件树、布局、主题、事件和动画系统。
-- Software、OpenGL 和实验性 Vulkan 渲染后端。
-- SDL/pygame 提供窗口、鼠标、键盘、文本输入和基础事件循环。
-- `Subpage` 支持同一进程中的多个原生窗口。
-- 已有焦点遍历、文本选择、剪贴板、IME、滚动、列表和文件选择能力。
-- 支持自定义控件、Shader、字体、图像、Material 风格控件。
-- 有行为测试、渲染测试、字体测试、输入测试和 C++ 行为测试。
-- C++/SDL3/OpenGL 核心已经开始建设，可作为长期的原生运行时方向。
+- Python control tree, layout, theme, event, and animation systems.
+- Software, OpenGL, and experimental Vulkan render backends.
+- SDL/pygame provides windows, mouse, keyboard, text input, and a basic event loop.
+- `Subpage` supports multiple native windows in the same process.
+- Focus traversal, text selection, clipboard, IME, scrolling, lists, and file picking already exist.
+- Custom controls, shaders, fonts, images, and Material-style controls are supported.
+- There are behavior tests, rendering tests, font tests, input tests, and C++ behavior tests.
+- The C++/SDL3/OpenGL core has started construction and can serve as a long-term native runtime direction.
 
-### 2.2 当前限制
+### 2.2 Current limitations
 
-- 项目仍是 Alpha，文档明确说明目前主要在 Windows 上开发和测试。
-- [saturn/_native_window.py](../saturn/_native_window.py) 直接依赖 Win32、DWM、COMCTL32 和 HWND。
-- [saturn/window.py](../saturn/window.py) 中不少窗口能力在非 Windows 系统上会抛出 `NotImplementedError`。
-- DPI、窗口边框、窗口位置、透明度、标题栏、任务栏进度和窗口拖拽主要按 Windows 语义实现。
-- 尚未形成完整的 Linux X11/Wayland 平台适配层。
-- 尚未看到完整的 D-Bus、xdg-desktop-portal、通知、托盘、桌面入口、系统设置和会话服务集成。
-- 没有原生无障碍树和屏幕阅读器 provider。
-- 复杂文字塑形、双向文字、复杂脚本和彩色 Emoji 还不是完整能力。
-- 原生菜单、系统托盘、原生拖放、富文本剪贴板、目录模型和文件监听仍需补充。
-- C++ 部分仍在逐步实现功能，不能直接视为完整生产级桌面运行时。
+- The project is still Alpha; the documentation explicitly states it is currently developed and tested mainly on Windows.
+- [saturn/_native_window.py](../saturn/_native_window.py) directly depends on Win32, DWM, COMCTL32, and HWND.
+- Many window capabilities in [saturn/window.py](../saturn/window.py) raise `NotImplementedError` on non-Windows systems.
+- DPI, window borders, window position, transparency, title bars, taskbar progress, and window dragging are implemented mainly with Windows semantics.
+- A complete Linux X11/Wayland platform adapter layer does not yet exist.
+- No complete D-Bus, xdg-desktop-portal, notification, tray, desktop entry, system settings, or session service integration is visible yet.
+- There is no native accessibility tree or screen reader provider.
+- Complex text shaping, bidirectional text, complex scripts, and color Emoji are not yet complete capabilities.
+- Native menus, system tray, native drag-and-drop, rich-text clipboard, directory models, and file watching still need to be added.
+- The C++ portion is still implementing features gradually and cannot yet be treated as a complete production-grade desktop runtime.
 
-### 2.3 代码层面的关键事实
+### 2.3 Key facts at the code level
 
-| 文件 | 事实 | 对 Linux 改造的含义 |
+| File | Fact | Implication for the Linux adaptation |
 | --- | --- | --- |
-| `saturn/app.py` | SDL 窗口、渲染器和 UI 线程集中管理 | 可以保留事件循环，但需要抽离平台服务 |
-| `saturn/window.py` | 统一暴露窗口属性，但部分属性 Windows-only | 需要能力协商和 Linux 实现，不宜继续扩大通用 API 假设 |
-| `saturn/_native_window.py` | Win32 原生窗口适配器 | 应替换成平台适配器目录，而不是向其中继续追加 Linux 分支 |
-| `saturn/services.py` | FilePicker 使用 Tkinter，Clipboard 依赖 pyperclip/SDL 路径 | Linux 应优先接入 portal、Wayland/X11 剪贴板和系统服务 |
-| `saturn/renderer/` | 有 Software/OpenGL/Vulkan 代码 | 适合先做 Linux 图形验证和 GPU 回退 |
-| `cpp/` | SDL3/OpenGL C++ 核心骨架 | 适合承载 compositor、原生协议和高可靠系统边界，当前功能尚未完整 |
-| `docs/feature-feasibility.md` | 已明确 Linux/macOS 原生集成不完整 | 应把这份路线图作为平台化工作的上位计划 |
+| `saturn/app.py` | SDL windows, renderers, and the UI thread are centrally managed | The event loop can be kept, but platform services need to be extracted |
+| `saturn/window.py` | Uniformly exposes window properties, but some properties are Windows-only | Needs capability negotiation and Linux implementations; the generic API assumptions should not keep expanding |
+| `saturn/_native_window.py` | Win32 native window adapter | Should be replaced by a platform adapter directory, not by appending more Linux branches into it |
+| `saturn/services.py` | FilePicker uses Tkinter; Clipboard depends on pyperclip/SDL paths | Linux should prioritize portal, Wayland/X11 clipboard, and system services |
+| `saturn/renderer/` | Software/OpenGL/Vulkan code exists | Suitable for Linux graphics validation and GPU fallback first |
+| `cpp/` | SDL3/OpenGL C++ core skeleton | Suitable for carrying the compositor, native protocols, and high-reliability system boundaries; features are not yet complete |
+| `docs/feature-feasibility.md` | Already notes that Linux/macOS native integration is incomplete | This roadmap should serve as the top-level plan for platformization work |
 
-## 3. 必须先澄清的产品边界
+## 3. Product boundaries that must be clarified first
 
-### 3.1 Linux 桌面应用框架
+### 3.1 Linux desktop application framework
 
-这是最现实的第一目标。应用通过 Saturn 创建普通桌面窗口，在 GNOME、KDE、XFCE、Sway 等现有桌面环境中运行。
+This is the most realistic first goal. Applications create ordinary desktop windows through Saturn and run inside existing desktop environments such as GNOME, KDE, XFCE, and Sway.
 
-需要完成：
+What needs to be completed:
 
-- X11 和 Wayland 普通顶层窗口。
-- OpenGL、Software，随后再验证 Vulkan。
-- 高 DPI/分数缩放和多显示器。
-- 字体、输入法、剪贴板、拖放和文件选择。
-- Linux 原生窗口状态、图标、全屏、透明度和窗口事件。
-- `.desktop`、图标、发行版包和应用资源查找。
+- X11 and Wayland ordinary top-level windows.
+- OpenGL and Software, then validating Vulkan afterwards.
+- High DPI/fractional scaling and multi-monitor.
+- Fonts, input methods, clipboard, drag-and-drop, and file selection.
+- Linux native window states, icons, fullscreen, transparency, and window events.
+- `.desktop` files, icons, distribution packages, and application resource lookup.
 
-### 3.2 Linux 桌面 Shell
+### 3.2 Linux desktop shell
 
-这是面板、启动器、桌面背景、通知中心、控制中心、锁屏界面等组件的集合。它们通常不是普通的应用窗口。
+This is the collection of components such as panels, launchers, desktop backgrounds, notification centers, control centers, and lock screens. They are usually not ordinary application windows.
 
-Wayland 下，面板和桌面背景通常需要 `wlr-layer-shell` 或桌面环境提供的等价协议；普通 SDL 顶层窗口不能自动获得这些能力。X11 下则需要 EWMH/NETWM、Dock 类型窗口、工作区和窗口管理约定。
+Under Wayland, panels and desktop backgrounds usually require `wlr-layer-shell` or an equivalent protocol provided by the desktop environment; ordinary SDL top-level windows do not automatically get these capabilities. Under X11, EWMH/NETWM, dock-type windows, and workspace/window-manager conventions are needed instead.
 
-### 3.3 完整桌面环境
+### 3.3 Full desktop environment
 
-完整桌面环境还要拥有或依赖：
+A full desktop environment must also own or depend on:
 
-- Wayland compositor 或 X11 window manager。
-- 会话启动与退出。
-- 锁屏、登录和权限边界。
-- 显示器、音频、网络、蓝牙、电源管理。
-- 通知、托盘、桌面入口和 MIME 关联。
-- 输入法和无障碍服务。
-- xdg-desktop-portal 后端。
-- 崩溃隔离、升级和配置迁移。
+- A Wayland compositor or X11 window manager.
+- Session startup and shutdown.
+- Lock screen, login, and permission boundaries.
+- Displays, audio, network, Bluetooth, power management.
+- Notifications, tray, desktop entries, and MIME associations.
+- Input methods and accessibility services.
+- An xdg-desktop-portal backend.
+- Crash isolation, upgrades, and configuration migration.
 
-这部分应是独立的原生系统工程，Saturn 主要提供界面层。
+This part should be an independent native systems engineering effort; Saturn mainly provides the interface layer.
 
-## 4. 建议的目标架构
+## 4. Recommended target architecture
 
 ```mermaid
 flowchart TB
-    App[Saturn 应用 / Shell UI]
-    Core[Saturn Core\n控件、布局、主题、动画、渲染]
+    App[Saturn application / Shell UI]
+    Core[Saturn Core\ncontrols, layout, theme, animation, rendering]
     Platform[Platform Adapter\nWindows / Linux X11 / Linux Wayland]
-    Services[Linux Services\nD-Bus、Portal、剪贴板、通知、托盘]
-    Shell[Desktop Shell\nPanel、Launcher、Settings、Lock Screen]
-    Compositor[Compositor\n独立 C++/Rust 进程]
+    Services[Linux Services\nD-Bus, Portal, clipboard, notifications, tray]
+    Shell[Desktop Shell\nPanel, Launcher, Settings, Lock Screen]
+    Compositor[Compositor\nindependent C++/Rust process]
     OS[Linux / SDL / OpenGL / Vulkan / Font Stack]
 
     App --> Core
@@ -126,21 +126,21 @@ flowchart TB
     Compositor --> OS
 ```
 
-建议拆成以下边界：
+It is recommended to split along the following boundaries:
 
 ```text
-saturn/core/                 平台无关控件、布局、渲染接口
-saturn/platform/windows/     Win32、DWM、任务栏和 Windows DPI
-saturn/platform/linux/       Linux 通用能力
-saturn/platform/linux/x11/   X11/EWMH/ICCCM 适配
-saturn/platform/linux/wayland/ Wayland/XDG 适配
-saturn/services/             D-Bus、Portal、通知、托盘、系统服务
-saturn/shell/                面板、启动器、设置、桌面背景
-cpp/                         原生渲染、协议和高可靠系统边界
-compositor/                  独立 compositor 项目，不塞进普通 App
+saturn/core/                 Platform-independent controls, layout, rendering interfaces
+saturn/platform/windows/     Win32, DWM, taskbar, and Windows DPI
+saturn/platform/linux/       Common Linux capabilities
+saturn/platform/linux/x11/   X11/EWMH/ICCCM adapter
+saturn/platform/linux/wayland/ Wayland/XDG adapter
+saturn/services/             D-Bus, Portal, notifications, tray, system services
+saturn/shell/                Panel, launcher, settings, desktop background
+cpp/                         Native rendering, protocols, and high-reliability system boundaries
+compositor/                  An independent compositor project, not stuffed into an ordinary App
 ```
 
-平台能力不应由“是否 Windows”判断，而应由能力表描述，例如：
+Platform capabilities should not be judged by "is it Windows" but described by a capability table, for example:
 
 ```python
 page.platform.capabilities = {
@@ -153,304 +153,304 @@ page.platform.capabilities = {
 }
 ```
 
-对于 Wayland 不允许的能力，应返回明确的能力状态或抛出带平台说明的异常，不能伪造成功。
+For capabilities Wayland does not allow, return an explicit capability state or throw an exception with a platform explanation; never fake success.
 
-## 5. Linux 改造工作清单
+## 5. Linux adaptation work checklist
 
-### 5.1 平台基础层
+### 5.1 Platform foundation layer
 
-- [ ] 抽离 Win32 代码，禁止公共模块直接导入 `ctypes.windll`。
-- [ ] 建立 `PlatformWindow`、`DisplayManager`、`ClipboardBackend`、`FileDialogBackend` 等接口。
-- [ ] 建立 Linux 平台检测：发行版、显示服务器、SDL 视频驱动、GPU、缩放因子。
-- [ ] 明确 X11、Wayland、无显示器和远程桌面环境的行为。
-- [ ] 统一窗口坐标、逻辑像素、物理像素和 framebuffer 尺寸。
-- [ ] 支持多显示器、显示器热插拔和分数缩放。
-- [ ] 验证窗口创建、关闭、隐藏、聚焦、全屏、最大化、最小化和 resize 事件。
-- [ ] 验证窗口图标、标题、透明度、背景和边框行为。
-- [ ] 对 Wayland 不支持的窗口定位、全局输入、输入注入等能力做能力声明。
+- [ ] Extract the Win32 code; forbid public modules from importing `ctypes.windll` directly.
+- [ ] Establish interfaces such as `PlatformWindow`, `DisplayManager`, `ClipboardBackend`, and `FileDialogBackend`.
+- [ ] Establish Linux platform detection: distribution, display server, SDL video driver, GPU, scaling factor.
+- [ ] Define the behavior for X11, Wayland, headless, and remote desktop environments.
+- [ ] Unify window coordinates, logical pixels, physical pixels, and framebuffer sizes.
+- [ ] Support multi-monitor, display hot-plugging, and fractional scaling.
+- [ ] Validate window creation, close, hide, focus, fullscreen, maximize, minimize, and resize events.
+- [ ] Validate window icon, title, transparency, background, and border behavior.
+- [ ] Declare capabilities for window positioning, global input, input injection, and other features Wayland does not support.
 
-### 5.2 渲染和输入
+### 5.2 Rendering and input
 
-- [ ] Ubuntu、Fedora 至少各有一套 OpenGL/Software CI。
-- [ ] X11 和 Wayland 都验证 OpenGL 上下文创建、交换链和 resize。
-- [ ] Vulkan 在 Linux 上单独验证驱动、loader、窗口 surface 和 GPU 选择。
-- [ ] 保留 Software 后端，用于无 GPU、远程桌面和自动化测试。
-- [ ] 检查 Mesa、Intel、AMD、NVIDIA 驱动。
-- [ ] 接入 FreeType、Fontconfig 和 HarfBuzz，补足复杂脚本塑形。
-- [ ] 验证阿拉伯语、印地语、中文、日文、韩文、RTL、组合字符和 Emoji。
-- [ ] 验证 IBus/Fcitx 输入法、候选框位置、预编辑和提交。
-- [ ] 验证键盘布局、`xkbcommon`、快捷键、Dead Key 和 Compose Key。
-- [ ] 验证触摸板滚动、鼠标高分辨率滚轮和触摸输入。
+- [ ] At least one OpenGL/Software CI setup each for Ubuntu and Fedora.
+- [ ] Validate OpenGL context creation, swap chains, and resize on both X11 and Wayland.
+- [ ] Separately validate Vulkan drivers, loader, window surfaces, and GPU selection on Linux.
+- [ ] Keep the Software backend for GPU-less machines, remote desktop, and automated testing.
+- [ ] Check Mesa, Intel, AMD, and NVIDIA drivers.
+- [ ] Integrate FreeType, Fontconfig, and HarfBuzz to complete complex script shaping.
+- [ ] Validate Arabic, Hindi, Chinese, Japanese, Korean, RTL, combining characters, and Emoji.
+- [ ] Validate IBus/Fcitx input methods, candidate window position, pre-edit, and commit.
+- [ ] Validate keyboard layouts, `xkbcommon`, shortcuts, Dead Keys, and the Compose Key.
+- [ ] Validate touchpad scrolling, high-resolution mouse wheels, and touch input.
 
-### 5.3 Linux 系统服务
+### 5.3 Linux system services
 
-- [ ] 剪贴板：X11 selection、Wayland data-control 或 SDL 后端。
-- [ ] 文件选择：优先使用 `xdg-desktop-portal`，Tkinter 作为临时后备。
-- [ ] 文件拖放：支持本地路径、URI、文本和取消操作。
-- [ ] 通知：实现 `org.freedesktop.Notifications`，包括图标、动作、超时和关闭事件。
-- [ ] 托盘：优先实现 StatusNotifierItem，X11 环境提供兼容路径。
-- [ ] 桌面入口：解析 `.desktop`、图标主题、启动参数和 MIME 关联。
-- [ ] 全局快捷键：在 X11 实现明确后，再为 Wayland 采用 compositor 或桌面门户方案。
-- [ ] 电源、网络、蓝牙和音量：通过 UPower、NetworkManager、BlueZ、PipeWire/PulseAudio 等系统接口访问。
-- [ ] 设置存储：明确使用配置文件、GSettings、D-Bus 或自有配置数据库。
-- [ ] 会话：支持 systemd user session、注销、关机、重启和应用退出通知。
+- [ ] Clipboard: X11 selection, Wayland data-control, or an SDL backend.
+- [ ] File selection: prefer `xdg-desktop-portal`, with Tkinter as a temporary fallback.
+- [ ] File drag-and-drop: support local paths, URIs, text, and cancel operations.
+- [ ] Notifications: implement `org.freedesktop.Notifications`, including icons, actions, timeouts, and close events.
+- [ ] Tray: implement StatusNotifierItem first; provide a compatibility path for X11 environments.
+- [ ] Desktop entries: parse `.desktop` files, icon themes, launch arguments, and MIME associations.
+- [ ] Global shortcuts: define the X11 implementation first, then adopt a compositor or desktop portal approach for Wayland.
+- [ ] Power, network, Bluetooth, and volume: access via UPower, NetworkManager, BlueZ, PipeWire/PulseAudio, and other system interfaces.
+- [ ] Settings storage: define whether to use config files, GSettings, D-Bus, or an own configuration database.
+- [ ] Session: support the systemd user session, logout, shutdown, reboot, and application exit notifications.
 
-### 5.4 Shell 组件
+### 5.4 Shell components
 
-- [ ] Panel：位置、尺寸、自动隐藏、工作区、窗口列表、托盘和通知入口。
-- [ ] Launcher：应用搜索、`.desktop` 启动、收藏、最近使用和权限提示。
-- [ ] Desktop：壁纸、多显示器、桌面图标或明确不提供桌面图标。
-- [ ] Control Center：显示、网络、声音、蓝牙、电源、主题、键盘和输入法。
-- [ ] Notification Center：历史记录、动作、分组、勿扰模式和持久化。
-- [ ] Lock Screen：输入密码、屏幕遮罩、会话恢复和 compositor 协作。
-- [ ] Window Rules：应用匹配、默认工作区、最大化和浮动策略。
-- [ ] Accessibility：AT-SPI2 角色、名称、状态、动作、焦点和变化通知。
-- [ ] Internationalization：gettext/翻译目录、复数规则、日期、数字和时区。
+- [ ] Panel: position, size, auto-hide, workspaces, window list, tray, and notification entries.
+- [ ] Launcher: app search, `.desktop` launching, favorites, recents, and permission prompts.
+- [ ] Desktop: wallpaper, multi-monitor, desktop icons, or explicitly not providing desktop icons.
+- [ ] Control Center: display, network, sound, Bluetooth, power, theme, keyboard, and input methods.
+- [ ] Notification Center: history, actions, grouping, do-not-disturb mode, and persistence.
+- [ ] Lock Screen: password input, screen mask, session restore, and compositor cooperation.
+- [ ] Window Rules: application matching, default workspace, maximize, and floating policies.
+- [ ] Accessibility: AT-SPI2 roles, names, states, actions, focus, and change notifications.
+- [ ] Internationalization: gettext/translation directories, plural rules, dates, numbers, and time zones.
 
-### 5.5 Compositor 或 Window Manager
+### 5.5 Compositor or window manager
 
-这是完整桌面环境的独立工作流：
+This is an independent workstream for a full desktop environment:
 
-- [ ] 选择 Wayland compositor 技术路线：wlroots、Smithay 或自研。
-- [ ] 决定 Saturn 与 compositor 的进程边界。
-- [ ] 实现输出管理、输入设备、窗口映射、焦点、层级和工作区。
-- [ ] 实现 `xdg-shell`、layer-shell、屏幕截图、屏幕录制和拖放协议。
-- [ ] 实现 XWayland 支持，兼容旧 X11 应用。
-- [ ] 实现锁屏、权限、虚拟终端和 session/seat 管理。
-- [ ] 实现 compositor 崩溃后的重启或安全退出策略。
-- [ ] 不把 compositor 放进 Python UI 线程，不让普通控件崩溃拖垮整个桌面。
+- [ ] Choose a Wayland compositor technology path: wlroots, Smithay, or in-house.
+- [ ] Decide the process boundary between Saturn and the compositor.
+- [ ] Implement output management, input devices, window mapping, focus, layers, and workspaces.
+- [ ] Implement `xdg-shell`, layer-shell, screenshots, screen recording, and drag-and-drop protocols.
+- [ ] Implement XWayland support for compatibility with old X11 applications.
+- [ ] Implement lock screen, permissions, virtual terminals, and session/seat management.
+- [ ] Implement restart or safe-exit policies after a compositor crash.
+- [ ] Do not put the compositor in the Python UI thread; do not let ordinary control crashes bring down the whole desktop.
 
-## 6. 推荐依赖方向
+## 6. Recommended dependency directions
 
-### 6.1 应用框架阶段
+### 6.1 Application framework stage
 
-- SDL2/SDL3：窗口、输入、基础事件和图形上下文。
-- OpenGL/Mesa：主 GPU 路径。
-- Vulkan loader/headers：实验性 Vulkan 路径。
-- FreeType、Fontconfig、HarfBuzz：字体发现、栅格化和复杂脚本塑形。
-- xkbcommon：键盘布局和按键解析。
-- Wayland/XCB/Xlib：Linux 原生协议适配。
-- xdg-desktop-portal：文件选择、屏幕共享和受控桌面能力。
-- D-Bus：通知、系统设置、会话和系统服务。
+- SDL2/SDL3: windows, input, basic events, and graphics contexts.
+- OpenGL/Mesa: the main GPU path.
+- Vulkan loader/headers: the experimental Vulkan path.
+- FreeType, Fontconfig, HarfBuzz: font discovery, rasterization, and complex script shaping.
+- xkbcommon: keyboard layouts and key parsing.
+- Wayland/XCB/Xlib: Linux native protocol adapters.
+- xdg-desktop-portal: file selection, screen sharing, and controlled desktop capabilities.
+- D-Bus: notifications, system settings, sessions, and system services.
 
-### 6.2 Shell 阶段
+### 6.2 Shell stage
 
-- Wayland layer-shell 协议实现或绑定。
-- StatusNotifierItem/DBusMenu。
-- systemd-logind 和 systemd user services。
-- UPower、NetworkManager、BlueZ、PipeWire/PulseAudio。
-- AT-SPI2 无障碍接口。
-- IBus/Fcitx 输入法接口。
+- Wayland layer-shell protocol implementations or bindings.
+- StatusNotifierItem/DBusMenu.
+- systemd-logind and systemd user services.
+- UPower, NetworkManager, BlueZ, PipeWire/PulseAudio.
+- AT-SPI2 accessibility interfaces.
+- IBus/Fcitx input method interfaces.
 
-### 6.3 依赖原则
+### 6.3 Dependency principles
 
-- UI 控件和布局保持 Saturn 自有实现。
-- 系统能力优先使用标准 Linux 协议，不绑定某个发行版的私有 API。
-- 原生协议、compositor、输入和安全边界优先放在 C++ 或 Rust。
-- Python 保留用于 UI 编排、应用开发和快速迭代。
+- UI controls and layout stay Saturn's own implementation.
+- Prefer standard Linux protocols for system capabilities; do not bind to a particular distribution's private APIs.
+- Native protocols, the compositor, input, and security boundaries belong first in C++ or Rust.
+- Python stays for UI orchestration, application development, and fast iteration.
 
-## 7. 分阶段路线
+## 7. Phased roadmap
 
-### Phase 0：架构冻结与平台抽象
+### Phase 0: Architecture freeze and platform abstraction
 
-目标：让 Linux 工作不再依赖追加零散的 `sys.platform` 分支。
+Goal: make Linux work no longer depend on appending scattered `sys.platform` branches.
 
-当前状态：平台适配器、Win32 原生窗口/GPU 代码隔离和非 Windows 空适配器已
-完成；Linux X11/Wayland 原生协议与系统服务仍未实现。
+Current status: platform adapters, the isolation of Win32 native window/GPU code, and non-Windows empty adapters are
+done; Linux X11/Wayland native protocols and system services are still not implemented.
 
-- [x] 建立平台能力接口和 capability 查询。
-- [x] 将 `_native_window.py` 重构为平台适配器。
-- [ ] 确认普通应用框架和 Desktop Shell 的 API 边界。
-- [ ] 决定 X11 与 Wayland 的首发顺序。
-- [ ] 设计系统服务接口和 mock backend。
-- [ ] 增加 Linux 代码风格、依赖和错误处理规范。
+- [x] Establish the platform capability interface and capability queries.
+- [x] Refactor `_native_window.py` into platform adapters.
+- [ ] Confirm the API boundary between the ordinary application framework and the Desktop Shell.
+- [ ] Decide whether X11 or Wayland ships first.
+- [ ] Design the system service interfaces and mock backends.
+- [ ] Add Linux code style, dependency, and error handling conventions.
 
-### Phase 1：Linux 普通应用框架
+### Phase 1: Linux ordinary application framework
 
-目标：Saturn 应用可以在现有 Linux 桌面环境中稳定运行。
+Goal: Saturn applications run stably in existing Linux desktop environments.
 
-- [ ] Ubuntu/Fedora 的 X11 与 Wayland 启动验证。
-- [ ] Software/OpenGL 窗口、输入、字体和 resize 全部可用。
-- [ ] 文件门户、剪贴板、拖放、输入法和 DPI 可用。
-- [ ] 多显示器和分数缩放可用。
-- [ ] 打包成 wheel、系统包和最小示例应用。
-- [ ] 完成跨平台测试矩阵。
+- [ ] Startup validation on X11 and Wayland for Ubuntu/Fedora.
+- [ ] Software/OpenGL windows, input, fonts, and resize all working.
+- [ ] File portal, clipboard, drag-and-drop, input methods, and DPI working.
+- [ ] Multi-monitor and fractional scaling working.
+- [ ] Packaging as wheels, system packages, and a minimal example application.
+- [ ] Complete the cross-platform test matrix.
 
-### Phase 2：Saturn Shell MVP
+### Phase 2: Saturn Shell MVP
 
-目标：在现有 compositor 上运行可用的 Saturn 桌面壳组件。
+Goal: run usable Saturn desktop shell components on an existing compositor.
 
-- [ ] Panel。
-- [ ] Launcher。
-- [ ] Notification Center。
-- [ ] Settings/Control Center。
-- [ ] `.desktop` 应用启动和图标主题。
-- [ ] D-Bus 通知和 StatusNotifierItem。
-- [ ] Wayland layer-shell/X11 Dock 适配。
-- [ ] 基础多显示器布局。
+- [ ] Panel.
+- [ ] Launcher.
+- [ ] Notification Center.
+- [ ] Settings/Control Center.
+- [ ] `.desktop` app launching and icon themes.
+- [ ] D-Bus notifications and StatusNotifierItem.
+- [ ] Wayland layer-shell/X11 Dock adapters.
+- [ ] Basic multi-monitor layout.
 
-### Phase 3：独立桌面环境
+### Phase 3: Independent desktop environment
 
-目标：Saturn Shell 不再依赖 GNOME/KDE 的窗口管理政策。
+Goal: Saturn Shell no longer depends on GNOME/KDE window management policies.
 
-- [ ] 独立 compositor 或 window manager。
-- [ ] 登录、会话、锁屏和注销。
-- [ ] XWayland 兼容。
-- [ ] xdg-desktop-portal 后端。
-- [ ] 电源、网络、蓝牙、声音和显示管理。
-- [ ] AT-SPI2 无障碍。
-- [ ] 崩溃恢复、升级和配置迁移。
-- [ ] 发行版安装器、默认配置和文档。
+- [ ] An independent compositor or window manager.
+- [ ] Login, session, lock screen, and logout.
+- [ ] XWayland compatibility.
+- [ ] An xdg-desktop-portal backend.
+- [ ] Power, network, Bluetooth, sound, and display management.
+- [ ] AT-SPI2 accessibility.
+- [ ] Crash recovery, upgrades, and configuration migration.
+- [ ] Distribution installers, default configuration, and documentation.
 
-## 8. 测试矩阵
+## 8. Test matrix
 
-### 8.1 最低平台矩阵
+### 8.1 Minimum platform matrix
 
-| 操作系统 | 显示服务器 | 后端 | 目的 |
+| Operating system | Display server | Backend | Purpose |
 | --- | --- | --- | --- |
-| Ubuntu LTS | X11 | Software/OpenGL | 基础兼容和 CI |
-| Ubuntu LTS | Wayland | Software/OpenGL | 主流 Wayland 路径 |
-| Fedora | Wayland | OpenGL | 新版 Mesa/Wayland |
-| Fedora | X11 | OpenGL | X11 回退 |
-| Arch 或滚动发行版 | Wayland | Vulkan | 新版协议和驱动验证 |
-| Windows | Win32 | Software/OpenGL/Vulkan | 防止 Linux 改造破坏现有能力 |
+| Ubuntu LTS | X11 | Software/OpenGL | Basic compatibility and CI |
+| Ubuntu LTS | Wayland | Software/OpenGL | Mainstream Wayland path |
+| Fedora | Wayland | OpenGL | New Mesa/Wayland |
+| Fedora | X11 | OpenGL | X11 fallback |
+| Arch or a rolling distribution | Wayland | Vulkan | New protocol and driver validation |
+| Windows | Win32 | Software/OpenGL/Vulkan | Prevent the Linux adaptation from breaking existing capabilities |
 
-### 8.2 硬件与场景
+### 8.2 Hardware and scenarios
 
-- [ ] Intel、AMD、NVIDIA。
-- [ ] 100%、125%、150%、200% 缩放。
-- [ ] 单显示器、异构多显示器、热插拔。
-- [ ] 本地会话、远程桌面、无 GPU、软件渲染。
-- [ ] 英文、中文、日文、阿拉伯文、印地文和 RTL。
-- [ ] IBus、Fcitx、无输入法环境。
-- [ ] 普通应用窗口、layer-shell 窗口、全屏、透明窗口和多窗口。
+- [ ] Intel, AMD, NVIDIA.
+- [ ] 100%, 125%, 150%, 200% scaling.
+- [ ] Single monitor, heterogeneous multi-monitor, hot-plugging.
+- [ ] Local session, remote desktop, no GPU, software rendering.
+- [ ] English, Chinese, Japanese, Arabic, Hindi, and RTL.
+- [ ] IBus, Fcitx, environments without an input method.
+- [ ] Ordinary application windows, layer-shell windows, fullscreen, transparent windows, and multi-window.
 
-### 8.3 验证类型
+### 8.3 Validation types
 
-- [ ] 单元测试：平台能力、坐标转换、窗口状态和协议消息。
-- [ ] 行为测试：键盘、焦点、IME、剪贴板、拖放、窗口生命周期。
-- [ ] 渲染测试：Software/OpenGL/Vulkan 截图和 resize 回归。
-- [ ] 系统测试：portal、D-Bus、通知、托盘、`.desktop` 启动。
-- [ ] 压力测试：多窗口、长时间动画、频繁显示器变化和 GPU 重置。
-- [ ] 无障碍测试：Orca、AT-SPI2、键盘全流程。
-- [ ] 崩溃测试：UI 进程、Shell 组件和 compositor 分别崩溃时的恢复行为。
+- [ ] Unit tests: platform capabilities, coordinate conversion, window states, and protocol messages.
+- [ ] Behavior tests: keyboard, focus, IME, clipboard, drag-and-drop, window lifecycle.
+- [ ] Rendering tests: Software/OpenGL/Vulkan screenshots and resize regressions.
+- [ ] System tests: portal, D-Bus, notifications, tray, `.desktop` launching.
+- [ ] Stress tests: many windows, long animations, frequent display changes, and GPU resets.
+- [ ] Accessibility tests: Orca, AT-SPI2, full keyboard flows.
+- [ ] Crash tests: recovery behavior when the UI process, Shell components, and compositor crash separately.
 
-自动化环境可以考虑：
+Automation environments to consider:
 
-- X11：Xvfb 或真实虚拟机。
-- Wayland：Weston headless 或嵌套 compositor。
-- GPU：Mesa llvmpipe 作为软件基线，真实 Intel/AMD/NVIDIA 作为硬件验证。
+- X11: Xvfb or real virtual machines.
+- Wayland: Weston headless or a nested compositor.
+- GPU: Mesa llvmpipe as the software baseline, real Intel/AMD/NVIDIA as hardware validation.
 
-## 9. 打包和发行
+## 9. Packaging and distribution
 
-### 普通 Saturn 应用
+### Ordinary Saturn applications
 
-- [ ] Python wheel，明确 Linux 依赖和可选 Vulkan 依赖。
-- [ ] Ubuntu/Debian 的 deb 包。
-- [ ] Fedora 的 rpm 包。
-- [ ] Flatpak manifest，限制权限并声明 D-Bus/portal 权限。
-- [ ] `.desktop` 文件、图标和 MIME 文件。
-- [ ] 资源路径不依赖当前工作目录。
-- [ ] 发布调试符号、日志开关和崩溃报告策略。
+- [ ] Python wheels with explicit Linux dependencies and optional Vulkan dependencies.
+- [ ] deb packages for Ubuntu/Debian.
+- [ ] rpm packages for Fedora.
+- [ ] Flatpak manifests with restricted permissions and declared D-Bus/portal permissions.
+- [ ] `.desktop` files, icons, and MIME files.
+- [ ] Resource paths that do not depend on the current working directory.
+- [ ] Publishing debug symbols, log switches, and a crash reporting policy.
 
-### Shell/桌面环境
+### Shell/desktop environment
 
-- [ ] systemd user service。
-- [ ] D-Bus service 文件。
-- [ ] xdg-desktop-portal backend 文件。
-- [ ] 默认配置、主题、图标和字体资源。
-- [ ] 安装、卸载、升级和回滚脚本。
-- [ ] 安全升级与配置迁移。
+- [ ] systemd user services.
+- [ ] D-Bus service files.
+- [ ] xdg-desktop-portal backend files.
+- [ ] Default configuration, themes, icons, and font resources.
+- [ ] Install, uninstall, upgrade, and rollback scripts.
+- [ ] Safe upgrades and configuration migration.
 
-## 10. 非功能要求
+## 10. Non-functional requirements
 
-### 性能
+### Performance
 
-- 普通桌面窗口在目标硬件上稳定保持 60 FPS。
-- 面板和通知中心不因后台服务阻塞而卡顿。
-- UI 线程不得执行阻塞式 D-Bus、文件扫描或网络操作。
-- GPU 不可用时有可预测的 Software 回退。
-- 多个 Shell 组件不会无限复制 Python 运行时和字体缓存。
+- Ordinary desktop windows hold a stable 60 FPS on target hardware.
+- Panels and the notification center do not stutter because background services block.
+- The UI thread must not perform blocking D-Bus, file scanning, or network operations.
+- There is a predictable Software fallback when the GPU is unavailable.
+- Multiple shell components do not endlessly duplicate Python runtimes and font caches.
 
-### 稳定性
+### Stability
 
-- 普通应用崩溃不应导致 Shell 或 compositor 退出。
-- Shell 服务可独立重启。
-- 原生资源、窗口、GPU 上下文和线程全部有明确所有权。
-- 协议异常、无效路径、超大图像和自定义 Shader 必须有边界检查。
+- Ordinary application crashes must not cause the Shell or compositor to exit.
+- Shell services can restart independently.
+- Native resources, windows, GPU contexts, and threads all have clear ownership.
+- Protocol exceptions, invalid paths, oversized images, and custom shaders must have boundary checks.
 
-### 安全
+### Security
 
-- 不默认允许全局输入注入、任意屏幕读取或任意文件访问。
-- portal 权限和 D-Bus 权限最小化。
-- 自定义 Shader、字体、图像和外部路径必须校验。
-- compositor、Shell 和普通应用的权限边界清晰。
+- Do not allow global input injection, arbitrary screen reading, or arbitrary file access by default.
+- Minimize portal permissions and D-Bus permissions.
+- Custom shaders, fonts, images, and external paths must be validated.
+- The permission boundaries between the compositor, Shell, and ordinary applications are clear.
 
-### 可访问性和国际化
+### Accessibility and internationalization
 
-- 公开的 semantics 信息必须映射到 AT-SPI2 role/name/state/action。
-- 焦点、键盘、缩放和高对比度主题要有完整测试。
-- 使用 HarfBuzz 处理复杂脚本和双向文字。
-- 翻译、复数、数字、日期、时区和键盘布局不能只按英文假设。
+- Exposed semantics information must map to AT-SPI2 role/name/state/action.
+- Focus, keyboard, scaling, and high-contrast themes need complete testing.
+- Use HarfBuzz for complex scripts and bidirectional text.
+- Translations, plurals, numbers, dates, time zones, and keyboard layouts must not assume English only.
 
-## 11. 各阶段验收标准
+## 11. Acceptance criteria per stage
 
-### Linux 应用框架 Beta
+### Linux application framework Beta
 
-- [ ] Ubuntu 和 Fedora 的 X11/Wayland 均可运行示例和测试。
-- [ ] Software/OpenGL 后端通过核心行为和截图测试。
-- [ ] 文件选择、剪贴板、拖放、IME、DPI、多显示器可用。
-- [ ] 有可安装 wheel、deb/rpm 或 Flatpak。
-- [ ] 文档明确列出平台能力差异。
+- [ ] Examples and tests run on X11/Wayland for both Ubuntu and Fedora.
+- [ ] The Software/OpenGL backends pass core behavior and screenshot tests.
+- [ ] File selection, clipboard, drag-and-drop, IME, DPI, and multi-monitor work.
+- [ ] An installable wheel, deb/rpm, or Flatpak exists.
+- [ ] Documentation clearly lists the platform capability differences.
 
 ### Shell MVP
 
-- [ ] Panel、Launcher、Settings、Notification Center 可独立启动和退出。
-- [ ] X11 Dock 与 Wayland layer-shell 均能正确占用工作区。
-- [ ] 通知、托盘、应用启动和多显示器均可用。
-- [ ] Shell 组件崩溃后可以单独重启。
-- [ ] 至少通过一种屏幕阅读器的基础操作测试。
+- [ ] Panel, Launcher, Settings, and Notification Center start and exit independently.
+- [ ] Both the X11 Dock and Wayland layer-shell correctly occupy the workspace.
+- [ ] Notifications, tray, app launching, and multi-monitor all work.
+- [ ] Shell components can restart individually after a crash.
+- [ ] At least one screen reader passes basic operation testing.
 
-### 完整桌面环境首个可用版本
+### First usable version of the full desktop environment
 
-- [ ] 可从登录到注销完成完整会话流程。
-- [ ] compositor、Shell、portal 和系统服务协同工作。
-- [ ] 可运行 X11 和 Wayland 应用。
-- [ ] 锁屏、显示器、电源、网络、声音和输入法可用。
-- [ ] 普通应用、Shell 和 compositor 之间有明确的崩溃隔离。
-- [ ] 至少在一个稳定发行版上提供可重复安装和升级方案。
+- [ ] A complete session flow works from login to logout.
+- [ ] The compositor, Shell, portal, and system services work together.
+- [ ] X11 and Wayland applications can run.
+- [ ] Lock screen, displays, power, network, sound, and input methods work.
+- [ ] Clear crash isolation exists between ordinary applications, the Shell, and the compositor.
+- [ ] A repeatable install-and-upgrade scheme exists on at least one stable distribution.
 
-## 12. 风险和应对
+## 12. Risks and mitigations
 
-| 风险 | 影响 | 应对 |
+| Risk | Impact | Mitigation |
 | --- | --- | --- |
-| 把普通 SDL 窗口误当成桌面 Shell | 架构返工 | 先建立 layer-shell/compositor 原型，单独定义 Shell 平台接口 |
-| 只验证导入成功，没有 Linux 实机验证 | 发布后窗口、输入、字体全部出问题 | 建立 X11/Wayland CI 和真实硬件矩阵 |
-| 继续扩大 Windows-specific Window API | Linux API 永远被迫模拟 Windows | 改为 capability API，并记录平台差异 |
-| Python 进程过多导致内存和启动性能差 | Shell 体验不稳定 | 核心服务合并或移至 C++/Rust，UI 保持 Python/高层 API |
-| 自研 compositor 范围失控 | 项目长期无法交付 | 先基于 wlroots/Smithay 做最小集成，再决定是否自研 |
-| 忽视无障碍和复杂文字 | 无法成为成熟桌面环境 | 将 AT-SPI2、HarfBuzz、输入法列为正式里程碑 |
-| 依赖发行版私有接口 | 跨发行版维护成本高 | 优先使用 Wayland、D-Bus、portal、EWMH 等标准接口 |
-| GPU/驱动差异 | 黑屏、闪烁、性能回退 | Software 基线、Mesa CI、真实 Intel/AMD/NVIDIA 验证 |
+| Mistaking an ordinary SDL window for a desktop shell | Architecture rework | Build a layer-shell/compositor prototype first; define the Shell platform interfaces separately |
+| Only verifying that imports succeed, without real Linux machine validation | Windows, input, and fonts all break after release | Build X11/Wayland CI and a real hardware matrix |
+| Continuing to expand Windows-specific Window APIs | Linux APIs are forever forced to simulate Windows | Switch to a capability API and document platform differences |
+| Too many Python processes causing poor memory and startup performance | Unstable shell experience | Merge core services or move them to C++/Rust; keep the UI in Python/high-level APIs |
+| In-house compositor scope getting out of control | The project cannot be delivered long-term | Do a minimal integration based on wlroots/Smithay first, then decide whether to build in-house |
+| Ignoring accessibility and complex text | Cannot become a mature desktop environment | List AT-SPI2, HarfBuzz, and input methods as formal milestones |
+| Depending on distribution-private interfaces | High cross-distribution maintenance cost | Prefer standard interfaces such as Wayland, D-Bus, portal, and EWMH |
+| GPU/driver differences | Black screens, flickering, performance regressions | Software baseline, Mesa CI, and real Intel/AMD/NVIDIA validation |
 
-## 13. 推荐的第一个可交付版本
+## 13. The recommended first deliverable
 
-不要一开始就做完整桌面环境。建议先交付一个 **Saturn Linux Shell Kit**：
+Do not build a full desktop environment right away. It is recommended to first deliver a **Saturn Linux Shell Kit**:
 
-1. Linux 普通应用框架稳定运行。
-2. 一个 Wayland/X11 兼容的面板。
-3. 一个可搜索 `.desktop` 应用的启动器。
-4. 一个设置中心，先覆盖显示、主题、网络和声音入口。
-5. D-Bus 通知中心和基础托盘。
-6. 可安装的 Flatpak 或 deb/rpm 包。
-7. 完整的 X11/Wayland、Software/OpenGL、DPI、IME 和多显示器测试。
+1. The Linux ordinary application framework runs stably.
+2. A Wayland/X11 compatible panel.
+3. A launcher that can search `.desktop` applications.
+4. A settings center, first covering the display, theme, network, and sound entries.
+5. A D-Bus notification center and a basic tray.
+6. Installable Flatpak or deb/rpm packages.
+7. Complete X11/Wayland, Software/OpenGL, DPI, IME, and multi-monitor testing.
 
-这个版本可以验证 Saturn 是否真的适合桌面 Shell，同时不会过早承担 compositor、登录管理和完整系统服务的全部风险。
+This deliverable can verify whether Saturn is truly suited for a desktop shell, without prematurely taking on all the risks of a compositor, login management, and complete system services.
 
-## 14. 最终判断
+## 14. Final judgment
 
-Saturn 具备成为 **Linux 桌面 UI 与 Shell 框架** 的技术基础，尤其适合启动器、设置中心、控制面板、通知界面和轻量桌面应用。
+Saturn has the technical foundation to become a **Linux desktop UI and shell framework**, especially suited for launchers, settings centers, control panels, notification interfaces, and lightweight desktop applications.
 
-要成为完整桌面环境，需要把项目分成“UI 框架”和“系统桌面栈”两部分。当前最重要的工作不是继续添加控件，而是完成 Linux 平台抽象、Wayland/X11 协议适配、系统服务、无障碍、复杂文字和跨发行版测试。
+To become a full desktop environment, the project needs to be split into "UI framework" and "system desktop stack" parts. The most important work right now is not to keep adding controls, but to complete the Linux platform abstraction, Wayland/X11 protocol adapters, system services, accessibility, complex text, and cross-distribution testing.
 
-如果坚持以现有 Python/SDL 代码直接扩展为完整桌面环境，成功风险很高；如果保留 Saturn 作为 UI 层，并用 C++/Rust 建设 compositor 和系统服务，长期做出一个轻量 Linux 桌面环境是可行的。
+Trying to extend the existing Python/SDL code directly into a full desktop environment carries a high risk of failure; keeping Saturn as the UI layer and building the compositor and system services in C++/Rust makes a lightweight Linux desktop environment feasible in the long run.

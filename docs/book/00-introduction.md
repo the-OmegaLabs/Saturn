@@ -1,8 +1,8 @@
-# 欢迎使用 Saturn
+# Welcome to Saturn
 
-Saturn 是一个现代化、轻量级、支持 GPU 加速的 Python 桌面 UI 框架。
+Saturn is a **modern, lightweight, GPU-accelerated** Python desktop UI framework.
 
-更多介绍，参阅 [the-OmegaLabs/Saturn.git](https://github.com/the-OmegaLabs/Saturn) 。
+For more information, see [the-OmegaLabs/Saturn.git](https://github.com/the-OmegaLabs/Saturn).
 
 ~~~python
 import saturn
@@ -13,70 +13,94 @@ def main(page: saturn.Page):
 saturn.run(main)
 ~~~
 
-这是 Saturn 创建一个窗口的最小实现，效果如下：
+This is the minimal implementation for creating a window with Saturn; the result looks like this:
 
 ![00-hello.png](./assets/00-hello.png)
 
-这段代码使用了 `saturn.run` 创建一个窗口，向 `main` 函数传入一个 `saturn.Page`。`main` 可以是普通函数、
-绑定方法或异步函数。
+This code uses `saturn.run` to create a window and passes a `saturn.Page` to the `main` function. `main` can be a **plain function, a bound method, or an async function**.
 
-## 四个核心概念
+## Core concepts:
 
-### 根 (`saturn.Page`)
+### The root `saturn.Page`
 
-`Page` 代表一个窗口中的应用页面。它拥有顶层 `controls`、主题、字体、对话框、
-服务和事件处理器。可以用 `add`、`insert`、`remove`、`clean` 管理直接子控件。
+`Page` represents the application page inside a window. It owns the top-level `controls`, theme, fonts, dialogs,
+services, and event handlers. You can manage its direct children with `add`, `insert`, `remove`, and `clean`.
 
-`page.controls` 是一个 `Page` 的控件列表。可以用 `add`、`insert`、`remove`、`clean` 管理直接子控件。
+`page.controls` is the list of controls belonging to a `Page`. You can manage its direct children with `add`, `insert`, `remove`, and `clean`.
 
-`page.window` 管理原生窗口。
+`page.window` manages the native window and its properties.
 
-`page.renderer` 管理当前渲染器，以及渲染器设置。
+`page.renderer` manages the current renderer and its settings.
 
-### 节点 (`saturn.Control`)
+---
 
-Text、Button、Row、Column、Container、TextField 等都是 Control。一个控件
-可以有子控件：Row 和 Column 通过 controls 保存子项，Container 通过 content
-包裹一个子项。每个控件最多属于一棵控件树。
+### Control nodes `saturn.Control`
 
-### 自动控件更新
+`Control` represents a control in an application; controls are the ways users interact with the application. `Text`, `Button`, `Row`, `Column`, `Container`, `TextField`, and so on are all `Control`s.
 
-无需手动管理空间状态。修改 value、checked 或子控件 controls 后，调用控件
-的 control.update() 或页面的 page.update()，让 Saturn 重新同步、布局并绘制。
-add 和 remove 已经会请求更新；一次操作修改多个属性时，通常最后统一更新一次。
+Some **controls** can also own **child controls**.
 
-如果你并不想自动更新控件，可以修改 `page.auto_update` 为 False。
+For example:
 
-### Renderer 负责绘制
+`saturn.Row` and `saturn.Column` hold multiple child controls through their `.controls` property, usually a `list`.
 
-Saturn 支持 Software、OpenGL 和实验性的 Vulkan 后端。默认运行
-saturn.run(main) 使用 OpenGL；应用逻辑仍使用相同的控件 API。GPU 初始化
-失败时可以回退到 Software，实际后端可从 page.renderer.name 读取。
+`saturn.Container` and similar wrap a single child through their `.content` property. Each control belongs to at most one control tree.
 
-## Saturn 与 Flet 的关系
+---
 
-Saturn 使用了许多熟悉的名字：Page、Text、Button、Row、Column、TextField
-和 FilePicker。这让已有 Flet 经验的开发者容易开始，但它们不是同一个实现。
-Saturn 当前主要面向本地桌面，Web 运行时是可选扩展；Flet 中的移动、平台服务、
-完整导航和所有构造参数不会自动出现在 Saturn 中。
+### Automatic control updates
 
-迁移或对照时，先看[功能映射](../flet-mapping.md)，再看
-[参数差异表](../control-parameters-comparison.md)。本书讲常用的 Saturn
-开发路径；API 页面记录当前版本实际支持的签名。
+In most cases you don't need to update control state manually. After you modify `value`, `checked`, or child `controls` properties, Saturn automatically re-syncs controls, lays out, and draws. When one operation modifies multiple properties, it's usually best to trigger a single update at the end.
 
-## 什么时候选择 Saturn
+If you don't want controls to update automatically, set `page.auto_update` to `False`. When you do need to update a control,
+call the control's `control.update()` or the page's `page.update()`.
 
-Saturn 适合：
+### Renderers
 
-- 需要 Python 本地桌面窗口、输入、布局和 Material 风格控件的工具；
-- 希望 UI 状态和事件在本地进程内运行；
-- 需要原生子窗口、渲染器选择或 GPU 着色器的应用；
-- 想从一套小而熟悉的 API 开始，再按需要使用 Expressive 和 Web 扩展。
+Saturn supports software rendering, OpenGL, and an experimental Vulkan backend. Saturn uses
+OpenGL by default. If GPU initialization fails, it falls back to software rendering. If you want to know which renderer is active, query the
+`page.renderer.name` property.
 
-如果应用依赖 Saturn 尚未实现的移动组件、服务或参数，应先确认替代方案，
-或继续使用 Flet。
+If you want to use a specific renderer, you can explicitly specify it when creating the window.
 
-## 本章要点
+```python
+saturn.run(**, backend=saturn.Renderer.SOFTWARE)
+saturn.run(**, backend=saturn.Renderer.OPENGL)
+saturn.run(**, backend=saturn.Renderer.VULKAN)
+```
 
-Saturn 应用从 saturn.run 开始；Page 是根，Control 组成树，事件修改状态，
-update 请求绘制。下一章准备开发环境，然后用 Application 类建立项目脚手架。
+Unless you have a special reason, the OpenGL renderer is recommended by default.
+
+## Saturn's relationship with Flet
+
+In actual development you will find that Saturn is, to some extent, very similar to [Flet](https://flet.dev/).
+
+Saturn uses many familiar names: `Page`, `Text`, `Button`, `Row`, `Column`, `TextField`,
+and `FilePicker`, among others. This makes it easier for developers with Flet experience to get started, but they are not the same implementation.
+
+Saturn was born out of my dissatisfaction with some of the design decisions and features of [Flutter](https://flutter.dev/) and Flet, and my search for a more ideal UI framework. Saturn is still in the Alpha stage. The content covered in this guide, as well as the controls, APIs, and interfaces currently provided, may change in future releases, including incompatible breaking changes.
+
+If you are interested in Saturn, contributions are welcome to help improve the project.
+
+---
+
+If you want to migrate your application from Flet, or port new controls, first check the [feature mapping](../flet-mapping.md), then the
+[parameter comparison table](../control-parameters-comparison.md). This book covers the common Saturn
+development paths; the API pages record the signatures actually supported by the current version. (The actual code is the source of truth.)
+
+## When to choose Saturn?
+
+Saturn is a good fit for:
+
+- Tools that need native Python desktop windows, input, layout, and Material-style controls;
+- Applications where UI state and events should run locally, in-process;
+- Applications that need native subwindows, renderer selection, or GPU shaders;
+- Anyone who wants to start from a small, familiar API set and adopt the Expressive and Web extensions as needed.
+
+If your application depends on mobile components, services, or parameters that Saturn does not yet implement, you should confirm alternatives first,
+or keep using Flet.
+
+## Key points of this chapter
+
+A Saturn application starts with `saturn.run`; `Page` is the root, `Control`s form the tree, events modify state,
+and `.update` requests a repaint. In the next chapter we will set up the development environment and then build a standard Saturn application scaffold.

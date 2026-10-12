@@ -1,9 +1,9 @@
-# 导航与原生子窗口
+# Navigation and Native Subwindows
 
-Saturn 提供共享 route 字符串和原生 Subpage 窗口。route 负责报告当前导航
-状态；Subpage 则创建一个真正独立的操作系统窗口。
+Saturn provides shared route strings and native Subpage windows. `route` is responsible for reporting the current navigation
+state; Subpage creates a genuinely independent OS window.
 
-## 处理应用 route
+## Handling the application route
 
 ~~~python
 def route_changed(event: saturn.RouteChangeEvent):
@@ -18,11 +18,11 @@ page.on_route_change = route_changed
 page.go("/settings")
 ~~~
 
-route = value 和 go(value) 都会通知注册了 on_route_change 的 Page。一次
-应用中的主页面和子页面共享 route。Saturn 不会自动创建、销毁或切换一组
-Flet View；回调需要自己决定控件或窗口如何变化。
+Both `route = value` and `go(value)` notify the Page registered with on_route_change. The main page and subpages in a single
+application share the route. Saturn does not automatically create, destroy, or switch a set of
+Flet Views; the callback needs to decide for itself how controls or windows change.
 
-## 打开设置窗口
+## Opening a settings window
 
 ~~~python
 def settings(child: saturn.Subpage):
@@ -39,19 +39,19 @@ def open_settings(event):
     page.open_subpage(settings, title="Preferences")
 ~~~
 
-page.open_subpage() 立即返回 Subpage。窗口在 UI 线程异步创建；传入的
-settings(child) 回调会在原生窗口建立后运行。返回的 Subpage 也是 Page，
-可以添加控件、设置 theme、处理事件和调用 update。
+page.open_subpage() returns the Subpage immediately. The window is created asynchronously on the UI thread; the
+settings(child) callback passed in runs after the native window is established. The returned Subpage is also a Page:
+you can add controls, set the theme, handle events, and call update.
 
-## 窗口生命周期
+## Window lifecycle
 
-- show() 与 hide() 显示或隐藏同一个窗口，不销毁控件；
-- close() 请求关闭，并遵守 prevent_close 与 window.on_event；
-- destroy() 强制关闭并销毁子孙窗口；
-- child.closed 检查窗口是否已关闭；关闭的 Subpage 不能重新打开；
-- 关闭父窗口会关闭它的所有子窗口，关闭子窗口不会关闭父窗口。
+- show() and hide() show or hide the same window without destroying controls;
+- close() requests closing and respects prevent_close and window.on_event;
+- destroy() forcibly closes and destroys descendant windows;
+- child.closed checks whether the window has closed; a closed Subpage cannot be reopened;
+- closing a parent window closes all of its child windows; closing a child window does not close the parent window.
 
-可以保存子窗口引用，避免重复创建：
+You can keep child window references to avoid creating duplicates:
 
 ~~~python
 children = {}
@@ -67,17 +67,17 @@ def open_settings(event):
         child.to_front()
 ~~~
 
-## 原生窗口属性
+## Native window properties
 
-窗口尺寸通过 page.window 设置。width 和 height 表示包含原生边框的外框尺寸；
-page.width 与 page.height 表示只读的内容区域。位置、最小尺寸、最大尺寸、
-标题栏、可见状态和关闭拦截都属于 Window API。
+Window sizes are set through page.window. width and height represent the outer frame size including the native border;
+page.width and page.height represent the read-only content area. Position, minimum size, maximum size,
+title bar, visibility, and close interception all belong to the Window API.
 
-子窗口可通过 anchor、offset 和 follow_parent 相对父窗口定位。modal=True
-会阻止父窗口接受输入。具体可用能力取决于平台；当前主要在 Windows 上验证。
+Child windows can be positioned relative to the parent via anchor, offset, and follow_parent. modal=True
+prevents the parent window from accepting input. The exact available capabilities depend on the platform; currently this is validated mainly on Windows.
 
-## 本章要点
+## Key points of this chapter
 
-route 只通知应用状态变化，应用决定显示什么；Subpage 是拥有独立 Page 和
-窗口配置的原生子窗口。查看[子窗口完整指南](../subpages.md)和
-[Window API](../window.md)了解平台差异。
+The route only notifies the application that state changed; the application decides what to show. A Subpage is a native subwindow with its own Page and
+window configuration. See the [full subwindow guide](../subpages.md) and the
+[Window API](../window.md) for platform differences.

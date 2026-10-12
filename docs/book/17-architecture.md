@@ -1,55 +1,55 @@
-# 架构与扩展 Saturn
+# Architecture and Extending Saturn
 
-应用开发通常只需要 Page、Control 和公开 widgets。理解这几个层次有助于
-排查问题，也能帮助有经验的开发者为项目贡献实现。
+Application development usually only needs Page, Control, and the public widgets. Understanding these layers helps
+with troubleshooting, and also helps experienced developers contribute implementations to the project.
 
-## 运行时层
+## The runtime layer
 
-saturn.run 在应用进程中创建 App，启动 pygame/SDL 窗口和所选 renderer，
-再创建 Page 并调用入口回调。App 管理 UI 事件循环、命令队列、后台 asyncio
-循环、多个子窗口和渲染器生命周期。
+saturn.run creates an App in the application process, starts the pygame/SDL window and the chosen renderer,
+then creates the Page and calls the entry callback. The App manages the UI event loop, the command queue, a background asyncio
+loop, multiple subwindows, and the renderer lifecycle.
 
-main 回调和控件事件不是 SDL 绘制钩子。普通代码应修改控件状态并调用
-update；只有 renderer 实现和平台适配层才直接使用 GPU、SDL 或原生句柄。
+The main callback and control events are not SDL draw hooks. Ordinary code should modify control state and call
+update; only renderer implementations and the platform adapter layer should use the GPU, SDL, or native handles directly.
 
-## 控件层
+## The control layer
 
-Control 提供布局尺寸、可见和禁用状态、变换、更新与生命周期。widgets 的
-子类定义内容、绘制几何、子节点和输入响应。Page 把控件树交给布局系统，
-再把绘制命令交给 Software 或 GPU renderer。
+Control provides layout sizing, visible and disabled states, transforms, updating, and lifecycle. Subclasses in widgets
+define content, drawn geometry, child nodes, and input responses. Page hands the control tree to the layout system,
+then hands the draw commands to the Software or GPU renderer.
 
-控件树有单一所有者。附着和移除会同步 page 与 parent 引用；在不同窗口
-复用同一个控件实例会造成所有权错误。
+The control tree has a single owner. Attaching and removing synchronizes the page and parent references; reusing the same
+control instance in different windows causes ownership errors.
 
-## 绘制层
+## The drawing layer
 
-Software renderer 提供不需要 OpenGL context 的绘制路径。OpenGL 和 Vulkan
-使用 GPU pipeline 处理几何、纹理、裁剪和部分效果。文字、图片和 SVG 需要
-源纹理或字体栅格化，因此“GPU renderer”不代表没有 CPU 准备工作。
+The Software renderer provides a drawing path that does not need an OpenGL context. OpenGL and Vulkan
+use the GPU pipeline to handle geometry, textures, clipping, and some effects. Text, images, and SVG require
+source textures or font rasterization, so a "GPU renderer" does not mean there is no CPU preparation work.
 
-Shader 是公开的 GPU 绘制入口之一，不是所有控件的后处理滤镜。自定义 GLSL
-需要 GPU renderer；Software 只绘制 fallback。
+Shader is one of the public GPU drawing entry points, not a post-processing filter for all controls. Custom GLSL
+requires a GPU renderer; Software only draws the fallback.
 
-## 从哪里开始修改
+## Where to start making changes
 
-- 新公开类型：实现控件/类型，导出于 saturn.__init__，更新 API 类别；
-- 新构造参数：更新控件实现、参数说明和相关对照表；
-- 新控件示例：编辑 tools/control_examples.py，并生成预览截图；
-- 手写用户指南：放在 docs/ 或 docs/book/，不要放入生成的 docs/api 页面；
-- renderer 或事件改变：添加覆盖真实行为的测试，并检查 Software、OpenGL
-  和 Vulkan 的适用范围。
+- New public type: implement the control/type, export it from saturn.__init__, update the API categories;
+- New constructor parameter: update the control implementation, parameter descriptions, and the relevant comparison tables;
+- New control example: edit tools/control_examples.py and generate preview screenshots;
+- Hand-written user guides: put them in docs/ or docs/book/, not in the generated docs/api pages;
+- Renderer or event changes: add tests covering real behavior, and check the applicability across Software, OpenGL,
+  and Vulkan.
 
-API 文档生成器会验证公开符号目录、控件示例集合、图像和 Markdown 链接。
-修改导出 API 时运行它，避免文档索引和源码漂移。
+The API documentation generator validates the public symbol catalog, the control example collection, images, and Markdown links.
+Run it when modifying exported APIs to keep the documentation index and the source from drifting apart.
 
-## 可选 Web Runtime
+## The optional Web runtime
 
-saturn.web 复用 Page 和一部分 Control API，但有独立的 FastAPI app、会话注册表、
-序列化场景和浏览器 Canvas renderer。桌面和 Web 不是同一个绘制后端；某个
-Control 可在桌面使用，不代表 Web 有它的序列化和输入适配器。
+saturn.web reuses Page and a subset of the Control API, but has its own FastAPI app, session registry,
+serialized scenes, and browser Canvas renderer. Desktop and Web are not the same drawing backend; the fact that a
+Control works on desktop does not mean Web has its serialization and input adapters.
 
-## 本章要点
+## Key points of this chapter
 
-公共 API 由运行时、控件树和 renderer 共同实现。扩展时应保持层次清晰，让
-语义留在 Control/Widget，将平台特定操作放在适当的适配层，并用面向用户的
-指南解释最终行为。
+The public API is implemented jointly by the runtime, the control tree, and the renderer. When extending, keep the layers clean: leave
+semantics in Control/Widget, put platform-specific operations in the appropriate adapter layer, and explain the final behavior with user-facing
+guides.

@@ -1,9 +1,9 @@
-# 列表、滚动与性能
+# Lists, Scrolling, and Performance
 
-ListView 用于显示纵向或横向滚动内容。它拥有固定视口，并在滚动时处理
-内部子控件的布局和裁剪。
+ListView is used to display vertically or horizontally scrolling content. It owns a fixed viewport and handles
+internal child layout and clipping while scrolling.
 
-## 建立列表
+## Building a list
 
 ~~~python
 rows = [
@@ -25,10 +25,10 @@ list_view = saturn.ListView(
 page.add(list_view)
 ~~~
 
-ListView 可用 horizontal=True 改为横向滚动。scroll 可选 AUTO、ALWAYS、
-HIDDEN 或 NONE；具体滚动方式以当前桌面实现为准。
+ListView can scroll horizontally with horizontal=True. `scroll` can be AUTO, ALWAYS,
+HIDDEN, or NONE; the exact scrolling behavior depends on the current desktop implementation.
 
-## 追加内容
+## Appending content
 
 ~~~python
 def add_row(event):
@@ -36,12 +36,12 @@ def add_row(event):
     list_view.update()
 ~~~
 
-列表的直接子项发生变化后，更新 ListView。若 auto_scroll=True，内容变化后
-会滚到末尾。也可以用 scroll_to(offset=...) 或 delta=... 控制位置。
+Update the ListView after its direct children change. If auto_scroll=True, the view scrolls
+to the end when content changes. You can also control the position with scroll_to(offset=...) or delta=....
 
-## 长列表
+## Long lists
 
-如果每一行高度固定，给 ListView 设置 item_extent，或给每个子项明确 height：
+If every row has a fixed height, set item_extent on the ListView, or give each child an explicit height:
 
 ~~~python
 list_view = saturn.ListView(
@@ -52,14 +52,14 @@ list_view = saturn.ListView(
 )
 ~~~
 
-已知行高时 Saturn 可以只摆放视口附近的控件；控件对象仍然存在于 Python
-列表中，因此这不是一个会按需创建业务对象的分页数据源。高度不固定的行
-仍需测量，窗口宽度变化也可能触发行高重算。
+When row heights are known, Saturn can lay out only the controls near the viewport; the control objects still exist in the Python
+list, so this is not a paged data source that creates business objects on demand. Rows with non-fixed heights
+still need measuring, and window width changes may trigger row height recomputation.
 
-可用 first_item_prototype 或 prototype_item 复用原型尺寸，但只有当行高
-一致时才适用。快速跳转到尚未测量的可变高度内容时，布局可能需要先完成测量。
+first_item_prototype or prototype_item can reuse a prototype size, but this only applies when row heights
+are consistent. When jumping quickly to variable-height content that hasn't been measured yet, layout may need to complete measurement first.
 
-## 滚动事件
+## Scroll events
 
 ~~~python
 def scrolled(event):
@@ -69,19 +69,19 @@ def scrolled(event):
 list_view.on_scroll = scrolled
 ~~~
 
-事件会按 scroll_interval 合并高频通知。若只需要视觉滚动效果，不要在每个
-滚动事件中重建整棵列表；只更新确实变化的内容。
+Events merge high-frequency notifications according to scroll_interval. If you only need the visual scrolling effect, don't rebuild the entire list on every
+scroll event; update only what actually changed.
 
-## 性能建议
+## Performance tips
 
-- 给同高度的大列表设置 item_extent。
-- 不要在滚动回调里同步执行磁盘、网络或长时间计算。
-- 控件样式尽量复用主题，避免为每一行创建重复的复杂阴影。
-- 一次批量修改多个行后，调用一次 list_view.update()。
-- 若列表数据来自服务端，将数据分页逻辑保留在应用层；ListView 不会替你
-  请求更多数据。
+- Set item_extent for large lists with uniform row heights.
+- Don't perform disk, network, or long computations synchronously in scroll callbacks.
+- Reuse theme styles for control styling as much as possible; avoid creating duplicate complex shadows for every row.
+- After batch-modifying many rows, call list_view.update() once.
+- If list data comes from a server, keep the data pagination logic in the application layer; ListView will not
+  request more data for you.
 
-## 本章要点
+## Key points of this chapter
 
-ListView 管视口、滚动和可见布局；应用仍然拥有数据和控件实例。更多细节见
-[ListView API](../api/ListView.md) 和[渲染性能说明](../rendering.md)。
+ListView manages the viewport, scrolling, and visible layout; the application still owns the data and control instances. For more details see
+the [ListView API](../api/ListView.md) and the [rendering performance notes](../rendering.md).

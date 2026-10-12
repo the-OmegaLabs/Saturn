@@ -1,9 +1,9 @@
-# 主题、颜色与字体
+# Theme, Colors, and Fonts
 
-Page 统一管理颜色方案、明暗模式和字体别名。优先从主题开始，再对少数
-控件覆盖颜色，避免每个按钮都写一组重复参数。
+The Page centrally manages the color scheme, light/dark mode, and font aliases. Start from the theme first, then override colors on the few
+controls that need it, avoiding writing a duplicate set of parameters on every button.
 
-## 明暗主题
+## Light and dark themes
 
 ~~~python
 page.theme_mode = saturn.ThemeMode.DARK
@@ -11,17 +11,17 @@ page.theme = saturn.Theme(font_family="Inter", color_scheme_seed="#6750A4")
 page.dark_theme = saturn.Theme(font_family="Inter", color_scheme_seed="#6750A4")
 ~~~
 
-ThemeMode 有 LIGHT、DARK 和 SYSTEM。显式指定 LIGHT 或 DARK 时更容易在
-不同电脑上得到一致结果；SYSTEM 会跟随平台当前的应用明暗偏好。
+ThemeMode has LIGHT, DARK, and SYSTEM. Explicitly specifying LIGHT or DARK makes it easier to get consistent results
+across different computers; SYSTEM follows the platform's current app light/dark preference.
 
-color_scheme_seed 只选择 Saturn 已支持的颜色角色方案，不是完整的 Material
-动态配色引擎。颜色令牌可从 saturn.Colors 使用，例如 PRIMARY、
-ON_SURFACE、SURFACE_CONTAINER 和 ERROR。控件级的 color、bgcolor 等参数
-仍可覆盖主题。
+color_scheme_seed only selects among the color role schemes Saturn already supports; it is not a full Material
+dynamic-color engine. Color tokens are available from saturn.Colors, for example PRIMARY,
+ON_SURFACE, SURFACE_CONTAINER, and ERROR. Control-level parameters like `color` and `bgcolor`
+can still override the theme.
 
-## 本地字体
+## Local fonts
 
-在 Page 注册字体文件，再按别名使用：
+Register font files on the Page, then use them by alias:
 
 ~~~python
 from pathlib import Path
@@ -32,19 +32,19 @@ page.theme = saturn.Theme(font_family="brand")
 page.add(saturn.Text("Brand font", font_family="brand", size=24))
 ~~~
 
-支持本地 TTF、OTF、TTC、WOFF 和 WOFF2。相对路径先相对于当前工作目录，
-然后尝试 assets 目录；发布应用时建议从 __file__ 构造明确路径。
+Local TTF, OTF, TTC, WOFF, and WOFF2 are supported. Relative paths are first resolved against the current working directory,
+then against the assets directory; when shipping an app, it is recommended to build an explicit path from `__file__`.
 
-HTTP(S) 字体会在后台加载。加载过程中先显示回退字体，完成后 Saturn 会
-重新测量文字并刷新布局。下载失败会保留回退文字并输出警告。page.fonts
-字典修改后调用 page.update()。
+HTTP(S) fonts load in the background. During loading the fallback font is shown first; once loaded, Saturn
+re-measures the text and refreshes the layout. If the download fails, the fallback text is kept and a warning is logged. After modifying the page.fonts
+dict, call page.update().
 
-Saturn 自带 Inter，并可通过可选的 CJK 字体包安装中文字体。显式设置
-fallback 列表有助于控制混合语言文本的字形来源。
+Saturn ships with Inter, and Chinese fonts can be installed via the optional CJK font package. Explicitly setting a
+fallback list helps control the glyph source for mixed-language text.
 
-## 颜色和文字样式
+## Colors and text styles
 
-可以直接在控件上设置颜色，也可以构造 TextStyle：
+You can set colors directly on controls, or construct a TextStyle:
 
 ~~~python
 heading = saturn.Text(
@@ -57,13 +57,13 @@ heading = saturn.Text(
 )
 ~~~
 
-Text 也支持 size、weight、italic、text_align、max_lines、no_wrap 和
-overflow 等常用选项。完整细节请查 [Text](../api/Text.md) 与
-[TextStyle](../api/TextStyle.md)。
+Text also supports common options such as size, weight, italic, text_align, max_lines, no_wrap, and
+overflow. For full details see [Text](../api/Text.md) and
+[TextStyle](../api/TextStyle.md).
 
-## 主题变化
+## Theme changes
 
-修改 Page 主题或主题模式后，调用 page.update() 应用新样式：
+After modifying the Page theme or theme mode, call page.update() to apply the new styles:
 
 ~~~python
 def toggle_theme(event):
@@ -75,9 +75,9 @@ def toggle_theme(event):
     page.update()
 ~~~
 
-主题按 Page 隔离。原生子窗口最初继承父窗口主题和字体，但后续可以独立配置。
+Themes are isolated per Page. Native subwindows initially inherit the parent window's theme and fonts, but can be configured independently afterwards.
 
-## 本章要点
+## Key points of this chapter
 
-主题控制应用默认值，控件参数处理局部例外，字体别名将资源路径和样式解耦。
-窗口和平台主题边界见 [Page 指南](../page.md)。
+The theme controls application defaults, control parameters handle local exceptions, and font aliases decouple resource paths from styles.
+For window and platform theme boundaries see the [Page guide](../page.md).

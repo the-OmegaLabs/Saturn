@@ -1,31 +1,31 @@
-# 平台适配层与 Win32 拆分
+# Platform Adapters and the Win32 Split
 
-Saturn 目前以 Windows 为主要开发环境，但 Linux 改造需要先固定边界：控件、
-布局、主题、事件和渲染接口保持平台无关；窗口系统、DPI、原生拖拽、任务栏、
-模块监控和 GPU 绑定由平台适配器实现。
+Saturn currently uses Windows as its primary development environment, but the Linux work requires fixing the boundaries first: controls,
+layout, theme, events, and rendering interfaces stay platform-independent; the window system, DPI, native dragging, the taskbar,
+module monitoring, and GPU binding are implemented by platform adapters.
 
-## 已完成的第一步
+## The first step, already done
 
-- `saturn/platform/base.py` 定义 `PlatformAdapter` 和
-  `PlatformCapabilities`。
-- `saturn/platform/windows.py` 集中 Windows DPI、窗口矩形、深色标题栏、
-  modal owner、实时 resize watch 和模块枚举。
-- `saturn/platform/windows_native.py` 集中 Win32 窗口样式、透明度、拖拽、
-  resize、任务栏进度/徽章和 COM 资源。
-- `saturn/platform/windows_gl.py` 集中 WGL GPU affinity/association。
-- `saturn/platform/linux.py` 和 `saturn/platform/other.py` 提供可扩展的空适配器；
-  Linux 已有 `/proc/self/maps` 模块快照。
-- `saturn/_native_window.py` 保留为旧私有导入的兼容转发，不再承载实现。
-- `App`、`Window`、`Page`、`Subpage`、`WindowDragArea`、颜色偏好和模块监控
-  已通过适配器访问平台能力。
+- `saturn/platform/base.py` defines `PlatformAdapter` and
+  `PlatformCapabilities`.
+- `saturn/platform/windows.py` centralizes Windows DPI, window rectangles, dark title bars,
+  modal owner, real-time resize watch, and module enumeration.
+- `saturn/platform/windows_native.py` centralizes Win32 window styles, transparency, dragging,
+  resize, taskbar progress/badge, and COM resources.
+- `saturn/platform/windows_gl.py` centralizes WGL GPU affinity/association.
+- `saturn/platform/linux.py` and `saturn/platform/other.py` provide extensible empty adapters;
+  Linux already has a `/proc/self/maps` module snapshot.
+- `saturn/_native_window.py` is kept as a compatibility forwarder for old private imports and no longer carries implementation.
+- `App`, `Window`, `Page`, `Subpage`, `WindowDragArea`, color preferences, and module monitoring
+  already access platform capabilities through the adapters.
 
-## 代码约束
+## Code constraints
 
-公共核心代码不应直接出现 `ctypes.windll`、`ctypes.WinDLL`、`winreg`、
-`WGL` 或 `sys.platform == "win32"`。平台判断只放在
-`saturn/platform/__init__.py`；平台原生库只在对应适配器中延迟加载。
+Public core code should not directly contain `ctypes.windll`, `ctypes.WinDLL`, `winreg`,
+`WGL`, or `sys.platform == "win32"`. Platform detection lives only in
+`saturn/platform/__init__.py`; platform-native libraries are lazily loaded only in their corresponding adapters.
 
-能力的正确调用方式是：
+The correct way to call a capability is:
 
 ```python
 platform = app.platform
@@ -33,19 +33,19 @@ if platform.supports("native_window_dragging"):
     await page.window.start_dragging()
 ```
 
-Wayland 不允许模拟窗口定位、全局输入或 layer-shell 的能力。适配器应返回
-明确的不支持状态，或让公开 API 抛出可理解的 `NotImplementedError`。
+Wayland does not allow simulating window positioning, global input, or layer-shell capabilities. Adapters should return
+an explicit unsupported state, or make the public API raise an understandable `NotImplementedError`.
 
-## 下一步 Linux 工作
+## Next Linux steps
 
-1. 先验证 SDL Software/OpenGL 在 Ubuntu、Fedora 的 X11 和 Wayland 上创建、
-   resize、输入、字体和多显示器窗口。
-2. 在 `linux.py` 中实现通用能力，再按需要增加 `linux_x11.py` 与
-   `linux_wayland.py`，不要把两套协议混进核心窗口类。
-3. 把剪贴板、文件选择、通知、托盘和桌面入口放到 services 层，优先使用
-   xdg-desktop-portal、D-Bus 和标准桌面协议。
-4. 面板、启动器、设置中心和通知中心放到 shell 层；完整 compositor、锁屏、
-   会话和权限边界保持独立进程。
+1. First verify that SDL Software/OpenGL can create, resize, take input, render fonts, and handle multi-monitor windows
+   on Ubuntu and Fedora, under both X11 and Wayland.
+2. Implement common capabilities in `linux.py`, then add `linux_x11.py` and
+   `linux_wayland.py` as needed; do not mix the two protocols into the core window classes.
+3. Put the clipboard, file selection, notifications, tray, and desktop entries in the services layer, preferring
+   xdg-desktop-portal, D-Bus, and standard desktop protocols.
+4. Put the panel, launcher, settings center, and notification center in the shell layer; keep a full compositor, lock screen,
+   session, and permission boundaries in separate processes.
 
-完整的可行性评估、路线图、测试矩阵和桌面环境范围见
-[Linux 桌面路线图](./linux-desktop-roadmap.md)。
+For the full feasibility assessment, roadmap, test matrix, and desktop environment scope, see the
+[Linux desktop roadmap](./linux-desktop-roadmap.md).

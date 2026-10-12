@@ -1,12 +1,11 @@
-# 动画与渲染后端
+# Animation and Render Backends
 
-Saturn 的动画可以通过 animate_* 属性描述，也可以使用控件和 Expressive
-控件内置的状态动画。绘制后端由 saturn.run 的 backend 参数选择。
+Saturn animations can be described with animate_* properties, or by using the built-in state animations of
+controls and Expressive controls. The drawing backend is chosen by the backend parameter of saturn.run.
 
-## 属性动画
+## Property animation
 
-控件支持 opacity、size、position、align、margin、rotation、scale 和 offset
-的动画配置：
+Controls support animation configuration for opacity, size, position, align, margin, rotation, scale, and offset:
 
 ~~~python
 panel = saturn.Container(
@@ -25,13 +24,13 @@ panel.opacity = 0.3
 panel.update()
 ~~~
 
-动画发生在目标值改变后。Duration 可以使用 milliseconds、seconds 等字段；
-AnimationCurve 决定插值速度。动画完成后可使用 on_animation_end。
+The animation happens after the target value changes. Duration can use fields such as milliseconds and seconds;
+AnimationCurve determines the interpolation speed. on_animation_end can be used after the animation completes.
 
-旋转、缩放和 offset 既影响绘制也影响命中测试，除非对应类型关闭
-transform_hit_tests。GPU 旋转裁剪使用保守的轴对齐范围。
+Rotation, scale, and offset affect both drawing and hit testing, unless the corresponding type disables
+transform_hit_tests. GPU rotation clipping uses conservative axis-aligned bounds.
 
-## 选择后端
+## Choosing a backend
 
 ~~~python
 saturn.run(main, backend=saturn.Renderer.SOFTWARE)
@@ -39,27 +38,27 @@ saturn.run(main, backend=saturn.Renderer.OPENGL)
 saturn.run(main, backend=saturn.Renderer.VULKAN)
 ~~~
 
-OpenGL 是支持最完整的 GPU 后端；Software 便于在没有 GPU 或需要稳定诊断
-时运行；Vulkan 仍是实验性后端。运行中的实际后端从
-page.renderer.name 读取：
+OpenGL is the GPU backend with the most complete support; Software is convenient when running without a GPU or when stable diagnostics are needed;
+Vulkan is still an experimental backend. The backend actually in use is read from
+page.renderer.name:
 
 ~~~python
 def main(page):
     print(page.renderer.name)
 ~~~
 
-renderer.anti_aliasing 和 renderer.vsync 都是布尔设置，默认开启。更改它们
-会排队到 UI 线程并可能触发重新布局或交换链重建。
+renderer.anti_aliasing and renderer.vsync are both boolean settings, enabled by default. Changing them
+is queued to the UI thread and may trigger re-layout or swap chain recreation.
 
-## GPU 选择和回退
+## GPU selection and fallback
 
 ~~~python
 saturn.run(main, backend=saturn.Renderer.VULKAN, gpu="Intel")
 saturn.run(main, backend=saturn.Renderer.VULKAN, gpu=1)
 ~~~
 
-gpu 可以是设备名称、唯一子串或索引。实际设备从 gpu_name、gpu_index 和
-gpus 读取。选择无效或初始化失败时，应用可能回退到软件后端：
+gpu can be a device name, a unique substring, or an index. The actual device is read from gpu_name, gpu_index, and
+gpus. When the selection is invalid or initialization fails, the application may fall back to the software backend:
 
 ~~~python
 def report(event):
@@ -70,16 +69,16 @@ page.on_render_failed = report
 page.on_render_ready = lambda event: print(event.backend, event.fallback)
 ~~~
 
-回退是启动恢复机制，不会在运行期间替换一个已经失败的着色器或任意绘制
-调用。应用应该为 Software 后端准备可见的 fallback 行为。
+Fallback is a startup recovery mechanism; it will not replace an already-failed shader or arbitrary draw
+calls at runtime. The application should prepare visible fallback behavior for the Software backend.
 
-## 着色器
+## Shaders
 
-Shader 可以使用内置 ShaderEffect，也可以传入 GLSL 字符串或 Path。GPU 后端
-执行自定义片段；Software 后端绘制 fallback_color。详细的 uniform、include、
-缓冲区和错误处理见[着色器章节](../shaders.md)。
+A Shader can use the built-in ShaderEffect, or pass a GLSL string or a Path. The GPU backend
+executes the custom fragment; the Software backend draws fallback_color. For detailed uniform, include,
+buffer, and error handling, see the [shader chapter](../shaders.md).
 
-## 本章要点
+## Key points of this chapter
 
-动画改变的是控件状态，renderer 决定状态如何绘制。先用 Software 验证布局
-和事件，再用 OpenGL 或 Vulkan 验证 GPU 效果。不要把 UI 线程当作耗时计算线程。
+Animations change control state, and the renderer decides how that state is drawn. Validate layout
+and events with Software first, then validate GPU effects with OpenGL or Vulkan. Do not treat the UI thread as a thread for time-consuming computation.

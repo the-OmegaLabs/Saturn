@@ -1,81 +1,81 @@
-# 项目脚手架：第一个窗口
+# Project scaffold: the first window
 
-[← 手册目录](./README.md) · [下一章：页面与控件树](./book/03-page-control-tree.md)
+[← Handbook contents](./README.md) · [Next chapter: Page and the control tree](./book/03-page-control-tree.md)
 
-本章会建立一个很小的 Saturn 应用。例子采用 Application 类保存界面对象，
-并把 create_window 作为 saturn.run 的入口回调。
+This chapter builds a very small Saturn application. It uses a class to hold the interface objects, as the entry callback for saturn.run.
 
-## 1. 创建项目
+## 1. Create the project
 
-Saturn 当前没有发布到 PyPI 上的这个项目包名；PyPI 上另有一个名为 Saturn
-的时间日期库。创建新项目时，从 Saturn 仓库安装，避免执行 uv add saturn
-或 pip install saturn 后装到同名的其他包。
+Saturn is not currently published to PyPI. When creating a new project, install from the Saturn repository to avoid installing a different
+same-named package after running `uv add saturn`
+or `pip install saturn`.
 
-使用 uv 创建 Python 项目，并把 Saturn 仓库作为依赖：
+Use uv to create a Python project and add the Saturn repository as a dependency:
 
 ~~~powershell
-uv init hello-saturn
-cd hello-saturn
+uv init hello
 uv add "saturn @ git+https://github.com/the-OmegaLabs/Saturn.git"
 ~~~
 
-项目目录可以保持很简单：
+The project directory can stay very simple:
 
 ~~~text
-hello-saturn/
+hello/
 ├── main.py
 ├── pyproject.toml
 └── uv.lock
 ~~~
 
-uv 会维护依赖和锁文件。提交 uv.lock 可以让其他开发者安装同一组版本。
-开发 Saturn 本身时，则克隆仓库并运行 uv sync；这会安装仓库示例所需的
-依赖。
+uv maintains the dependencies and the lock file. Committing uv.lock lets other developers install the same set of versions.
+When developing Saturn itself, clone the repository and run `uv sync`; this installs the
+dependencies needed by the repository examples.
 
-## 2. 写入最小应用
+## 2. Write the minimal application
 
-在 main.py 中写入：
+Write the following in main.py:
 
 ~~~python
 import saturn
 
 
-class Application:
+class Application: # your application class
     def __init__(self):
         pass
 
     def create_window(self, page: saturn.Page):
-        self.page = page
+        self.page = page # attach the page
 
-        hello = saturn.Text(value="Hello, World!")
+        hello = saturn.Text(value="Hello, World!") # a text control
 
-        self.page.add(hello)
+        self.page.add(hello) # add the control to the control tree
 
 
 if __name__ == "__main__":
-    saturn.run(main=Application().create_window)
+    saturn.run(main=Application().create_window) # run the Saturn application
 ~~~
 
-运行它：
+Run it:
 
 ~~~powershell
-uv run python main.py
+uv run main.py
 ~~~
 
-窗口中会出现 “Hello, World!”。这几行建立了 Saturn 应用的基本结构：
+A window appears with "Hello, World!". These lines establish the basic structure of a Saturn application:
 
-- Application 是你自己的应用对象，可以在其中保存控件引用和应用状态。
-- create_window 是入口回调；saturn.run 启动后会将新建的 Page 传给它。
-- Page 是当前窗口的根控件，使用 page.add() 将控件加入可见的界面。
-- Text 是一个显示文字的控件。
+- `Application` is your own application object, where you can keep control references and application state.
+- `.create_window` is the entry callback; after `saturn.run` starts, it passes the newly created `Page` to it.
+- `Page` is the root control of the current window; use `page.add()` to add controls to the visible interface.
+- `Text` is a control that displays text.
 
-注意 saturn.run(main=Application().create_window) 最后没有括号。带括号会
-立刻调用 create_window，但此时还没有 Page 可以传入。绑定方法会保留
-Application 实例，运行期间可以访问 self。
+Note that `saturn.run(main=Application().create_window)` has no parentheses at the end.
 
-## 3. 添加按钮和可变状态
+With parentheses,
+`.create_window` would be called immediately, but at that point there is no `Page` to pass in yet. The bound method keeps the
+`Application` instance, so during the run you can access `self`, letting functions within the program share variables.
 
-现在给文字添加点击行为。把 Application 替换为：
+## 3. Add a button and mutable state
+
+Now add click behavior to the text. Replace `Application` with:
 
 ~~~python
 import saturn
@@ -83,38 +83,44 @@ import saturn
 
 class Application:
     def __init__(self):
-        self.click_count = 0
+        self.click_count = 0 # a variable shared within the class
 
     def create_window(self, page: saturn.Page):
         self.page = page
-        page.title = "Hello Saturn"
-        page.padding = 24
 
+        self.page.title = "Hello Saturn" # set the window title
+        self.page.padding = 24 # set the page padding
+
+        # a text control, mounted on the class so other class functions can modify it.
         self.message = saturn.Text(value="Hello, World!", size=28)
-        button = saturn.FilledButton("Click me", on_click=self.handle_click)
+        
+        # a button, passing the function into on_click (called when the user clicks)
+        button = saturn.Button("Click me", on_click=self.handle_click)
 
+        # add the controls to the control tree
         page.add(self.message, button)
 
     def handle_click(self, event: saturn.ControlEvent):
-        self.click_count += 1
-        self.message.value = f"Clicked {self.click_count} times"
-        self.message.update()
+        self.click_count += 1 # modify the variable
+
+        self.message.value = f"Clicked {self.click_count} times" # modify the text control's content
+        self.message.update() # manually update the control
 
 
 if __name__ == "__main__":
     saturn.run(main=Application().create_window)
 ~~~
 
-控件是可变对象。事件处理器修改 message.value 后，调用
-message.update() 请求重新布局和绘制该控件。若一次操作修改了多个控件，
-可以在修改结束后调用 page.update()。
+Controls are mutable objects. After an event handler modifies `message.value`, it can call
+`message.update()` to request re-layout and redraw of that control. If a single operation modifies several controls,
+you can call `page.update()` after the modifications are finished.
 
-page.add() 和 page.remove() 等页面方法会自行请求更新；直接修改普通属性或
-嵌套控件列表时，记得调用所属控件的 update() 或 page.update()。
+Page methods like `page.add()` and `page.remove()` request an update themselves; when directly modifying ordinary properties or
+nested control lists, remember to call the owning control's `update()` or `page.update()`.
 
-## 4. 常用窗口设置
+## 4. Common window settings
 
-入口回调中可以设置标题、窗口大小、主题和页面边距：
+Inside the entry callback you can set the title, window size, theme, and page padding:
 
 ~~~python
 def create_window(self, page: saturn.Page):
@@ -126,15 +132,16 @@ def create_window(self, page: saturn.Page):
     page.add(saturn.Text("Tasks"))
 ~~~
 
-page.window.width 和 height 设置原生窗口外框的尺寸；page.width 与
-page.height 是只读的内容区域尺寸。详情见[窗口章节](./window.md)。
+Modifying `page.window.width` and `height` sets the size of the native window's outer frame;
 
-## 接下来
+`page.width` and `page.height` are the read-only content area sizes. For details see the [window chapter](./window.md).
 
-- 学习 [Page、控件树与更新](./book/03-page-control-tree.md)，理解控件如何归属页面。
-- 使用 [Row、Column 和 Container](./book/04-layout.md) 排列内容。
-- 在 [事件与状态](./book/05-events-state.md) 中扩展交互。
-- 查阅 [Text](./api/Text.md)、[FilledButton](./api/FilledButton.md) 和
-  [Page](./api/Page.md) 的完整 API。
-- 在仓库中运行 [hello 示例](../examples/hello.py) 和
-  [控件画廊](./gallery.md)。
+## What's next
+
+- Study [Page, the Control Tree, and Updates](./book/03-page-control-tree.md) to understand how controls belong to a page.
+- Use [Row, Column, and Container](./book/04-layout.md) to arrange content.
+- Extend interaction in [Events and State](./book/05-events-state.md).
+- Consult the full APIs of [Text](./api/Text.md), [FilledButton](./api/FilledButton.md), and
+  [Page](./api/Page.md).
+- Run the [hello example](../examples/hello.py) and the
+  [control gallery](./gallery.md) in the repository.

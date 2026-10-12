@@ -1,18 +1,18 @@
-# 安装与运行
+# Installation and Running
 
-## 系统要求
+## System requirements
 
-- Python 3.10 或更高版本；
-- 一个能运行 SDL 的桌面环境；
-- 使用 OpenGL 时需要可用的 OpenGL 驱动；
-- 使用 Vulkan 时需要 Vulkan 驱动、可选的 vulkan Python 包和相应工具链。
+- Python 3.10 or later;
+- A desktop environment capable of running SDL;
+- Working OpenGL drivers when using OpenGL;
+- Vulkan drivers, the optional `vulkan` Python package, and the corresponding toolchain when using Vulkan.
 
-Saturn 当前主要在 Windows 上开发和验证。其他平台的代码路径正在建设中；
-即使能启动，也应先验证窗口、输入和字体行为。
+Saturn is currently developed and validated mainly on Windows. Code paths for other platforms are under construction;
+even if they start, you should first verify window, input, and font behavior.
 
-## 从源码运行 Saturn
+## Running Saturn from source
 
-这是贡献者和想运行仓库示例的方式：
+This is how contributors and people who want to run the repository examples do it:
 
 ~~~powershell
 git clone https://github.com/the-OmegaLabs/Saturn.git
@@ -21,29 +21,29 @@ uv sync
 uv run python examples/hello.py
 ~~~
 
-也可以在已激活的虚拟环境中安装可编辑版本：
+You can also install an editable version into an already activated virtual environment:
 
 ~~~powershell
 python -m pip install -e .
 ~~~
 
-uv sync 会安装 pyproject.toml 中的默认示例组。浏览器示例需要 web 可选依赖：
+`uv sync` installs the default example groups from pyproject.toml. The browser examples require the `web` optional dependency:
 
 ~~~powershell
 uv sync --extra web
 ~~~
 
-Vulkan 和额外字体、图标包是独立的可选项：
+Vulkan and the extra font and icon packages are separate optional extras:
 
 ~~~powershell
 uv sync --extra vulkan
 uv sync --extra cjk --extra icons
 ~~~
 
-## 在新项目中使用
+## Using Saturn in a new project
 
-Saturn 的项目仓库地址是
-https://github.com/the-OmegaLabs/Saturn。安装时建议显式使用 Git URL：
+The Saturn repository lives at
+[https://github.com/the-OmegaLabs/Saturn](https://github.com/the-OmegaLabs/Saturn). When installing, prefer using the Git URL explicitly:
 
 ~~~powershell
 uv init hello-saturn
@@ -51,50 +51,48 @@ cd hello-saturn
 uv add "saturn @ git+https://github.com/the-OmegaLabs/Saturn.git"
 ~~~
 
-PyPI 上有另一个同名的 Saturn 时间日期库。直接执行 uv add saturn 或
-pip install saturn 可能得到错误的包；如果导入后找不到 Page、Text 或 run，
-先检查安装来源。
+There is another Saturn date/time library with the same name on PyPI. Running `uv add saturn` or
+`pip install saturn` directly may install the wrong package; if `Page`, `Text`, or `run` cannot be found after importing, check the install source first.
 
-## 验证导入
+## Verifying the import
 
 ~~~powershell
 uv run python -c "import saturn; print(saturn.__file__)"
 ~~~
 
-输出应指向当前虚拟环境或仓库中的 saturn/__init__.py。然后运行
-uv run python examples/hello.py；如果窗口出现，基础安装就完成了。
+The output should point to `saturn/__init__.py` in the current virtual environment or repository. Then run
+`uv run python examples/hello.py`; if a window appears, the base installation is complete.
 
-## 选择渲染后端
+## Choosing the render backend
 
-默认入口选择 OpenGL：
+The default entry point selects OpenGL:
 
 ~~~python
 saturn.run(main)
 ~~~
 
-需要诊断或没有可用 GPU 时，可以选择软件后端：
+For diagnostics or when no GPU is available, you can choose the software backend:
 
 ~~~python
 saturn.run(main, backend=saturn.Renderer.SOFTWARE)
 ~~~
 
-Vulkan 是实验性后端：
+The experimental Vulkan backend:
 
 ~~~python
 saturn.run(main, backend=saturn.Renderer.VULKAN)
 ~~~
 
-省略 backend 时可以通过环境变量选择：
+When `backend` is omitted, you can choose via an environment variable:
 
 ~~~powershell
 $env:SATURN_BACKEND = "software"
 uv run python main.py
 ~~~
 
-如果 GPU 初始化失败，OpenGL 和 Vulkan 会打印回退提示并尝试使用软件渲染。
-应用可以通过 page.on_render_failed 和 page.on_render_ready 记录这次恢复。
+If GPU initialization fails, OpenGL and Vulkan print a fallback notice and try software rendering.
+The application can record this recovery through `page.on_render_failed` and `page.on_render_ready`.
 
-## 下一步
+## Next steps
 
-安装完成后，按[项目脚手架](../getting-started.md)写入 main.py。不要先学习
-所有控件；先让一个 Text 和一个 Button 跑起来，再按需要查 API。
+Once installation is complete, follow the [project scaffold](../getting-started.md) to write your `main.py`. You don't need to learn every control; a rough understanding of this guide is enough, and you can consult the control APIs as needed.

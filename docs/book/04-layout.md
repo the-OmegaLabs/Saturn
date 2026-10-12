@@ -1,12 +1,12 @@
-# 布局：Row、Column、Stack 和 Container
+# Layout: Row, Column, Stack, and Container
 
-Saturn 的布局控件把“显示什么”和“放在哪里”分开。Text、Button 和
-TextField 提供内容；Row、Column、Stack 和 Container 决定位置、间距与装饰。
+Saturn's layout controls separate "what to show" from "where to put it". `Text`, `Button`, and
+`TextField` provide content; `Row`, `Column`, `Stack`, and `Container` decide position, spacing, and decoration.
 
-## Column 和 Row
+## Column and Row
 
-Column 从上到下排列子控件，Row 从左到右排列。两者都可以接收 controls
-列表或位置参数，并通过 spacing、对齐和 expand 控制空间。
+`Column` arranges children top to bottom, `Row` left to right. Both accept a `controls`
+list or positional arguments, and use `spacing`, alignment, and `expand` to control space.
 
 ~~~python
 import saturn
@@ -14,30 +14,37 @@ import saturn
 
 def main(page: saturn.Page):
     page.add(
-        saturn.Column([
-            saturn.Text("Account", size=24),
-            saturn.Row([
-                saturn.TextField(label="Name", expand=True),
-                saturn.FilledButton("Save"),
-            ], spacing=12, vertical_alignment=saturn.CrossAxisAlignment.CENTER),
-        ], spacing=16),
+        saturn.Column(
+            controls=[
+                saturn.Text("Account", size=24),
+                saturn.Row(
+                    controls=[
+                        saturn.TextField(label="Name", expand=True),
+                        saturn.Button("Save"),
+                    ], 
+                    spacing=12, 
+                    vertical_alignment=saturn.CrossAxisAlignment.CENTER
+                ),
+            ], 
+            spacing=16
+        ),
     )
 
 
 saturn.run(main)
 ~~~
 
-Column 的 vertical_alignment 和 Row 的 horizontal_alignment 使用
-MainAxisAlignment；反方向的对齐使用 CrossAxisAlignment。常用值包括
-START、CENTER、END、SPACE_BETWEEN 和 STRETCH。
+A `Column`'s `vertical_alignment` and a `Row`'s `horizontal_alignment` use
+`MainAxisAlignment`; alignment along the other direction uses `CrossAxisAlignment`. Common values include
+`START`, `CENTER`, `END`, `SPACE_BETWEEN`, and `STRETCH`.
 
-expand=True 让控件占用父布局的剩余空间；width 和 height 给出明确尺寸。
-只有父布局有可分配空间时，expand 才能体现效果。
+`expand=True` lets a control take the remaining space of its parent layout; `width` and `height` give explicit sizes.
+`expand` only has an effect when the parent layout has space to distribute.
 
 ## Container
 
-Container 可以包裹 content，并提供 padding、背景、边框、圆角、阴影、对齐
-和点击事件：
+`Container` can wrap `content` and offers `padding`, background, border, border radius, shadow, alignment,
+and click events:
 
 ~~~python
 card = saturn.Container(
@@ -50,20 +57,20 @@ card = saturn.Container(
 page.add(card)
 ~~~
 
-padding 是内容与边界之间的空间；margin 是控件与相邻控件之间的空间。
-需要四边不同的值时使用 saturn.Padding.only(...)：
+`padding` is the space between the content and the boundary; `margin` is the space between the control and its neighbors.
+Use `saturn.Padding.only(...)` when the four sides need different values:
 
 ~~~python
 page.padding = saturn.Padding.only(left=24, top=16, right=12, bottom=16)
 ~~~
 
-Card 是带有表面和阴影语义的容器，适合信息分组；Container 更适合需要
-精细控制装饰和点击区域的场景。
+`Card` is a container with surface and shadow semantics, suitable for grouping information; `Container` is better suited
+for scenarios that need fine-grained control over decoration and the clickable area.
 
 ## Stack
 
-Stack 让子控件重叠，后加入的控件绘制在上面。它适合把背景、内容和浮动
-操作组合在一个区域：
+`Stack` lets children overlap; controls added later draw on top. It suits combining a background, content, and floating
+actions in one area:
 
 ~~~python
 background = saturn.Container(
@@ -76,33 +83,33 @@ overlay = saturn.Text("Overlay", left=24, top=24)
 page.add(saturn.Stack([background, overlay], width=420, height=240))
 ~~~
 
-left、top、right、bottom 是相对父容器的定位值。Stack 中的控件仍然参加
-命中测试；如果上层控件覆盖了下层，点击会先到达上层。
+`left`, `top`, `right`, and `bottom` are positioning values relative to the parent container. Controls in a Stack still participate in
+hit testing; if an upper control covers a lower one, clicks reach the upper one first.
 
-## 对齐和响应式尺寸
+## Alignment and responsive sizing
 
-页面默认从左上开始布局。页面级设置可以改变根内容：
+The page lays out from the top left by default. Page-level settings can change the root content:
 
 ~~~python
 page.horizontal_alignment = saturn.CrossAxisAlignment.CENTER
 page.vertical_alignment = saturn.MainAxisAlignment.CENTER
 ~~~
 
-更常见的做法是让一个 Column 或 Container 负责对齐，让页面的其他区域
-保持独立。窗口尺寸变化时，使用 expand、宽度约束和 ListView 构建可以
-伸缩的内容；Saturn 目前没有 Flet 的完整 ResponsiveRow 和断点系统。
+A more common approach is to let a `Column` or `Container` handle alignment and keep the rest of the page
+independent. When the window size changes, use `expand`, width constraints, and `ListView` to build content that
+stretches; Saturn currently has no full `ResponsiveRow` and breakpoint system.
 
-## 布局排查
+## Layout troubleshooting
 
-1. 给外层容器临时设置 bgcolor，确认它的实际边界。
-2. 给需要填满空间的控件设置 width、height 或 expand。
-3. 检查 Row 和 Column 的主轴、交叉轴是否符合预期。
-4. 修改嵌套列表后调用外层控件的 update。
-5. 用 Software 后端排除 GPU 驱动造成的视觉干扰。
+1. Temporarily set `bgcolor` on the outer container to confirm its actual bounds.
+2. Set `width`, `height`, or `expand` on controls that need to fill space.
+3. Check that the `Row` and `Column` main axis and cross axis match your expectations.
+4. Call `update` on the outer control after modifying a nested list.
+5. Use the `Software` backend to rule out visual artifacts caused by `GPU` drivers.
 
-## 本章要点
+## Key points of this chapter
 
-先用 Column 建立垂直页面，再在需要的地方加入 Row；用 Container 提供
-空间和装饰，用 Stack 叠加内容。完整参数见
-[Row](../api/Row.md)、[Column](../api/Column.md)、
-[Container](../api/Container.md) 和 [Stack](../api/Stack.md)。
+First build a vertical page with `Column`, then add `Row`s where needed; use `Container` to provide
+space and decoration, and `Stack` to overlay content. For the full parameters see
+[Row](../api/Row.md), [Column](../api/Column.md),
+[Container](../api/Container.md), and [Stack](../api/Stack.md).

@@ -1,7 +1,7 @@
-# Page、控件树与更新
+# Page, the Control Tree, and Updates
 
-Saturn 的 UI 是一棵树。Page 是根节点，controls 是直接子节点，Row、
-Column、Stack、ListView 等容器继续拥有自己的子节点。
+Saturn's UI is a tree. `Page` is the root node, `controls` are its direct children, and containers
+like `Row`, `Column`, `Stack`, and `ListView` keep owning children of their own.
 
 ~~~python
 import saturn
@@ -9,17 +9,22 @@ import saturn
 
 def main(page: saturn.Page):
     title = saturn.Text("Today")
-    actions = saturn.Row([
-        saturn.Button("Refresh"),
-        saturn.Button("Settings"),
-    ], spacing=8)
+    
+    actions = saturn.Row(
+        controls=[
+            saturn.Button("Refresh"),
+            saturn.Button("Settings"),
+        ], 
+        spacing=8
+    )
+
     page.add(title, actions)
 
 
 saturn.run(main)
 ~~~
 
-这段代码建立的控件树如下：
+The control tree built by this code looks like this:
 
 ~~~text
 Page
@@ -29,9 +34,9 @@ Page
     └── Button("Settings")
 ~~~
 
-## 添加和删除
+## Adding and removing
 
-页面方法操作顶层控件：
+Page methods operate on the top-level controls:
 
 ~~~python
 page.add(saturn.Text("one"), saturn.Text("two"))
@@ -40,7 +45,7 @@ page.remove_at(1)
 page.clean()
 ~~~
 
-容器的 controls 列表也可以直接改变，但之后要更新拥有它的控件：
+A container's `controls` list can also be changed directly, but afterwards you must update the control that owns it:
 
 ~~~python
 items = saturn.Column()
@@ -48,12 +53,12 @@ items.controls.append(saturn.Text("new item"))
 items.update()
 ~~~
 
-一个 Control 不能同时出现在页面的两个位置。把同一个实例重复放入树会
-抛出 ValueError；要重复显示内容，请创建多个控件实例。
+A Control cannot appear in two places on the page at once. Putting the same instance into the tree repeatedly
+raises a ValueError; to show content more than once, create multiple control instances.
 
-## 修改属性
+## Modifying properties
 
-控件属性是可变的：
+Control properties are mutable:
 
 ~~~python
 message = saturn.Text("Waiting")
@@ -64,13 +69,13 @@ message.color = saturn.Colors.PRIMARY
 message.update()
 ~~~
 
-update 会重新协调控件归属，并在需要时重新布局。只改变不影响几何尺寸的
-外观时，repaint() 可以只请求绘制；普通应用使用 update() 更简单。
+`update` re-reconciles control ownership and re-lays-out when needed. When only appearance changes that don't affect geometry,
+`repaint()` can request a draw only; for ordinary applications, `update()` is simpler.
 
-`page.auto_update` 默认为 `True`。设为 `False` 后，控件的隐式更新、输入
-状态变化和动画帧不会自动请求新帧；控件树和状态仍会在内存中同步。可以手动调用
-`page.update()` 或 `page.repaint()` 强制显示最新状态，重新设为 `True` 时
-也会立即刷新一次：
+`page.auto_update` defaults to `True`. When set to `False`, implicit control updates, input
+state changes, and animation frames do not automatically request new frames; the control tree and state are still synchronized in memory. You can manually call
+`page.update()` or `page.repaint()` to force the latest state to be shown, and setting it back to `True`
+also refreshes immediately once:
 
 ~~~python
 page.auto_update = False
@@ -79,7 +84,7 @@ page.update()
 page.auto_update = True
 ~~~
 
-一次事件通常修改多个对象，最后统一更新一次：
+A single event usually modifies several objects; perform a single unified update at the end:
 
 ~~~python
 def reset(event):
@@ -88,13 +93,13 @@ def reset(event):
     page.update()
 ~~~
 
-事件回调可以接收零个参数，也可以接收一个事件对象。事件的 event.control
-是触发它的控件，event.page 是所属页面。
+Event callbacks can receive zero arguments, or one event object. An event's `event.control`
+is the control that triggered it, and `event.page` is the owning page.
 
-## 对话框和覆盖层
+## Dialogs and overlays
 
-AlertDialog 和 SnackBar 不放在普通 controls 中，而是由 page.show_dialog()
-放到 overlay：
+`AlertDialog` and `SnackBar` are not placed in ordinary `controls`; instead `page.show_dialog()`
+puts them into the page's `overlay`:
 
 ~~~python
 def save(event):
@@ -105,19 +110,22 @@ def close_dialog(event):
     page.pop_dialog()
 ~~~
 
-可见的 AlertDialog 会限制键盘焦点；SnackBar 是非阻塞提示。要自己控制
-生命周期，可以保存 dialog 引用并调用 page.pop_dialog(dialog)。
+A visible `AlertDialog` restricts keyboard focus; `SnackBar` is a non-blocking notice. To control the
+lifecycle yourself, keep a reference to the `dialog` and call `page.pop_dialog(dialog)`.
 
-## 所有权和线程
+## Ownership and threads
 
-控件附着到 Page 后，control.page 指向它的页面，control.parent 指向父控件。
-不要把一个已附着的控件跨页面复用。
+Once a control is attached to a `Page`, `control.page` points to its page and `control.parent` points to its parent control.
+Do not reuse an attached control across pages.
 
-页面回调由 Saturn 的工作线程或应用异步循环调度。回调中修改控件后调用
-update 是安全的；直接操作 SDL、窗口句柄或 GPU renderer 必须回到 UI 线程。
-需要把工作排入应用上下文时，可以使用 page.run_task(handler, ...)。
+Page callbacks are scheduled by Saturn's worker threads or the application's async loop. After modifying controls in a callback, calling
+`update` is safe;
 
-## 本章要点
+**Directly touching SDL, window handles, or the GPU renderer must happen on the UI thread.**
 
-先构建控件树，再在事件中修改状态，最后请求更新。接下来用 Row、Column、
-Container 和 Stack 把这棵树排成可读的界面。
+When you need to schedule work into the application context, use `page.run_task(handler, ...)`.
+
+## Key points of this chapter
+
+Build the control tree first, modify state in events, then request an update. Next, use `Row`, `Column`,
+`Container`, and `Stack` to arrange this tree into a readable interface.

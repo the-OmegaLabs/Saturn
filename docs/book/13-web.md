@@ -1,26 +1,25 @@
-# 在浏览器中运行
+# Running in the Browser
 
-Saturn 的桌面运行时由 saturn.run 启动。可选的 saturn.web 则用 FastAPI、
-WebSocket 和浏览器 Canvas 运行受支持的控件子集。Web 是独立部署路径，
-不会把原生窗口 API 变成浏览器窗口。
+Saturn's desktop runtime is started by saturn.run. The optional saturn.web, instead, runs a supported subset of controls using FastAPI,
+WebSocket, and the browser Canvas. Web is a separate deployment path; it does not turn native window APIs into browser windows.
 
-## 安装可选依赖
+## Installing the optional dependencies
 
 ~~~powershell
 uv add "saturn[web] @ git+https://github.com/the-OmegaLabs/Saturn.git"
 ~~~
 
-若开发的是 Saturn 仓库示例：
+If you are developing the Saturn repository examples:
 
 ~~~powershell
 uv sync --extra web
 uv run python examples/web_sessions.py
 ~~~
 
-打开终端输出的本地地址。示例支持独立页面、共享会话、同步文本、命名消息
-和滚动列表。
+Open the local address printed by the terminal. The example supports standalone pages, shared sessions, synchronized text, named messages,
+and scrolling lists.
 
-## 创建 FastAPI 应用
+## Creating a FastAPI application
 
 ~~~python
 from saturn.web import create_app
@@ -33,16 +32,16 @@ def main(page):
 app = create_app(main)
 ~~~
 
-create_app 返回标准 FastAPI app，可以像其他 ASGI 应用一样挂载路由。也可用
-saturn.web.run(main, host="127.0.0.1", port=8000) 由 Uvicorn 启动。
+create_app returns a standard FastAPI app, which can mount routes like any other ASGI application. You can also use
+saturn.web.run(main, host="127.0.0.1", port=8000) to start via Uvicorn.
 
-如果挂载到现有 FastAPI app，需在宿主 lifespan 中接入 Saturn Web child
-lifespan。详细写法见 [Web sessions](../web.md#fastapi-integration)。
+If you mount into an existing FastAPI app, you need to hook the Saturn Web child
+lifespan into the host lifespan. For details see [Web sessions](../web.md#fastapi-integration).
 
-## 独立视图和共享会话
+## Standalone views and shared sessions
 
-默认每个浏览器连接得到自己的 Page。想要两个标签共享同一棵控件树时，在
-首次修改 Page 之前选定同一个 session：
+By default, every browser connection gets its own Page. When you want two tabs to share the same control tree, pick the same session
+before first modifying the Page:
 
 ~~~python
 def main(page):
@@ -52,23 +51,23 @@ def main(page):
     page.add(saturn.Text("Shared page"))
 ~~~
 
-对共享控件的更新会同步给会话中的其他视图。视口大小、焦点、光标选择、
-输入法草稿、滚动位置和动画播放进度仍然是各自浏览器视图的状态。
+Updates to shared controls are synchronized to the other views in the session. Viewport size, focus, cursor selection,
+IME drafts, scroll positions, and animation playback progress remain the state of each individual browser view.
 
-自定义 session ID 只是状态选择器，不是身份验证。部署时使用 authorize
-校验请求；敏感资源需要自己的认证和授权策略。
+A custom session ID is only a state selector, not authentication. When deploying, use `authorize` to validate requests;
+sensitive resources need their own authentication and authorization policies.
 
-## Web 的功能边界
+## Web's feature boundaries
 
-Web 客户端使用 Canvas 2D。基础支持包括文字、按钮、输入、布局、图像、
-ListView、AlertDialog 和 SnackBar。原生文件对话框、子窗口、GPU Shader、
-完整的 TextField 装饰与所有桌面事件并不适用。
+The Web client uses Canvas 2D. Basic support includes text, buttons, input, layout, images,
+ListView, AlertDialog, and SnackBar. Native file dialogs, subwindows, GPU shaders,
+full TextField decorations, and all desktop events are not available.
 
-页面保持在服务进程内存中，服务重启会清除会话。当前注册表是单进程内存
-状态，生产部署使用一个 worker，或自行提供一致的外部会话架构。
+Pages stay in the memory of the serving process; a service restart clears the sessions. The current registry is a single-process, in-memory
+state; production deployments should use one worker, or provide their own consistent external session architecture.
 
-## 本章要点
+## Key points of this chapter
 
-saturn.web 是共享控件模型上的另一个 renderer 和会话层。先阅读
-[Web 会话指南](../web.md)了解事件顺序、授权、生命周期与覆盖情况，再部署
-给真实用户。
+saturn.web is another renderer and session layer on top of the shared control model. First read the
+[Web sessions guide](../web.md) to understand event ordering, authorization, lifecycle, and coverage, then deploy
+to real users.

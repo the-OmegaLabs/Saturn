@@ -1,7 +1,7 @@
-# 输入、表单与反馈
+# Inputs, Forms, and Feedback
 
-Saturn 的输入控件包括 TextField、Checkbox、Switch、Radio、RadioGroup、
-Slider 和 Dropdown。输入控件保存当前值，并通过回调通知应用。
+Saturn's input controls include TextField, Checkbox, Switch, Radio, RadioGroup,
+Slider, and Dropdown. Input controls hold the current value and notify the application through callbacks.
 
 ## TextField
 
@@ -16,21 +16,21 @@ name = saturn.TextField(
 page.add(name)
 ~~~
 
-常用参数包括：
+Common parameters include:
 
-- value：初始或当前文本；
-- label、hint_text：标签和占位提示；
-- password：用圆点隐藏输入；
-- multiline、min_lines、max_lines：多行输入；
-- read_only：显示但禁止编辑；
-- max_length：限制长度，-1 表示不限制；
-- input_filter：使用正则过滤输入；
-- autofocus：页面打开时尝试获取焦点。
+- value: the initial or current text;
+- label, hint_text: the label and placeholder hint;
+- password: hide the input with dots;
+- multiline, min_lines, max_lines: multi-line input;
+- read_only: display but disallow editing;
+- max_length: limit the length, -1 means unlimited;
+- input_filter: filter input with a regular expression;
+- autofocus: try to grab focus when the page opens.
 
-桌面输入由 SDL 和 Saturn 自己处理。keyboard_type 只支持有限的桌面值；
-移动端键盘、自动填充和部分 Flet 输入装饰参数没有对应实现。
+Desktop input is handled by SDL and Saturn itself. keyboard_type supports only a limited set of desktop values;
+mobile keyboards, autofill, and some Flet input decoration parameters have no corresponding implementation.
 
-## 选择控件
+## Selection controls
 
 ~~~python
 agree = saturn.Checkbox("I agree", on_change=lambda e: print(agree.value))
@@ -45,7 +45,7 @@ volume = saturn.Slider(
 page.add(agree, enabled, volume)
 ~~~
 
-Radio 应该放在 RadioGroup 中：
+Radios should be placed in a RadioGroup:
 
 ~~~python
 group = saturn.RadioGroup(
@@ -59,7 +59,7 @@ group = saturn.RadioGroup(
 page.add(group)
 ~~~
 
-Dropdown 使用 Option 或 DropdownOption：
+Dropdown uses Option or DropdownOption:
 
 ~~~python
 format_field = saturn.Dropdown(
@@ -74,13 +74,12 @@ format_field = saturn.Dropdown(
 page.add(format_field)
 ~~~
 
-Dropdown 的 editable、过滤和搜索功能只覆盖 Saturn 当前实现的桌面范围；
-需要自由编辑文本时，优先使用 TextField。
+Dropdown's editable, filtering, and search features only cover the desktop scope Saturn currently implements;
+when free-form text editing is needed, prefer TextField.
 
-## 表单校验
+## Form validation
 
-Saturn 不会替应用决定验证策略。可以在 on_change 中更新 error，或在提交
-时统一验证：
+Saturn does not decide the validation strategy for your application. You can update `error` in on_change, or validate everything together on submit:
 
 ~~~python
 def submit(event):
@@ -92,10 +91,10 @@ def submit(event):
     page.show_dialog(saturn.SnackBar("Submitted"))
 ~~~
 
-错误可以通过 TextField 的 error 参数、旁边的 Text 或 AlertDialog 表达。
-校验失败时不要依赖 disabled 作为唯一提示；让用户看到具体原因。
+Errors can be expressed through TextField's `error` parameter, a neighboring Text, or an AlertDialog.
+When validation fails, don't rely on `disabled` as the only hint; let users see the specific reason.
 
-## 对话框和 SnackBar
+## Dialogs and SnackBar
 
 ~~~python
 dialog = saturn.AlertDialog(
@@ -112,26 +111,26 @@ def ask_delete(event):
     page.show_dialog(dialog)
 ~~~
 
-AlertDialog 是模态覆盖层；SnackBar 是短暂的非阻塞反馈：
+AlertDialog is a modal overlay; SnackBar is brief, non-blocking feedback:
 
 ~~~python
 page.show_dialog(saturn.SnackBar("Saved", action="Undo", duration=3000))
 ~~~
 
-在回调中修改输入值或错误状态后，调用 input.update()；打开或关闭对话框
-使用 page.show_dialog() 和 page.pop_dialog()。
+After modifying an input value or error state in a callback, call input.update(); to open or close dialogs,
+use page.show_dialog() and page.pop_dialog().
 
-## 焦点和键盘
+## Focus and keyboard
 
-控件可以通过 autofocus 获取初始焦点，也可以在事件中调用 control.focus()。
-Page 的 on_keyboard_event 收到全局按键；TextField 获得焦点时优先处理文本、
-选择和提交。
+Controls can grab initial focus via autofocus, or call control.focus() inside an event.
+The Page's on_keyboard_event receives global key presses; when a TextField has focus, it handles text,
+selection, and submit first.
 
-将 page.disabled 设为 True 并调用 page.update()，会清除焦点并阻止控件和
-覆盖层的鼠标、键盘和输入法事件；重新启用时设为 False 并更新页面。
+Setting page.disabled to True and calling page.update() clears focus and blocks mouse, keyboard, and IME events for controls and
+overlays; to re-enable, set it to False and update the page.
 
-## 本章要点
+## Key points of this chapter
 
-输入控件是状态源，回调是校验和提交边界，AlertDialog 和 SnackBar 是反馈
-边界。详细参数与当前限制见 [TextField](../api/TextField.md)、
-[Dropdown](../api/Dropdown.md) 和 [Slider](../api/Slider.md)。
+Input controls are the source of state, callbacks are the validation and submission boundary, and AlertDialog and SnackBar are the feedback
+boundary. For detailed parameters and current limitations see [TextField](../api/TextField.md),
+[Dropdown](../api/Dropdown.md), and [Slider](../api/Slider.md).

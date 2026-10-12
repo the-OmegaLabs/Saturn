@@ -1,9 +1,9 @@
 # Material 3 Expressive
 
-Saturn.Compose 将 Material 3 Expressive 控件集中到一个命名空间。标准控件
-仍然可以从 saturn 顶层导入；新应用可以用 Compose 让意图更明显。
+Saturn.Compose gathers the Material 3 Expressive controls into one namespace. Standard controls
+can still be imported from the saturn top level; new applications can use Compose to make the intent clearer.
 
-## 使用 Compose
+## Using Compose
 
 ~~~python
 import saturn
@@ -21,21 +21,21 @@ def main(page: saturn.Page):
 saturn.run(main, backend=saturn.Renderer.OPENGL)
 ~~~
 
-Compose.Theme 是 MaterialExpressiveTheme。Compose.Button 和
-Compose.IconButton 启用尺寸、形状和状态变化；Compose 下的 FilledButton、
-OutlinedButton、TextButton 等变体默认使用 Expressive 的 small 尺寸。
+Compose.Theme is MaterialExpressiveTheme. Compose.Button and
+Compose.IconButton enable size, shape, and state variations; variants such as FilledButton,
+OutlinedButton, and TextButton under Compose use the Expressive small size by default.
 
-## 可用控件
+## Available controls
 
-Expressive 组包括：
+The Expressive group includes:
 
-- Button、IconButton、SplitButton 和 ButtonGroup；
-- ToggleButton 及其 Elevated、FilledTonal、Outlined 变体；
-- Small、Medium、Large、Extended FloatingActionButton；
-- ListItem、LoadingIndicator 和线性/圆形 WavyProgressIndicator；
-- FloatingToolbar 和 FloatingActionButtonMenu。
+- Button, IconButton, SplitButton, and ButtonGroup;
+- ToggleButton and its Elevated, FilledTonal, and Outlined variants;
+- Small, Medium, Large, and Extended FloatingActionButton;
+- ListItem, LoadingIndicator, and the linear/circular WavyProgressIndicator;
+- FloatingToolbar and FloatingActionButtonMenu.
 
-它们仍遵循普通 Saturn 控件的树、事件和 update 规则：
+They still follow the ordinary Saturn control rules for tree, events, and update:
 
 ~~~python
 menu = saturn.Compose.FloatingActionButtonMenu([
@@ -48,12 +48,12 @@ menu = saturn.Compose.FloatingActionButtonMenu([
 page.add(menu)
 ~~~
 
-LoadingIndicator 和波浪进度控件会请求动画帧；不可见控件和 Software 后端
-不会执行完整的 GPU 片段动画。
+LoadingIndicator and the wavy progress controls request animation frames; invisible controls and the Software backend
+do not run the full GPU fragment animations.
 
-## 与标准控件混用
+## Mixing with standard controls
 
-Compose 控件和普通 Text、TextField、ListView 可以放在同一棵树中：
+Compose controls and ordinary Text, TextField, and ListView can live in the same tree:
 
 ~~~python
 page.add(
@@ -62,11 +62,11 @@ page.add(
 )
 ~~~
 
-标准顶层的 Expressive 别名仍保留，用于迁移旧代码。新代码使用
-saturn.Compose.* 更容易区分标准 API 和扩展 API。
+The standard top-level Expressive aliases are kept for migrating old code. New code using
+saturn.Compose.* makes it easier to distinguish the standard API from the extension API.
 
-## 本章要点
+## Key points of this chapter
 
-Compose 是 Saturn 的命名空间，不是另一个运行时。先掌握标准控件和页面
-更新，再用 Expressive 提升状态动画与 Material 视觉表达。更多示例见
-[Expressive 指南](../expressive.md)。
+Compose is Saturn's namespace, not another runtime. Master the standard controls and page
+updates first, then use Expressive to elevate state animations and Material visual expression. For more examples see the
+[Expressive guide](../expressive.md).

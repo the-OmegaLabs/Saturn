@@ -1,9 +1,9 @@
-# 文件服务与资源
+# File Services and Assets
 
-Saturn 的服务通过 Page 显式注册。FilePicker 使用系统对话框选择文件、
-目录或保存路径；资源路径则由你的应用负责管理。
+Saturn's services are registered explicitly through the Page. FilePicker uses system dialogs to pick files,
+directories, or a save path; asset paths are managed by your application.
 
-## 注册 FilePicker
+## Registering a FilePicker
 
 ~~~python
 picker = saturn.FilePicker(on_result=self.file_picked)
@@ -11,11 +11,11 @@ page.services.append(picker)
 page.update()
 ~~~
 
-服务加入 page.services 后才拥有 Page。删除服务并更新页面会清除它的所有权。
+A service only owns a Page after being added to page.services. Removing the service and updating the page clears its ownership.
 
-## 选择文件
+## Picking files
 
-FilePicker 的操作是异步的：
+FilePicker's operations are asynchronous:
 
 ~~~python
 async def choose_image(event):
@@ -30,7 +30,7 @@ async def choose_image(event):
         selected.update()
 ~~~
 
-也可以通过 on_result 处理结果：
+You can also handle results through on_result:
 
 ~~~python
 def file_picked(event: saturn.FilePickerResultEvent):
@@ -38,10 +38,10 @@ def file_picked(event: saturn.FilePickerResultEvent):
         print(file.name, file.size, file.path)
 ~~~
 
-FilePickerFile 提供 id、name、size、path 和可选的 bytes。设置 with_data=True
-会把文件内容读入内存，只适合可控大小的文件。
+FilePickerFile provides id, name, size, path, and optional bytes. Setting with_data=True
+reads the file content into memory, which is only suitable for files of a manageable size.
 
-## 目录和保存
+## Directories and saving
 
 ~~~python
 directory = await picker.get_directory_path(
@@ -54,13 +54,13 @@ target = await picker.save_file(
 )
 ~~~
 
-upload() 在当前桌面服务中没有实现；应用需要自己把选择到的 path 交给
-HTTP 客户端或其他上传层。
+upload() is not implemented in the current desktop service; the application must hand the selected path to an
+HTTP client or another upload layer itself.
 
-## 图片和字体
+## Images and fonts
 
-Image 可以读取本地路径或 SVG。发布应用时不要假设当前工作目录，使用
-Path(__file__).parent 构造资源路径：
+Image can read local paths or SVG. When shipping an application, don't assume the current working directory; use
+Path(__file__).parent to construct asset paths:
 
 ~~~python
 from pathlib import Path
@@ -69,12 +69,12 @@ asset = Path(__file__).parent / "assets" / "logo.png"
 page.add(saturn.Image(str(asset), width=180, height=80))
 ~~~
 
-字体也建议使用绝对路径或基于模块文件的路径。相对路径在开发环境中方便，
-但从快捷方式、打包程序或服务启动时，工作目录可能不同。
+Fonts should also use absolute paths or paths based on the module file. Relative paths are convenient in a development environment,
+but when launched from a shortcut, a packager, or a service, the working directory may differ.
 
 ## Clipboard
 
-Clipboard 是异步服务，可以读写系统剪贴板：
+Clipboard is an asynchronous service that can read and write the system clipboard:
 
 ~~~python
 clipboard = saturn.Clipboard()
@@ -82,8 +82,8 @@ await clipboard.set("Copied from Saturn")
 value = await clipboard.get()
 ~~~
 
-## 本章要点
+## Key points of this chapter
 
-服务需要显式注册，文件操作可能阻塞或读入大量数据，资源路径应以应用文件
-位置为基础。完整接口见 [FilePicker](../api/FilePicker.md) 和
-[Page 指南](../page.md)。
+Services need explicit registration, file operations can block or read large amounts of data, and asset paths should be based on the application file
+location. For the full interfaces see [FilePicker](../api/FilePicker.md) and the
+[Page guide](../page.md).
