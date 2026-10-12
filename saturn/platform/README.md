@@ -1,54 +1,63 @@
-# Saturn 平台适配层
+# Saturn Platform Adapter Layer
 
-这里是 Saturn 与操作系统原生 API 之间的边界。核心 UI、窗口公开 API
-和渲染器只调用 `PlatformAdapter`，不应直接导入 Win32、X11、Wayland、D-Bus
-或平台动态库。
+This directory is the boundary between Saturn and the operating system's native
+APIs. The core UI, public window API, and renderers only call `PlatformAdapter`
+and must not import Win32, X11, Wayland, D-Bus, or platform dynamic libraries
+directly.
 
-## 目录
+## Layout
 
-| 文件 | 职责 |
+| File | Responsibility |
 | --- | --- |
-| `base.py` | 跨平台接口、能力表和无操作默认实现 |
-| `__init__.py` | 按运行时平台选择适配器并缓存实例 |
-| `windows.py` | DPI、窗口矩形、标题栏、模态 owner、模块监控和 Win32 resize hook |
-| `windows_native.py` | Win32 窗口样式、透明度、任务栏、拖拽、缩放和子类回调 |
-| `windows_gl.py` | WGL GPU affinity/association 和跨上下文呈现 |
-| `linux.py` | Linux 适配器占位，以及 `/proc` 模块快照 |
-| `other.py` | macOS、BSD、无显示器测试环境的安全回退 |
+| `base.py` | Cross-platform interface, capability table, and no-op default implementations |
+| `__init__.py` | Selects the adapter for the running platform and caches the instance |
+| `windows.py` | DPI, window rectangles, title bars, modal owners, module monitoring, and the Win32 resize hook |
+| `windows_native.py` | Win32 window styles, transparency, taskbar, drag-and-drop, resizing, and subclass callbacks |
+| `windows_gl.py` | WGL GPU affinity/association and cross-context presentation |
+| `linux.py` | Linux adapter placeholder plus `/proc` module snapshots |
+| `other.py` | Safe fallback for macOS, BSD, and headless test environments |
 
-## 使用方式
+## Usage
 
 ```python
 from saturn.platform import get_platform
 
 platform = get_platform()
 if platform.supports("window_frame_metrics"):
-    # 使用平台提供的原生窗口边框测量
+    # use platform-provided native window frame metrics
     ...
 ```
 
-功能要通过能力表查询，而不是在公共模块中判断 `sys.platform`。不支持的
-功能应返回空结果、使用 SDL 回退，或抛出带有平台说明的
-`NotImplementedError`；不能伪造原生成功。
+Features must be queried through the capability table instead of checking
+`sys.platform` in public modules. Unsupported features should return an empty
+result, fall back to SDL, or raise a `NotImplementedError` with a
+platform-specific explanation; never fake a native success.
 
-## Linux 接入顺序
+## Linux Integration Order
 
-Linux 的第一阶段只需要普通顶层窗口：SDL 窗口、输入、Software/OpenGL
-和基础 DPI/resize。之后再按显示协议拆成：
+The first Linux milestone only needs ordinary top-level windows: an SDL window,
+input, Software/OpenGL rendering, and basic DPI/resize handling. After that,
+split by display protocol:
 
 ```text
-saturn/platform/linux.py       通用 Linux 能力
-saturn/platform/linux_x11.py   X11/EWMH/ICCCM
+saturn/platform/linux.py          generic Linux capabilities
+saturn/platform/linux_x11.py      X11/EWMH/ICCCM
 saturn/platform/linux_wayland.py  Wayland/XDG
 ```
 
-面板、桌面背景和通知中心等 Shell 能力不应塞进普通窗口适配器，应在独立
-的 services/shell 层使用 layer-shell、D-Bus 和 xdg-desktop-portal。
+Shell capabilities such as panels, desktop backgrounds, and a notification
+center must not be crammed into the ordinary window adapter; they belong in a
+separate services/shell layer using layer-shell, D-Bus, and
+xdg-desktop-portal.
 
-## 新增平台能力的规则
+## Rules for Adding Platform Capabilities
 
-1. 在 `PlatformCapabilities` 增加能力标志，并在 `PlatformAdapter` 提供默认行为。
-2. 在对应平台文件实现行为；不要把原生库导入放到核心模块的顶层。
-3. 在 `Window`、`App` 或渲染器中只调用适配器方法。
-4. 为不支持该能力的平台保留软件/SDL 回退和明确错误。
-5. 至少运行 Software smoke test、`compileall` 和目标平台窗口生命周期测试。
+1. Add a capability flag to `PlatformCapabilities` and provide default behavior
+   in `PlatformAdapter`.
+2. Implement the behavior in the corresponding platform file; do not put native
+   library imports at the top level of core modules.
+3. Call adapter methods only from `Window`, `App`, or the renderers.
+4. Keep software/SDL fallbacks and clear errors for platforms that do not
+   support a capability.
+5. Run at least the Software smoke test, `compileall`, and the target
+   platform's window lifecycle tests.
