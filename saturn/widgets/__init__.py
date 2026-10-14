@@ -1,5 +1,5 @@
 """Widget modules re-exported here. Files fill in across milestones 6-9."""
-from .basic import Card, Icon, Image, ProgressBar, ProgressRing  # noqa: F401
+from .basic import Card, CircleAvatar, Icon, Image, Placeholder, ProgressBar, ProgressRing  # noqa: F401
 from .buttons import (Button, ElevatedButton, ExpressiveButton, FilledButton,  # noqa: F401
                       FilledTonalButton, IconButton, ExpressiveIconButton,
                       OutlinedButton, TextButton)

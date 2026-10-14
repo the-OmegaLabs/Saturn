@@ -480,7 +480,14 @@ class Window:
         return bool(self._native is not None and self._native.set_client_size(pixels))
 
     def _apply_limits(self):
+        # Applying SDL's native limits can synchronously trigger a resize.
+        # Preserve the size that was current before that resize so the
+        # follow-up SetWindowSize below restores it instead of accepting the
+        # temporary frame-size overshoot as a new target.
+        size = (self.width, self.height)
         frame = self._app._frame_size
+        if (self.title_bar_hidden or self.frameless) and frame == (0, 0):
+            frame = getattr(self._app, "_sdl_frame_size", frame)
         ratio = self._app.pixel_ratio
         def client(value, border, default):
             return default if value is None else max(1, round((value - border) * ratio))
@@ -502,7 +509,7 @@ class Window:
                     self._app._window.maximum_size = tuple(
                         value or 2147483647 for value in maximum)
             self._applied_limits = (minimum, maximum)
-        self._set_size(*self._normalize_size(self.width, self.height))
+        self._set_size(*self._normalize_size(*size))
 
     def _constrain_sizing(self, rect, edge):
         ratio = self._app.pixel_ratio

@@ -17,7 +17,8 @@ from .._gen.icons import Icons
 from ..control import Control, ControlOptions
 from ..event import fire
 from ..painting import draw_shadow
-from ..types import Alignment, AnimationCurve, Padding, as_padding
+from ..types import (Alignment, AnimationCurve, Padding, PopupMenuPosition,
+                     as_padding)
 from ._compat import value
 from ._material import (draw_state_layer, init_state_layer, press, release,
                         set_hover, tick_state_layer)
@@ -126,6 +127,14 @@ class _PopupMenuSurface(Control):
     def _find_scrollable(self, x, y):
         return None
 
+    def handle_event(self, event):
+        import pygame
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.owner._close_menu(cancelled=True)
+            return True
+        return False
+
 
 class PopupMenuButton(Control):
     """Material popup menu button (flet-compatible surface).
@@ -137,7 +146,9 @@ class PopupMenuButton(Control):
     def __init__(self, items=None, *, content=None, icon=None, icon_color=None,
                  icon_size=None, width=None, height=None, padding=None,
                  tooltip=None, bgcolor=None, elevation=8, on_opened=None,
-                 on_closed=None, **base: Unpack[ControlOptions]):
+                 on_closed=None, on_open=None, on_cancel=None, on_select=None,
+                 menu_position=PopupMenuPosition.OVER,
+                 **base: Unpack[ControlOptions]):
         base.setdefault("width", width)
         base.setdefault("height", height)
         super().__init__(tooltip=tooltip, **base)
@@ -151,6 +162,10 @@ class PopupMenuButton(Control):
         self.elevation = elevation
         self.on_opened = on_opened
         self.on_closed = on_closed
+        self.on_open = on_open
+        self.on_cancel = on_cancel
+        self.on_select = on_select
+        self.menu_position = menu_position
         self.open = False
         self._menu_closing = False
         self._menu_close_deadline = None
@@ -242,7 +257,7 @@ class PopupMenuButton(Control):
     # -- menu plumbing (mirrors Dropdown) -------------------------------------
     def _toggle_menu(self, e=None):
         if self.open:
-            self._close_menu()
+            self._close_menu(cancelled=True)
             return
         self.open = True
         self._menu_closing = False
@@ -255,10 +270,12 @@ class PopupMenuButton(Control):
         self._animate_internal("_menu_timeline", 1.0, motion.MEDIUM2,
                                AnimationCurve.LINEAR)
         self.update()
-        if self.on_opened is not None:
+        if self.on_open is not None:
+            fire(self, "open")
+        elif self.on_opened is not None:
             fire(self, "opened")
 
-    def _close_menu(self):
+    def _close_menu(self, *, cancelled=False):
         if not self.open or self._menu_closing:
             return
         self.open = False
@@ -270,6 +287,8 @@ class PopupMenuButton(Control):
         self._animate_internal("_menu_timeline", 0.0, motion.SHORT3,
                                AnimationCurve.LINEAR, now=now)
         self.update()
+        if cancelled and self.on_cancel is not None:
+            fire(self, "cancel")
         if self.on_closed is not None:
             fire(self, "closed")
 
@@ -294,11 +313,13 @@ class PopupMenuButton(Control):
         return super()._tick_animations(now) or waiting or closing
 
     def _barrier_click(self, e=None):
-        self._close_menu()
+        self._close_menu(cancelled=True)
 
     def _pick_item(self, item):
         self._close_menu()
         self.update()
+        if self.on_select is not None:
+            fire(self, "select", item)
         # PopupMenuItem objects are data holders, never attached to the tree,
         # so their handlers go through page._dispatch instead of fire().
         if item.on_click is not None and not item.disabled and self.page is not None:
@@ -337,8 +358,10 @@ class PopupMenuButton(Control):
         elif leading is not None:
             children.append(Icon(leading, size=24,
                                  color=colors.Colors.ON_SURFACE_VARIANT))
-        if item.content is not None:
+        if isinstance(item.content, Control):
             children.append(item.content)
+        elif item.content is not None:
+            children.append(Text(str(item.content)))
         elif item.text is not None:
             color = (colors.with_opacity(0.38, colors.Colors.ON_SURFACE)
                      if item.disabled else colors.Colors.ON_SURFACE)
@@ -367,9 +390,15 @@ class PopupMenuButton(Control):
         height = min(self._menu_surface._height,
                      max(0, self.page.height - 8))
         left = min(max(0, anchor_left), max(0, self.page.width - width))
-        top = anchor_bottom + 4
+        position = getattr(self.menu_position, "value", self.menu_position)
+        top = (anchor_top if position == PopupMenuPosition.OVER.value
+               else anchor_bottom + 4)
         if top + height > self.page.height:
-            top = max(0, anchor_top - height - 4)
+            above = anchor_top - height - 4
+            top = (above if above >= 0 else
+                   max(0, self.page.height - height))
+        elif top < 0:
+            top = max(0, anchor_bottom + 4)
         self._menu_surface._height = height
         self._menu_surface._place(left, top, width, height,
                                   self.page._app.renderer.scale)

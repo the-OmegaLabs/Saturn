@@ -72,6 +72,11 @@ class ScrollMode(enum.Enum):
     ALWAYS = "always"
 
 
+class PopupMenuPosition(enum.Enum):
+    OVER = "over"
+    UNDER = "under"
+
+
 class KeyboardType(enum.Enum):
     TEXT = "text"
     NUMBER = "number"

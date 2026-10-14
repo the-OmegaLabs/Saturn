@@ -8,7 +8,11 @@ if TYPE_CHECKING:
 import base64
 import io
 import math
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlsplit
+from urllib.request import urlopen
 from pathlib import Path
 
 import pygame
@@ -19,12 +23,24 @@ from .. import motion
 from ..animation import _cubic_bezier, ease
 from ..control import Control, ControlOptions
 from ..text import render_icon_cached
-from ..types import AnimationCurve, BoxFit
+from ..types import Alignment, AnimationCurve, BoxFit
 from ..types import as_padding
 from ._compat import value, reject_options, shape_radius, constrain
 
 ASSETS = Path(__file__).parent.parent / "assets"
 _img_cache: dict = {}
+_img_cache_lock = threading.Lock()
+_MAX_REMOTE_IMAGE_BYTES = 12 * 1024 * 1024
+_MAX_CACHED_REMOTE_IMAGES = 64
+_image_loader = ThreadPoolExecutor(max_workers=4, thread_name_prefix="saturn-image")
+
+
+def _fetch_image(url):
+    with urlopen(url, timeout=5) as response:
+        data = response.read(_MAX_REMOTE_IMAGE_BYTES + 1)
+    if len(data) > _MAX_REMOTE_IMAGE_BYTES:
+        raise ValueError("remote image exceeds the 12 MiB limit")
+    return data
 
 
 def _as_alpha_surface(surface: pygame.Surface) -> pygame.Surface:
@@ -147,9 +163,18 @@ class Image(Control):
         self._is_svg = False
         self._prepared_key = None
         self._prepared_surface = None
+        self._remote_key = None
+        self._remote_future = None
 
     def _children(self):
         return [self.error_content] if isinstance(self.error_content,Control) else []
+
+    def _remote_image_ready(self, future):
+        # Network work finishes on a worker thread. Reconcile and invalidate
+        # the control on Saturn's UI thread, where the control tree is owned.
+        page = self.page
+        if page is not None:
+            page._app.post(self.update)
 
     def _load(self):
         if self.src is None:
@@ -157,18 +182,36 @@ class Image(Control):
         key = self.src if isinstance(self.src, (str, bytes)) else id(self.src)
         if key == self._loaded_key:
             return self._surface
-        data = None
-        if isinstance(self.src, bytes):
-            data = self.src
-        elif isinstance(self.src, str) and self.src.startswith("data:"):
-            b64 = self.src.split(",", 1)[1]
-            data = base64.b64decode(b64)
         previous_svg = self._is_svg
-        self._is_svg = (str(self.src).lower().endswith(".svg") if data is None
-                        else b"<svg" in data[:2048].lower())
         try:
+            data = None
+            remote = isinstance(self.src, str) and self.src.startswith(("http://", "https://"))
+            if isinstance(self.src, bytes):
+                data = self.src
+            elif isinstance(self.src, str) and self.src.startswith("data:"):
+                data = base64.b64decode(self.src.split(",", 1)[1])
+            elif remote:
+                with _img_cache_lock:
+                    data = _img_cache.get(key)
+                if data is None:
+                    if self._remote_key != key:
+                        self._remote_key = key
+                        self._remote_future = _image_loader.submit(_fetch_image, key)
+                        self._remote_future.add_done_callback(self._remote_image_ready)
+                    if not self._remote_future.done():
+                        return self._surface if self.gapless_playback else None
+                    data = self._remote_future.result()
+                    with _img_cache_lock:
+                        if len(_img_cache) >= _MAX_CACHED_REMOTE_IMAGES:
+                            _img_cache.pop(next(iter(_img_cache)))
+                        _img_cache[key] = data
+            self._is_svg = (str(self.src).lower().endswith(".svg") if data is None
+                            else b"<svg" in data[:2048].lower())
             if data is not None:
-                s = pygame.image.load(io.BytesIO(data), ".svg" if self._is_svg else "")
+                namehint = ".svg" if self._is_svg else ""
+                if remote and not self._is_svg:
+                    namehint = Path(urlsplit(self.src).path).suffix
+                s = pygame.image.load(io.BytesIO(data), namehint)
             else:
                 s = pygame.image.load(self.src)
         except (pygame.error, OSError, ValueError):
@@ -306,6 +349,116 @@ class Image(Control):
                 self._effects_end(r)
 
     __unsupported_parameters__ = {"color_blend_mode", "fade_in_animation", "placeholder_fade_out_animation"}
+
+
+class CircleAvatar(Container):
+    """Circular avatar surface with optional content or image."""
+
+    def __init__(self, content=None, *, foreground_image_src=None,
+                 background_image_src=None, color=None, bgcolor=None,
+                 radius=None, min_radius=None, max_radius=None,
+                 on_image_error=None, **base: Unpack[ControlOptions]):
+        from .text import Text
+
+        width = base.pop("width", None)
+        height = base.pop("height", None)
+        if radius is not None:
+            width = height = float(radius) * 2
+        elif width is None and height is None:
+            size = 2 * (min_radius if min_radius is not None else 20)
+            if max_radius is not None:
+                size = min(size, 2 * max_radius)
+            width = height = size
+        elif width is None:
+            width = height
+        elif height is None:
+            height = width
+        size = min(float(width), float(height))
+
+        image_src = foreground_image_src or background_image_src
+        if image_src is not None:
+            avatar_content = Image(
+                image_src,
+                fit=BoxFit.COVER,
+                border_radius=size / 2,
+                width=width,
+                height=height,
+                placeholder_src=background_image_src,
+            )
+        elif isinstance(content, str):
+            avatar_content = Text(content, color=color)
+        else:
+            avatar_content = content
+
+        super().__init__(
+            avatar_content,
+            width=width,
+            height=height,
+            bgcolor=bgcolor or colors.Colors.PRIMARY,
+            shape="circle",
+            clip_behavior="antiAlias",
+            alignment=Alignment.CENTER,
+            **base,
+        )
+        self.color = color
+        self.foreground_image_src = foreground_image_src
+        self.background_image_src = background_image_src
+        self.on_image_error = on_image_error
+
+
+class Placeholder(Control):
+    """Outlined placeholder box with diagonal guides."""
+
+    def __init__(self, content=None, *, color=colors.Colors.BLUE_GREY_700,
+                 fallback_height=400, fallback_width=400,
+                 stroke_width=2, **base: Unpack[ControlOptions]):
+        super().__init__(**base)
+        self.content = content
+        self.color = color
+        self.fallback_height = float(fallback_height)
+        self.fallback_width = float(fallback_width)
+        self.stroke_width = 2 if stroke_width is None else float(stroke_width)
+
+    def _children(self):
+        return [self.content] if isinstance(self.content, Control) else []
+
+    def _intrinsic(self, max_w, max_h, scale):
+        width = self._width if self._width is not None else self.fallback_width
+        height = self._height if self._height is not None else self.fallback_height
+        if self._width is None and max_w is not None and math.isfinite(max_w):
+            width = max(0, max_w)
+        if self._height is None and max_h is not None and math.isfinite(max_h):
+            height = max(0, max_h)
+        if max_w is not None:
+            width = min(width, max_w)
+        if max_h is not None:
+            height = min(height, max_h)
+        return width, height
+
+    def _place(self, x, y, w, h, scale):
+        self._rect = (x, y, w, h)
+        if isinstance(self.content, Control):
+            cw, ch = self.content._intrinsic(w, h, scale)
+            self.content._place(x + (w - cw) / 2, y + (h - ch) / 2,
+                                cw, ch, scale)
+
+    def _draw(self, r, x, y):
+        _, _, width, height = self._rect
+        color = colors.parse_color(self.color)
+        r.stroke_rect(x, y, width, height, color, width=self.stroke_width)
+        r.line(x, y, x + width, y + height, color, width=self.stroke_width)
+        r.line(x + width, y, x, y + height, color, width=self.stroke_width)
+
+    def _draw_all(self, r, ox=0, oy=0):
+        if not self.visible:
+            return
+        self._effects_begin(r, ox, oy)
+        try:
+            self._draw(r, self._rect[0] + ox, self._rect[1] + oy)
+            if isinstance(self.content, Control):
+                self.content._draw_all(r, ox, oy)
+        finally:
+            self._effects_end(r)
 
 
 class Card(Container):

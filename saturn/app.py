@@ -99,6 +99,11 @@ class App:
         self._outer_size = [800, 600]
         self._size = list(self._outer_size)
         self._frame_size = (0, 0)
+        # SDL keeps the original window style when translating its minimum
+        # and maximum client sizes.  A hidden title bar changes the native
+        # client/outer frame to zero, but SDL still needs the frame measured
+        # at creation time for those limit values.
+        self._sdl_frame_size = (0, 0)
         self._title = title
         self._dirty = threading.Event()
         self._closed = threading.Event()
@@ -194,6 +199,7 @@ class App:
         self._refresh_rate = _system_refresh_rate()
         self._apply_default_window_icon()
         self._frame_size = self._measure_frame_size()
+        self._sdl_frame_size = self._frame_size
         client = self.client_size_for_outer(*self._outer_size)
         pixel_client = self.physical_size_for_logical(*client)
         if tuple(self._window.size) != pixel_client:
