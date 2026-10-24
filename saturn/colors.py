@@ -192,14 +192,9 @@ def parse_color(value) -> tuple[int, int, int, int]:
     raise ValueError(f"cannot parse color: {value!r}")
 
 
-def with_opacity(opacity: float, color) -> str:
+def with_opacity(opacity: float, color: str | int | tuple[int, ...] | list[int]) -> str:
     """Return `color` at the given opacity as #AARRGGBB
     (parse_color reads it back)."""
     r, g, b, _ = parse_color(color)
     a = round(max(0.0, min(1.0, opacity)) * 255)
     return f"#{a:02X}{r:02X}{g:02X}{b:02X}"
-
-
-# Attach the opacity helper outside the generated Colors enum.
-# Enum classes accept new non-member attributes.
-Colors.with_opacity = staticmethod(with_opacity)

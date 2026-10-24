@@ -653,3 +653,10 @@ class Colors(str, enum.Enum):
     YELLOW_ACCENT_200 = "yellowaccent200"
     YELLOW_ACCENT_400 = "yellowaccent400"
     YELLOW_ACCENT_700 = "yellowaccent700"
+
+    @staticmethod
+    def with_opacity(opacity: float, color: str | int | tuple[int, ...] | list[int]) -> str:
+        """Return the color with opacity applied as #AARRGGBB."""
+        from ..colors import with_opacity
+
+        return with_opacity(opacity, color)

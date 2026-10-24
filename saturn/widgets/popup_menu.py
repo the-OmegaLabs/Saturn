@@ -27,8 +27,10 @@ from .basic import Icon
 from .containers import Container, Row
 from .text import Text
 
-_ITEM_PAD = 12.0
+_ITEM_PAD = 12.0  # flet: menu items are inset 12px (ListTile horizontal padding)
 _MIN_MENU_WIDTH = 112.0
+_ITEM_GAP = 8.0   # breathing room above the first row and below the last row
+_ICON_GAP = 15.0  # leading icon -> text gap in flet's menu rows
 
 
 class PopupMenuItem(Control):
@@ -43,7 +45,9 @@ class PopupMenuItem(Control):
         self.icon = icon
         self.leading = leading
         self.trailing = trailing
-        self.height = 40 if height is None else float(height)
+        # flet's default item height is kMinInteractiveDimension (48)
+        self.height = 48 if height is None else float(height)
+        self._height_explicit = height is not None
         self.on_click = on_click
         self.disabled = bool(disabled)
         self.checked = checked
@@ -68,7 +72,8 @@ class _PopupMenuSurface(Control):
 
     def _place(self, x, y, w, h, scale):
         self._rect = (x, y, w, h)
-        cursor = y
+        # flet pads the menu surface 8px top and bottom; rows touch each other
+        cursor = y + _ITEM_GAP
         for item in self.items:
             item._place(x, cursor, w, item.height, scale)
             cursor += item.height
@@ -329,8 +334,15 @@ class PopupMenuButton(Control):
         width = max(_MIN_MENU_WIDTH, self._rect[2])
         for item in self.items:
             width = max(width, self._item_width(item))
+        # flet renders an empty PopupMenuItem() as a Divider that keeps the
+        # row's declared height; default empty items stay at the menu's
+        # normal row height, not a 48px ListTile.
+        for item in self.items:
+            if self._is_divider(item) and not item._height_explicit:
+                item.height = 24.0
         rows = [self._item_row(item) for item in self.items]
-        height = sum(item.height for item in self.items)
+        # flet lays menu items out with vertical padding between them
+        height = sum(item.height for item in self.items) + _ITEM_GAP * 2
         self._menu = rows
         self._menu_surface = _PopupMenuSurface(self, rows, width, height)
         self._menu_surface._attach(page, None)
@@ -345,12 +357,32 @@ class PopupMenuButton(Control):
             needed += content._intrinsic(None, None, 1.0)[0]
         for part in (item.leading, item.icon, item.trailing):
             if isinstance(part, Control):
-                needed += part._intrinsic(None, None, 1.0)[0] + 12.0
+                needed += part._intrinsic(None, None, 1.0)[0] + _ICON_GAP
             elif part is not None:
-                needed += 24.0 + 12.0
+                needed += 24.0 + _ICON_GAP
         return needed
 
+    @staticmethod
+    def _is_divider(item):
+        return (item.text is None and item.content is None
+                and item.icon is None and item.leading is None
+                and item.trailing is None and item.checked is None)
+
     def _item_row(self, item):
+        # flet adds 8px above the first row and below the last one (the menu's
+        # vertical padding); rows themselves touch, so the divider sits tight
+        # against its neighbours rather than floating in an empty band.
+        if self._is_divider(item):
+            # A PopupMenuItem() without text/icon/content is a Divider, tinted
+            # with the outline role (outline_variant is invisible on dark).
+            return Container(
+                height=item.height,
+                padding=Padding(_ITEM_PAD, 0, _ITEM_PAD, 0),
+                alignment=Alignment.CENTER,
+                disabled=True,
+                content=Container(height=1,
+                                  bgcolor=colors.Colors.OUTLINE),
+            )
         leading = item.leading or item.icon
         children = []
         if isinstance(leading, Control):
@@ -370,7 +402,7 @@ class PopupMenuButton(Control):
             children.append(item.trailing if isinstance(item.trailing, Control)
                             else Icon(item.trailing or Icons.CHECK, size=24,
                                       color=colors.Colors.ON_SURFACE))
-        return Container(Row(*children, spacing=12),
+        return Container(Row(*children, spacing=_ICON_GAP),
                          height=item.height,
                          padding=Padding(_ITEM_PAD, 0, _ITEM_PAD, 0),
                          alignment=Alignment.CENTER_LEFT, border_radius=4,

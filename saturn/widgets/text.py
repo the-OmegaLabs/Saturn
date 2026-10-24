@@ -370,15 +370,19 @@ class Text(Control):
                 r.fill_rect(x + ox + left, y, right - left, self._line_h,
                             colors.parse_color(colors.with_opacity(.35, colors.Colors.PRIMARY)))
             if getattr(self.text_align, "value", self.text_align) == "justify" and row < len(self._lines) - 1 and " " in line:
+                line_surf = render_line_cached(line, self.size, color=color, **self._style(r.scale))
+                line_y = y + (self._line_h - line_surf.get_height() / r.scale) / 2
                 index = 0
                 for word in line.split(" "):
                     wx = self._line_position(line, index, w, r.scale, row)
                     surf = render_line_cached(word, self.size, color=color, **self._style(r.scale))
-                    r.blit_cached(surf, x + wx, y)
+                    r.blit_cached(surf, x + wx, line_y)
                     index += len(word) + 1
             else:
                 surf = render_line_cached(line, self.size, color=color, **self._style(r.scale))
-                r.blit_cached(surf, x + ox, y)
+                # Split the line box's extra leading above and below the
+                # font raster instead of leaving it all below the text.
+                r.blit_cached(surf, x + ox, y + (self._line_h - surf.get_height() / r.scale) / 2)
             if self.selectable and self.show_selection_cursor and self._focused and start <= self._caret <= end:
                 left = self._line_position(original, self._caret - start, w, r.scale, row)
                 ch = self.selection_cursor_height or self._line_h

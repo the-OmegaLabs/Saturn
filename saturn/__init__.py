@@ -146,6 +146,11 @@ from .widgets import (
     Text,
     TextField,
     TextButton,
+    Markdown,
+    MarkdownCodeTheme,
+    MarkdownCustomCodeTheme,
+    MarkdownExtensionSet,
+    MarkdownStyleSheet,
 )
 from .compose import Compose
 
@@ -165,7 +170,7 @@ __all__ = [
     "TextSelection", "TextAffinity", "InputFilter", "NumbersOnlyInputFilter",
     "InputBorder", "TextCapitalization",
     "Colors", "Icons", "parse_color",
-    "Control", "Page", "Window", "Text", "Row", "Column", "Container",
+    "Control", "Page", "Window", "Text", "Markdown", "Row", "Column", "Container",
     "CircleAvatar", "Placeholder", "PopupMenuPosition",
     "Stack", "Divider", "VerticalDivider", "WindowDragArea", "Icon", "Image", "Card", "ProgressBar", "ProgressRing",
     "Button", "ElevatedButton", "FilledButton", "FilledTonalButton", "OutlinedButton",
@@ -199,6 +204,8 @@ __all__ = [
     "OutlineInputBorder",
     "Rotate", "Scale", "TextAlign", "Theme", "ThemeMode", "TextOverflow", "TextStyle",
     "Tooltip", "TooltipTriggerMode",
+    "MarkdownCodeTheme", "MarkdownCustomCodeTheme", "MarkdownExtensionSet",
+    "MarkdownStyleSheet",
 ]
 __version__ = "0.1.0"
 

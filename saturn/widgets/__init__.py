@@ -26,3 +26,5 @@ from .toggle_button import (ToggleButton, ElevatedToggleButton,  # noqa: F401
                             FilledTonalToggleButton, OutlinedToggleButton)
 from .scrolling import GestureDetector, ListView  # noqa: F401
 from .text import Text  # noqa: F401
+from .markdown import (Markdown, MarkdownCodeTheme, MarkdownCustomCodeTheme,
+                       MarkdownExtensionSet, MarkdownStyleSheet)  # noqa: F401

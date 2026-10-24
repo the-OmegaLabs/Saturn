@@ -10,6 +10,7 @@ dependencies = [
     "pyperclip>=1.11.0",
     "pygame-ce>=2.5.8",
     "numpy>=2.2.6",
+    "markdown-it-py>=4.0.0",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
